@@ -1,0 +1,16 @@
+object frmMain: TfrmMain
+  Left = 449
+  Height = 774
+  Top = 250
+  Width = 1158
+  Caption = 'frmMain'
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  OnPaint = FormPaint
+  LCLVersion = '1.8.4.0'
+  object ApplicationProperties1: TApplicationProperties
+    OnIdle = ApplicationProperties1Idle
+    left = 80
+    top = 32
+  end
+end

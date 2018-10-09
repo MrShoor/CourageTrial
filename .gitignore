@@ -64,3 +64,10 @@ __recovery/
 
 # Castalia statistics file (since XE7 Castalia is distributed with Delphi)
 *.stat
+/backup
+/bin
+/lib/x86_64-win64
+/res_src/Gop
+/res_src
+/shaders/!Out
+/shaders/nbproject
