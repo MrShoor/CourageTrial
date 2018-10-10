@@ -1,5 +1,5 @@
 CC=apcc
-ShaderName=shaders
+ShaderName=CT_shaders
 
 all:
 	$(CC) $(ShaderName).json

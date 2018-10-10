@@ -1,4 +1,0 @@
-DX_avMesh RCDATA "!Out\DX_avMesh.hlsl"
-DX_shadows RCDATA "!Out\DX_shadows.hlsl"
-DX_Grid RCDATA "!Out\DX_Grid.hlsl"
-DX_Lighting_render_clusters RCDATA "!Out\DX_Lighting_render_clusters.hlsl"
