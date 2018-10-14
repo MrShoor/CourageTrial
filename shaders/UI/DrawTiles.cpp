@@ -46,6 +46,6 @@ struct PS_Out {
 PS_Out PS(VS_Out In) {
     PS_Out Out;
     Out.Color = In.Color;    
-    Out.Color.a = pow(Out.Color.a, 4);
+    Out.Color.a = pow(Out.Color.a, 1);
     return Out;
 }

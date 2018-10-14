@@ -16,6 +16,9 @@ type
     procedure ApplicationProperties1Idle(Sender: TObject; var Done: Boolean);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure FormMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
     procedure FormPaint(Sender: TObject);
   private
     FMain: TavMainRender;
@@ -64,6 +67,22 @@ end;
 procedure TfrmMain.FormDestroy(Sender: TObject);
 begin
   FreeAndNil(FMain);
+end;
+
+procedure TfrmMain.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  FRoom.KeyPress(Key);
+end;
+
+procedure TfrmMain.FormMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var btnIdx: Integer;
+begin
+  case Button of
+    mbLeft : btnIdx := 0;
+    mbMiddle : btnIdx := 1;
+    mbRight : btnIdx := 2;
+  end;
+  FRoom.MouseClick(btnIdx, x, y);
 end;
 
 procedure TfrmMain.FormPaint(Sender: TObject);

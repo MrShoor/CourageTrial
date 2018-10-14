@@ -6,8 +6,10 @@ object frmMain: TfrmMain
   Caption = 'frmMain'
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnKeyDown = FormKeyDown
+  OnMouseDown = FormMouseDown
   OnPaint = FormPaint
-  LCLVersion = '1.8.4.0'
+  LCLVersion = '1.8.0.3'
   object ApplicationProperties1: TApplicationProperties
     OnIdle = ApplicationProperties1Idle
     left = 80

@@ -103,7 +103,7 @@
         <PackageName Value="LCL"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="3">
+    <Units Count="5">
       <Unit0>
         <Filename Value="CT.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -121,6 +121,16 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="untLevel"/>
       </Unit2>
+      <Unit3>
+        <Filename Value="untenemies.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="untEnemies"/>
+      </Unit3>
+      <Unit4>
+        <Filename Value="untgraphics.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="untGraphics"/>
+      </Unit4>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

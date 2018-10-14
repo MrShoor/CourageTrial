@@ -4,13 +4,13 @@
     <PathDelim Value="\"/>
     <Version Value="10"/>
     <BuildModes Active="Debug"/>
-    <Units Count="18">
+    <Units Count="29">
       <Unit0>
         <Filename Value="CT.lpr"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <CursorPos X="72" Y="17"/>
-        <UsageCount Value="35"/>
+        <CursorPos X="3" Y="3"/>
+        <UsageCount Value="56"/>
       </Unit0>
       <Unit1>
         <Filename Value="untmain.pas"/>
@@ -19,8 +19,9 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="untMain"/>
-        <CursorPos X="52" Y="55"/>
-        <UsageCount Value="35"/>
+        <TopLine Value="63"/>
+        <CursorPos X="34" Y="75"/>
+        <UsageCount Value="56"/>
         <Loaded Value="True"/>
         <LoadedDesigner Value="True"/>
       </Unit1>
@@ -28,76 +29,74 @@
         <Filename Value="untlevel.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="untLevel"/>
-        <IsVisibleTab Value="True"/>
         <EditorIndex Value="1"/>
-        <TopLine Value="563"/>
-        <CursorPos X="40" Y="572"/>
-        <UsageCount Value="35"/>
+        <TopLine Value="546"/>
+        <CursorPos X="13" Y="577"/>
+        <UsageCount Value="56"/>
         <Loaded Value="True"/>
       </Unit2>
       <Unit3>
         <Filename Value="..\BackTerria\Src\bWorld.pas"/>
         <EditorIndex Value="5"/>
-        <TopLine Value="452"/>
-        <CursorPos X="59" Y="493"/>
-        <UsageCount Value="16"/>
+        <TopLine Value="75"/>
+        <CursorPos X="5" Y="214"/>
+        <UsageCount Value="26"/>
         <Loaded Value="True"/>
       </Unit3>
       <Unit4>
         <Filename Value="..\AvalancheProject\Common\avtess.pas"/>
         <UnitName Value="avTess"/>
-        <EditorIndex Value="7"/>
+        <EditorIndex Value="-1"/>
         <CursorPos X="26" Y="12"/>
-        <UsageCount Value="15"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="25"/>
       </Unit4>
       <Unit5>
         <Filename Value="..\AvalancheProject\Utils\avcontnrs.pas"/>
         <UnitName Value="avContnrs"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="2334"/>
-        <CursorPos X="26" Y="2372"/>
-        <UsageCount Value="9"/>
+        <TopLine Value="1930"/>
+        <CursorPos Y="1949"/>
+        <UsageCount Value="16"/>
       </Unit5>
       <Unit6>
         <Filename Value="..\AvalancheProject\Common\avres.pas"/>
         <UnitName Value="avRes"/>
-        <EditorIndex Value="2"/>
-        <TopLine Value="466"/>
-        <CursorPos X="3" Y="490"/>
-        <UsageCount Value="14"/>
-        <Loaded Value="True"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="57"/>
+        <CursorPos X="3" Y="89"/>
+        <UsageCount Value="24"/>
       </Unit6>
       <Unit7>
         <Filename Value="..\AvalancheProject\Common\avbase.pas"/>
         <UnitName Value="avBase"/>
-        <EditorIndex Value="3"/>
-        <CursorPos X="33" Y="35"/>
-        <UsageCount Value="12"/>
+        <IsVisibleTab Value="True"/>
+        <EditorIndex Value="2"/>
+        <TopLine Value="275"/>
+        <CursorPos X="28" Y="291"/>
+        <UsageCount Value="22"/>
         <Loaded Value="True"/>
       </Unit7>
       <Unit8>
         <Filename Value="..\BackTerria\Src\blights.pas"/>
         <UnitName Value="bLights"/>
-        <EditorIndex Value="6"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="784"/>
         <CursorPos X="36" Y="793"/>
-        <UsageCount Value="11"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="21"/>
       </Unit8>
       <Unit9>
         <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="264"/>
-        <CursorPos X="105" Y="287"/>
-        <UsageCount Value="10"/>
+        <TopLine Value="233"/>
+        <CursorPos X="16" Y="258"/>
+        <UsageCount Value="15"/>
       </Unit9>
       <Unit10>
         <Filename Value="..\AvalancheProject\Common\avtexloader.pas"/>
         <UnitName Value="avTexLoader"/>
         <EditorIndex Value="-1"/>
         <CursorPos X="21" Y="4"/>
-        <UsageCount Value="9"/>
+        <UsageCount Value="7"/>
       </Unit10>
       <Unit11>
         <Filename Value="..\AvalancheProject\Common\avmodel.pas"/>
@@ -105,29 +104,29 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="700"/>
         <CursorPos X="27" Y="713"/>
-        <UsageCount Value="9"/>
+        <UsageCount Value="7"/>
       </Unit11>
       <Unit12>
         <Filename Value="..\AvalancheProject\Utils\mutils.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="221"/>
         <CursorPos X="17" Y="243"/>
-        <UsageCount Value="9"/>
+        <UsageCount Value="7"/>
       </Unit12>
       <Unit13>
         <Filename Value="..\AvalancheProject\Common\avcontext.pas"/>
         <UnitName Value="avContext"/>
-        <EditorIndex Value="4"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="146"/>
         <CursorPos X="15" Y="170"/>
-        <UsageCount Value="13"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="23"/>
       </Unit13>
       <Unit14>
         <Filename Value="..\AvalancheProject\Common\avtypes.pas"/>
         <UnitName Value="avTypes"/>
         <EditorIndex Value="-1"/>
-        <UsageCount Value="9"/>
+        <CursorPos X="6" Y="16"/>
+        <UsageCount Value="17"/>
       </Unit14>
       <Unit15>
         <Filename Value="..\AvalancheProject\Common\avcameracontroller.pas"/>
@@ -135,15 +134,15 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="24"/>
         <CursorPos X="10" Y="31"/>
-        <UsageCount Value="9"/>
+        <UsageCount Value="7"/>
       </Unit15>
       <Unit16>
         <Filename Value="..\AvalancheProject\Utils\avpathfinder.pas"/>
         <UnitName Value="avPathFinder"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="12"/>
-        <CursorPos X="22" Y="36"/>
-        <UsageCount Value="9"/>
+        <TopLine Value="321"/>
+        <CursorPos Y="330"/>
+        <UsageCount Value="17"/>
       </Unit16>
       <Unit17>
         <Filename Value="..\AvalancheProject\Common\avcontext_dx11.pas"/>
@@ -151,129 +150,225 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="1908"/>
         <CursorPos X="24" Y="1914"/>
-        <UsageCount Value="11"/>
+        <UsageCount Value="9"/>
       </Unit17>
+      <Unit18>
+        <Filename Value="..\AvalancheProject\Utils\intfutils.pas"/>
+        <UnitName Value="intfUtils"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="17"/>
+        <CursorPos X="3" Y="41"/>
+        <UsageCount Value="17"/>
+      </Unit18>
+      <Unit19>
+        <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\inc\objpash.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="221"/>
+        <CursorPos X="58" Y="248"/>
+        <UsageCount Value="8"/>
+      </Unit19>
+      <Unit20>
+        <Filename Value="..\AvalancheProject\Utils\avcontnrsdefaults.pas"/>
+        <UnitName Value="avContnrsDefaults"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="7"/>
+        <CursorPos X="43" Y="30"/>
+        <UsageCount Value="17"/>
+      </Unit20>
+      <Unit21>
+        <Filename Value="untenemies.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="untEnemies"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="61"/>
+        <CursorPos X="33" Y="93"/>
+        <UsageCount Value="30"/>
+      </Unit21>
+      <Unit22>
+        <Filename Value="..\AvalancheProject\Common\avcontrols.pas"/>
+        <UnitName Value="avControls"/>
+        <EditorIndex Value="-1"/>
+        <CursorPos X="30" Y="25"/>
+        <UsageCount Value="10"/>
+      </Unit22>
+      <Unit23>
+        <Filename Value="..\AvalancheProject\Common\avminicontrols.pas"/>
+        <UnitName Value="avMiniControls"/>
+        <EditorIndex Value="-1"/>
+        <UsageCount Value="10"/>
+      </Unit23>
+      <Unit24>
+        <Filename Value="..\AvalancheProject\Common\avcanvas.pas"/>
+        <UnitName Value="avCanvas"/>
+        <EditorIndex Value="6"/>
+        <TopLine Value="202"/>
+        <CursorPos X="24" Y="207"/>
+        <UsageCount Value="11"/>
+        <Loaded Value="True"/>
+      </Unit24>
+      <Unit25>
+        <Filename Value="..\BackTerria\Src\bgraphicalobjects.pas"/>
+        <UnitName Value="bGraphicalObjects"/>
+        <EditorIndex Value="4"/>
+        <TopLine Value="12"/>
+        <CursorPos X="10" Y="15"/>
+        <UsageCount Value="11"/>
+        <Loaded Value="True"/>
+      </Unit25>
+      <Unit26>
+        <Filename Value="..\BackTerria\Src\bminiparticles.pas"/>
+        <UnitName Value="bMiniParticles"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="9"/>
+        <CursorPos X="3" Y="45"/>
+        <UsageCount Value="10"/>
+      </Unit26>
+      <Unit27>
+        <Filename Value="..\BackTerria\Src\bpostprocess.pas"/>
+        <UnitName Value="bPostProcess"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="62"/>
+        <CursorPos X="13" Y="91"/>
+        <UsageCount Value="10"/>
+      </Unit27>
+      <Unit28>
+        <Filename Value="untgraphics.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="untGraphics"/>
+        <EditorIndex Value="3"/>
+        <TopLine Value="24"/>
+        <CursorPos X="22" Y="29"/>
+        <UsageCount Value="21"/>
+        <Loaded Value="True"/>
+      </Unit28>
     </Units>
     <JumpHistory Count="30" HistoryIndex="29">
       <Position1>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="24" Column="15"/>
+        <Filename Value="..\AvalancheProject\Common\avcanvas.pas"/>
+        <Caret Line="418" Column="15" TopLine="401"/>
       </Position1>
       <Position2>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="183" Column="45" TopLine="177"/>
+        <Filename Value="..\AvalancheProject\Common\avcanvas.pas"/>
+        <Caret Line="1569" Column="19" TopLine="1555"/>
       </Position2>
       <Position3>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="37" Column="15"/>
+        <Filename Value="..\BackTerria\Src\bgraphicalobjects.pas"/>
+        <Caret Line="70" Column="27" TopLine="42"/>
       </Position3>
       <Position4>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="229" Column="45" TopLine="223"/>
+        <Filename Value="untgraphics.pas"/>
+        <Caret Line="14" Column="27"/>
       </Position4>
       <Position5>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="228" Column="37" TopLine="205"/>
+        <Filename Value="untgraphics.pas"/>
+        <Caret Line="20" Column="42"/>
       </Position5>
       <Position6>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="139" Column="27" TopLine="118"/>
+        <Filename Value="untgraphics.pas"/>
+        <Caret Line="17" Column="14"/>
       </Position6>
       <Position7>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="627" Column="44" TopLine="596"/>
+        <Filename Value="..\BackTerria\Src\bgraphicalobjects.pas"/>
+        <Caret Line="16" Column="3"/>
       </Position7>
       <Position8>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="137" Column="21" TopLine="107"/>
+        <Filename Value="..\BackTerria\Src\bWorld.pas"/>
+        <Caret Line="61" Column="20" TopLine="50"/>
       </Position8>
       <Position9>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="568" Column="16" TopLine="556"/>
+        <Filename Value="..\BackTerria\Src\bWorld.pas"/>
+        <Caret Line="656" Column="3" TopLine="654"/>
       </Position9>
       <Position10>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="269" Column="18" TopLine="238"/>
+        <Filename Value="..\BackTerria\Src\bgraphicalobjects.pas"/>
+        <Caret Line="31" Column="18"/>
       </Position10>
       <Position11>
-        <Filename Value="..\BackTerria\Src\bWorld.pas"/>
-        <Caret Line="53" Column="19" TopLine="70"/>
+        <Filename Value="..\BackTerria\Src\bgraphicalobjects.pas"/>
+        <Caret Line="63" Column="3" TopLine="44"/>
       </Position11>
       <Position12>
-        <Filename Value="..\BackTerria\Src\bWorld.pas"/>
-        <Caret Line="493" Column="59" TopLine="452"/>
+        <Filename Value="..\BackTerria\Src\bgraphicalobjects.pas"/>
+        <Caret Line="31" Column="18" TopLine="12"/>
       </Position12>
       <Position13>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="269" Column="16" TopLine="255"/>
+        <Filename Value="..\BackTerria\Src\bgraphicalobjects.pas"/>
+        <Caret Line="63" Column="3" TopLine="44"/>
       </Position13>
       <Position14>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="485" Column="22" TopLine="478"/>
+        <Filename Value="untgraphics.pas"/>
+        <Caret Line="31" Column="3"/>
       </Position14>
       <Position15>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="527" TopLine="487"/>
+        <Filename Value="..\AvalancheProject\Common\avcanvas.pas"/>
+        <Caret Line="405" Column="14" TopLine="386"/>
       </Position15>
       <Position16>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
+        <Filename Value="untgraphics.pas"/>
+        <Caret Line="40" Column="14" TopLine="4"/>
       </Position16>
       <Position17>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="485" Column="25" TopLine="444"/>
+        <Filename Value="untgraphics.pas"/>
+        <Caret Line="30" Column="35" TopLine="10"/>
       </Position17>
       <Position18>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="527" Column="45" TopLine="487"/>
+        <Filename Value="untgraphics.pas"/>
+        <Caret Line="23" Column="17" TopLine="4"/>
       </Position18>
       <Position19>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="116" Column="12" TopLine="103"/>
+        <Filename Value="untlevel.pas"/>
+        <Caret Line="220" Column="27" TopLine="208"/>
       </Position19>
       <Position20>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="280" Column="20" TopLine="239"/>
+        <Filename Value="untlevel.pas"/>
       </Position20>
       <Position21>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="1018" Column="3" TopLine="1016"/>
+        <Filename Value="untlevel.pas"/>
+        <Caret Line="91" Column="25" TopLine="60"/>
       </Position21>
       <Position22>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="275" Column="14" TopLine="256"/>
+        <Filename Value="untgraphics.pas"/>
+        <Caret Line="24" Column="16" TopLine="10"/>
       </Position22>
       <Position23>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="974" Column="3" TopLine="971"/>
+        <Filename Value="untlevel.pas"/>
+        <Caret Line="575" Column="19" TopLine="556"/>
       </Position23>
       <Position24>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="276" Column="15" TopLine="251"/>
+        <Filename Value="untlevel.pas"/>
+        <Caret Line="345" Column="32" TopLine="331"/>
       </Position24>
       <Position25>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="987" Column="3" TopLine="984"/>
+        <Filename Value="untlevel.pas"/>
+        <Caret Line="575" Column="19" TopLine="556"/>
       </Position25>
       <Position26>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="276" Column="15" TopLine="252"/>
+        <Filename Value="untlevel.pas"/>
+        <Caret Line="345" Column="26" TopLine="345"/>
       </Position26>
       <Position27>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="989" Column="25" TopLine="984"/>
+        <Filename Value="untlevel.pas"/>
+        <Caret Line="575" Column="26" TopLine="557"/>
       </Position27>
       <Position28>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="180" Column="19" TopLine="153"/>
+        <Filename Value="untlevel.pas"/>
+        <Caret Line="577" Column="13" TopLine="546"/>
       </Position28>
       <Position29>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="866" Column="3" TopLine="863"/>
+        <Filename Value="..\AvalancheProject\Common\avbase.pas"/>
+        <Caret Line="294" TopLine="275"/>
       </Position29>
       <Position30>
-        <Filename Value="..\BackTerria\Src\blights.pas"/>
-        <Caret Line="25" Column="15"/>
+        <Filename Value="..\AvalancheProject\Common\avbase.pas"/>
+        <Caret Line="298" TopLine="275"/>
       </Position30>
     </JumpHistory>
   </ProjectSession>
+  <Debugging>
+    <Watches Count="1">
+      <Item1>
+        <Expression Value="FRoomPos"/>
+      </Item1>
+    </Watches>
+  </Debugging>
 </CONFIG>
