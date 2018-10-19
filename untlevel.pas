@@ -350,10 +350,7 @@ function TBRA_MakeDamage.ProcessAction: Boolean;
 begin
   Result := FRoomUnit.World.GameTime < FActionTime;
   if not Result then
-  begin
     FRoomUnit.SetAnimation('Idle0');
-    FRoomUnit.DealDamage(FDamage);
-  end;
 end;
 
 constructor TBRA_MakeDamage.Create(const AUnit: TRoomUnit; const ADamage: Integer);
@@ -364,6 +361,7 @@ begin
   FDamage := ADamage;
 
   FRoomUnit.SetAnimation('React0');
+  FRoomUnit.DealDamage(FDamage);
 end;
 
 { TBRA_UnitDefaultAttack }
@@ -575,7 +573,7 @@ begin
   FHP := FHP - ADmg;
 
   msg := TbFlyOutMessage.Create(World);
-  msg.SetState(Pos, IntToStr(ADmg), 2000);
+  msg.SetState(Pos+Vec(0,1.5,0), IntToStr(ADmg), Vec(1,0,0,1));
 end;
 
 procedure TRoomUnit.SetAP(const AValue: Integer);
