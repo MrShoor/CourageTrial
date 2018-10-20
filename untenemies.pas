@@ -37,7 +37,7 @@ type
   protected
     procedure UpdateStep; override;
   public
-    procedure SetAnimation(const AName: string); override;
+    procedure SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean); override;
     function  GetUnitMoveSpeed: Single; override;
 
     procedure LoadModels(); override;
@@ -88,10 +88,11 @@ begin
   FAnim.SetTime(World.GameTime);
 end;
 
-procedure TBotMutant1.SetAnimation(const AName: string);
+procedure TBotMutant1.SetAnimation(const ANameSequence: array of string;
+  const ALoopedLast: Boolean);
 begin
-  inherited SetAnimation(AName);
-  FAnim.AnimationStartAndStopOther([AName]);
+  inherited SetAnimation(ANameSequence, ALoopedLast);
+  FAnim.AnimationSequence_StartAndStopOther(ANameSequence, ALoopedLast);
 end;
 
 function TBotMutant1.GetUnitMoveSpeed: Single;
@@ -103,11 +104,13 @@ procedure TBotMutant1.LoadModels;
 begin
   AddModel('Mutant1', mtDefault);
 	FAnim := Create_IavAnimationController(FModels[0].Mesh.Pose, World.GameTime);
-	FAnim.AnimationStartAndStopOther(['Idle0']);
+	SetAnimation(['Idle0'], False);
 
   MaxAP := 8;
   MaxHP := 100;
   HP := MaxHP;
+
+  Preview96_128 := 'ui\units\mutant1.png';
 end;
 
 end.

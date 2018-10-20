@@ -10,7 +10,7 @@ interface
 uses
   Math,
   Classes, SysUtils, avBase, avRes, bWorld, mutils, bLights, avMesh, avTypes, avTess, avContnrs, avContnrsDefaults,
-  avPathFinder;
+  avPathFinder, avMiniControls;
 
 type
   IRoomMapGraph = {$IfDef FPC}specialize{$EndIf} IMap<TVec2i>;
@@ -67,16 +67,20 @@ type
 
     FHP: Integer;
     FMaxHP: Integer;
+    FPreview96_128: string;
 
     procedure SetAP(const AValue: Integer);
     procedure SetHP(const AValue: Integer);
     procedure SetMaxAP(const AValue: Integer);
     procedure SetMaxHP(const AValue: Integer);
+    procedure SetPreview96_128(const AValue: string);
   protected
   public
+    property Preview96_128: string read FPreview96_128 write SetPreview96_128;
+
     procedure LoadModels(); virtual;
 
-    procedure SetAnimation(const AName: string); virtual;
+    procedure SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean); virtual;
     function  GetUnitMoveSpeed: Single; virtual;
 
     function FindPath(const ATarget: TVec2i): IRoomPath;
@@ -239,7 +243,7 @@ type
   protected
     procedure UpdateStep; override;
   public
-    procedure SetAnimation(const AName: string); override;
+    procedure SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean); override;
     function  GetUnitMoveSpeed: Single; override;
 
     procedure LoadModels(); override;
@@ -313,6 +317,9 @@ type
     FActiveUnit: Integer;
 
     FMap: TRoomMap;
+
+    FUnitMenu: TavmCustomControl;
+    procedure OnEndTurnBtnClick(ASender: TObject);
   private
     FActions: IBRA_ActionArr;
   protected
@@ -320,6 +327,7 @@ type
     FMovePath : IRoomPath;
     function IsPlayerTurn: Boolean;
     function IsBotTurn: Boolean;
+    function IsMouseOnUI: Boolean;
   protected
     procedure EMUps(var msg: TavMessage); message EM_UPS;
   	procedure AfterRegister; override;
@@ -342,15 +350,13 @@ type
 implementation
 
 uses
-  untEnemies, untGraphics;
+  untEnemies, untGraphics, ui_unit;
 
 { TBRA_MakeDamage }
 
 function TBRA_MakeDamage.ProcessAction: Boolean;
 begin
   Result := FRoomUnit.World.GameTime < FActionTime;
-  if not Result then
-    FRoomUnit.SetAnimation('Idle0');
 end;
 
 constructor TBRA_MakeDamage.Create(const AUnit: TRoomUnit; const ADamage: Integer);
@@ -360,8 +366,11 @@ begin
   FActionTime := FRoomUnit.World.GameTime + 1000;
   FDamage := ADamage;
 
-  FRoomUnit.SetAnimation('React0');
   FRoomUnit.DealDamage(FDamage);
+  if FRoomUnit.HP <= 0 then
+    FRoomUnit.SetAnimation(['React0', 'Death0'], False)
+  else
+    FRoomUnit.SetAnimation(['React0', 'Idle0'], True);
 end;
 
 { TBRA_UnitDefaultAttack }
@@ -373,14 +382,10 @@ begin
   if FRoomUnit.World.GameTime > FDamageStartTime then
   begin
     FDamageStartTime := HUGE;
-    FTarget.Room.AddAction(TBRA_MakeDamage.Create(FTarget, 5));
+    FTarget.Room.AddAction(TBRA_MakeDamage.Create(FTarget, 50));
   end;
 
   Result := FRoomUnit.World.GameTime < FActionTime;
-  if not Result then
-  begin
-    FRoomUnit.SetAnimation('Idle0');
-  end;
 end;
 
 constructor TBRA_UnitDefaultAttack.Create(const AUnit, ATarget: TRoomUnit; const ADurationTime, ADamageStartTime: Integer);
@@ -397,7 +402,7 @@ begin
   if FValidAction then
   begin
     FRoomUnit.AP := FRoomUnit.AP - cAPCost;
-    FRoomUnit.SetAnimation('Attack0');
+    FRoomUnit.SetAnimation(['Attack0', 'Idle0'], True);
     FRoomUnit.RoomDir := FRoomUnit.Room.Direction(FRoomUnit.RoomPos, FTarget.RoomPos);
   end;
 end;
@@ -410,7 +415,7 @@ begin
   RoomUnit.AP := RoomUnit.AP - 1;
   if RoomUnit.AP <= 0 then
   begin
-    RoomUnit.SetAnimation('Idle0');
+    RoomUnit.SetAnimation(['Idle0'], True);
     Exit(False);
   end;
 
@@ -419,7 +424,7 @@ begin
   Inc(MovePathIdx);
   if MovePathIdx > MovePath.Count - 1 then
   begin
-    RoomUnit.SetAnimation('Idle0');
+    RoomUnit.SetAnimation(['Idle0'], True);
     Exit(False);
   end;
 
@@ -455,7 +460,7 @@ begin
   if (MovePath <> nil) and (RoomUnit <> nil) and (RoomUnit.AP > 0) then
   begin
     RoomUnit.RoomDir := RoomUnit.Room.Direction(RoomUnit.RoomPos, MovePath[0]);
-    RoomUnit.SetAnimation('Walk');
+    RoomUnit.SetAnimation(['Walk'], True);
   end;
 end;
 
@@ -534,12 +539,19 @@ begin
   FMaxHP := AValue;
 end;
 
+procedure TRoomUnit.SetPreview96_128(const AValue: string);
+begin
+  if FPreview96_128 = AValue then Exit;
+  FPreview96_128 := AValue;
+end;
+
 procedure TRoomUnit.LoadModels;
 begin
 
 end;
 
-procedure TRoomUnit.SetAnimation(const AName: string);
+procedure TRoomUnit.SetAnimation(const ANameSequence: array of string;
+  const ALoopedLast: Boolean);
 begin
 
 end;
@@ -570,7 +582,7 @@ end;
 procedure TRoomUnit.DealDamage(ADmg: Integer);
 var msg: TbFlyOutMessage;
 begin
-  FHP := FHP - ADmg;
+  HP := HP - ADmg;
 
   msg := TbFlyOutMessage.Create(World);
   msg.SetState(Pos+Vec(0,1.5,0), IntToStr(ADmg), Vec(1,0,0,1));
@@ -1026,13 +1038,13 @@ begin
 	  FAnim[i].SetTime(World.GameTime);
 end;
 
-procedure TPlayer.SetAnimation(const AName: string);
+procedure TPlayer.SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean);
 var
   i: Integer;
 begin
-  inherited SetAnimation(AName);
+  inherited SetAnimation(ANameSequence, ALoopedLast);
   for i := 0 to Length(FAnim) - 1 do
-	  FAnim[i].AnimationStartAndStopOther([AName]);
+	  FAnim[i].AnimationSequence_StartAndStopOther(ANameSequence, ALoopedLast);
 end;
 
 function TPlayer.GetUnitMoveSpeed: Single;
@@ -1053,16 +1065,16 @@ begin
 
   SetLength(FAnim, FModels.Count);
   for i := 0 to FModels.Count - 1 do
-  begin
 	  FAnim[i] := Create_IavAnimationController(FModels[i].Mesh.Pose, World.GameTime);
-	  FAnim[i].AnimationStartAndStopOther(['Idle0']);
-  end;
+  SetAnimation(['Idle0'], True);
   SubscribeForUpdateStep;
 
   Scale := 0.5;
   MaxAP := 10;
   MaxHP := 100;
   HP := MaxHP;
+
+  Preview96_128 := 'ui\units\player.png';
 end;
 
 { TLantern }
@@ -1110,6 +1122,12 @@ end;
 
 { TBattleRoom }
 
+procedure TBattleRoom.OnEndTurnBtnClick(ASender: TObject);
+begin
+  if not IsPlayerTurn then Exit;
+  EndTurn();
+end;
+
 function TBattleRoom.IsPlayerTurn: Boolean;
 begin
   Result := FUnits[FActiveUnit] = FPlayer;
@@ -1118,6 +1136,13 @@ end;
 function TBattleRoom.IsBotTurn: Boolean;
 begin
   Result := FUnits[FActiveUnit] is TBot;
+end;
+
+function TBattleRoom.IsMouseOnUI: Boolean;
+var curpt: TVec2;
+begin
+  curpt := (Main.Cursor.WindowCur*Vec(0.5, -0.5) + Vec(0.5, 0.5) )*Main.WindowSize;
+  Result := FUnitMenu.HitTest(curpt, True) <> nil;
 end;
 
 procedure TBattleRoom.EMUps(var msg: TavMessage);
@@ -1131,7 +1156,7 @@ begin
   begin
     FMovedTile := FMap.UI.GetTileAtCoords(Main.Cursor.Ray);
     FMovePath := nil;
-    if FPlayer <> nil then
+    if (not IsMouseOnUI) and (FPlayer <> nil) then
     begin
       FMovePath := FPlayer.FindPath(FMovedTile);
       if FMovePath <> nil then FMovePath.Add(FMovedTile);
@@ -1188,6 +1213,7 @@ end;
 procedure TBattleRoom.MouseMove(xpos, ypos: Integer);
 begin
   if not IsPlayerTurn() then Exit;
+  if IsMouseOnUI() then Exit;
 end;
 
 procedure TBattleRoom.MouseClick(button: Integer; xpos, ypos: Integer);
@@ -1195,6 +1221,7 @@ var obj: TRoomObject;
     new_action: IBRA_Action;
 begin
   if not IsPlayerTurn() then Exit;
+  if IsMouseOnUI() then Exit;
 
   if (button = 0) and (FActions.Count = 0) then
   begin
@@ -1218,6 +1245,10 @@ begin
   FActiveUnit := (FActiveUnit + 1) mod FUnits.Count;
   unt := FUnits[FActiveUnit] as TRoomUnit;
   unt.AP := unt.MaxAP;
+
+  if unt.HP <= 0 then EndTurn();
+
+  (FUnitMenu as TavmUnitMenu).RoomUnit := unt;
 end;
 
 procedure TBattleRoom.AddAction(AAction: IBRA_Action);
@@ -1242,7 +1273,8 @@ procedure TBattleRoom.Draw();
           else
             FMap.UI.TileColor[FMovePath[i]] := TTileColorID.HighlightedGreen;
         end;
-      FMap.UI.TileColor[FMovedTile] := TTileColorID.Hovered;
+      if not IsMouseOnUI then
+        FMap.UI.TileColor[FMovedTile] := TTileColorID.Hovered;
     end;
   end;
 
@@ -1253,16 +1285,24 @@ begin
   Main.Clear(Black, True, Main.Projection.DepthRange.y, True);
   FWorld.Renderer.DrawWorld;
 
+  FUnitMenu.Draw();
+
   Main.ActiveFrameBuffer.BlitToWindow();
 end;
 
 procedure TBattleRoom.Generate();
 var lantern: TLantern;
     bot: TBot;
+
+    menu: TavmUnitMenu;
 begin
   FLanterns := TbGameObjArr.Create();
   FUnits := TRoomUnitArr.Create();
   FActions := TBRA_ActionArr.Create();
+
+  menu := TavmUnitMenu.Create(Self);
+  menu.OnEndTurnClick := {$IfDef FPC}@{$EndIf}OnEndTurnBtnClick;
+  FUnitMenu := menu;
 
   FWorld.Renderer.PreloadModels(['models\scene1.avm']);
   FWorld.Renderer.PreloadModels(['chars\gop.avm']);
