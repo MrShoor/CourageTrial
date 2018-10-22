@@ -1,0 +1,8 @@
+object fmrMain: TfmrMain
+  Left = 457
+  Height = 862
+  Top = 250
+  Width = 1249
+  Caption = 'fmrMain'
+  LCLVersion = '1.8.4.0'
+end

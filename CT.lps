@@ -10,7 +10,7 @@
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
         <CursorPos X="3" Y="3"/>
-        <UsageCount Value="88"/>
+        <UsageCount Value="89"/>
       </Unit0>
       <Unit1>
         <Filename Value="untmain.pas"/>
@@ -19,9 +19,8 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="untMain"/>
-        <TopLine Value="53"/>
         <CursorPos X="16" Y="60"/>
-        <UsageCount Value="88"/>
+        <UsageCount Value="89"/>
         <Loaded Value="True"/>
         <LoadedDesigner Value="True"/>
       </Unit1>
@@ -31,18 +30,17 @@
         <UnitName Value="untLevel"/>
         <IsVisibleTab Value="True"/>
         <EditorIndex Value="1"/>
-        <TopLine Value="1431"/>
-        <CursorPos X="30" Y="1463"/>
-        <UsageCount Value="88"/>
+        <TopLine Value="229"/>
+        <CursorPos X="8" Y="215"/>
+        <UsageCount Value="89"/>
         <Loaded Value="True"/>
       </Unit2>
       <Unit3>
         <Filename Value="untenemies.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="untEnemies"/>
-        <EditorIndex Value="4"/>
-        <UsageCount Value="63"/>
-        <Loaded Value="True"/>
+        <EditorIndex Value="-1"/>
+        <UsageCount Value="64"/>
       </Unit3>
       <Unit4>
         <Filename Value="untgraphics.pas"/>
@@ -51,25 +49,23 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="30"/>
         <CursorPos X="34" Y="54"/>
-        <UsageCount Value="53"/>
+        <UsageCount Value="54"/>
       </Unit4>
       <Unit5>
         <Filename Value="ui_unit.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="7"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="6"/>
         <CursorPos X="15" Y="39"/>
-        <UsageCount Value="50"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="51"/>
       </Unit5>
       <Unit6>
         <Filename Value="..\BackTerria\Src\bworld.pas"/>
         <UnitName Value="bWorld"/>
-        <EditorIndex Value="5"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="846"/>
         <CursorPos Y="865"/>
         <UsageCount Value="40"/>
-        <Loaded Value="True"/>
       </Unit6>
       <Unit7>
         <Filename Value="..\AvalancheProject\Common\avtess.pas"/>
@@ -82,20 +78,18 @@
       <Unit8>
         <Filename Value="..\AvalancheProject\Utils\avcontnrs.pas"/>
         <UnitName Value="avContnrs"/>
-        <EditorIndex Value="6"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="1891"/>
         <CursorPos X="45" Y="1911"/>
         <UsageCount Value="24"/>
-        <Loaded Value="True"/>
       </Unit8>
       <Unit9>
         <Filename Value="..\AvalancheProject\Common\avres.pas"/>
         <UnitName Value="avRes"/>
-        <EditorIndex Value="3"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="3414"/>
         <CursorPos X="32" Y="3432"/>
         <UsageCount Value="33"/>
-        <Loaded Value="True"/>
       </Unit9>
       <Unit10>
         <Filename Value="..\AvalancheProject\Common\avbase.pas"/>
@@ -267,11 +261,10 @@
         <Filename Value="untobstacles.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="untObstacles"/>
-        <EditorIndex Value="2"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="38"/>
         <CursorPos X="47" Y="47"/>
-        <UsageCount Value="24"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="25"/>
       </Unit32>
     </Units>
     <JumpHistory Count="30" HistoryIndex="29">
@@ -385,12 +378,12 @@
         <Filename Value="untlevel.pas"/>
       </Position28>
       <Position29>
-        <Filename Value="untenemies.pas"/>
-        <Caret Line="71" Column="24" TopLine="55"/>
+        <Filename Value="untlevel.pas"/>
+        <Caret Line="1438" Column="32" TopLine="1431"/>
       </Position29>
       <Position30>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="1438" Column="32" TopLine="1431"/>
+        <Caret Line="914" Column="14" TopLine="904"/>
       </Position30>
     </JumpHistory>
   </ProjectSession>
