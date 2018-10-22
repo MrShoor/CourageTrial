@@ -8,10 +8,9 @@
       <Unit0>
         <Filename Value="CT.lpr"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="5"/>
+        <EditorIndex Value="-1"/>
         <CursorPos X="3" Y="3"/>
-        <UsageCount Value="66"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="78"/>
       </Unit0>
       <Unit1>
         <Filename Value="untmain.pas"/>
@@ -20,10 +19,9 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="untMain"/>
-        <IsVisibleTab Value="True"/>
-        <TopLine Value="48"/>
-        <CursorPos X="34" Y="54"/>
-        <UsageCount Value="66"/>
+        <TopLine Value="82"/>
+        <CursorPos X="71" Y="87"/>
+        <UsageCount Value="78"/>
         <Loaded Value="True"/>
         <LoadedDesigner Value="True"/>
       </Unit1>
@@ -32,368 +30,361 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="untLevel"/>
         <EditorIndex Value="1"/>
-        <TopLine Value="1041"/>
-        <CursorPos X="6" Y="1044"/>
-        <UsageCount Value="66"/>
+        <TopLine Value="31"/>
+        <CursorPos X="41" Y="42"/>
+        <UsageCount Value="78"/>
         <Loaded Value="True"/>
       </Unit2>
       <Unit3>
         <Filename Value="untenemies.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="untEnemies"/>
-        <EditorIndex Value="4"/>
-        <TopLine Value="76"/>
-        <CursorPos X="47" Y="92"/>
-        <UsageCount Value="41"/>
+        <IsVisibleTab Value="True"/>
+        <EditorIndex Value="2"/>
+        <UsageCount Value="53"/>
         <Loaded Value="True"/>
       </Unit3>
       <Unit4>
         <Filename Value="untgraphics.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="untGraphics"/>
-        <EditorIndex Value="9"/>
-        <TopLine Value="40"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="30"/>
         <CursorPos X="34" Y="54"/>
-        <UsageCount Value="31"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="43"/>
       </Unit4>
       <Unit5>
-        <Filename Value="..\BackTerria\Src\bWorld.pas"/>
-        <EditorIndex Value="10"/>
-        <TopLine Value="746"/>
-        <CursorPos Y="766"/>
-        <UsageCount Value="32"/>
+        <Filename Value="ui_unit.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="4"/>
+        <TopLine Value="6"/>
+        <CursorPos X="15" Y="39"/>
+        <UsageCount Value="40"/>
         <Loaded Value="True"/>
       </Unit5>
       <Unit6>
+        <Filename Value="..\BackTerria\Src\bworld.pas"/>
+        <UnitName Value="bWorld"/>
+        <EditorIndex Value="5"/>
+        <TopLine Value="18"/>
+        <CursorPos X="3" Y="42"/>
+        <UsageCount Value="38"/>
+        <Loaded Value="True"/>
+      </Unit6>
+      <Unit7>
         <Filename Value="..\AvalancheProject\Common\avtess.pas"/>
         <UnitName Value="avTess"/>
         <EditorIndex Value="-1"/>
-        <CursorPos X="31" Y="17"/>
-        <UsageCount Value="25"/>
-      </Unit6>
-      <Unit7>
-        <Filename Value="..\AvalancheProject\Utils\avcontnrs.pas"/>
-        <UnitName Value="avContnrs"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="199"/>
-        <CursorPos X="7" Y="201"/>
-        <UsageCount Value="17"/>
+        <CursorPos X="28" Y="16"/>
+        <UsageCount Value="27"/>
       </Unit7>
       <Unit8>
-        <Filename Value="..\AvalancheProject\Common\avres.pas"/>
-        <UnitName Value="avRes"/>
-        <EditorIndex Value="6"/>
-        <TopLine Value="2767"/>
-        <CursorPos X="27" Y="2780"/>
-        <UsageCount Value="27"/>
+        <Filename Value="..\AvalancheProject\Utils\avcontnrs.pas"/>
+        <UnitName Value="avContnrs"/>
+        <EditorIndex Value="3"/>
+        <TopLine Value="118"/>
+        <CursorPos X="15" Y="142"/>
+        <UsageCount Value="18"/>
         <Loaded Value="True"/>
       </Unit8>
       <Unit9>
-        <Filename Value="..\AvalancheProject\Common\avbase.pas"/>
-        <UnitName Value="avBase"/>
-        <EditorIndex Value="8"/>
-        <TopLine Value="83"/>
-        <CursorPos X="28" Y="291"/>
-        <UsageCount Value="27"/>
+        <Filename Value="..\AvalancheProject\Common\avres.pas"/>
+        <UnitName Value="avRes"/>
+        <EditorIndex Value="6"/>
+        <TopLine Value="64"/>
+        <CursorPos X="3" Y="89"/>
+        <UsageCount Value="29"/>
         <Loaded Value="True"/>
       </Unit9>
       <Unit10>
+        <Filename Value="..\AvalancheProject\Common\avbase.pas"/>
+        <UnitName Value="avBase"/>
+        <EditorIndex Value="7"/>
+        <UsageCount Value="29"/>
+        <Loaded Value="True"/>
+      </Unit10>
+      <Unit11>
         <Filename Value="..\BackTerria\Src\blights.pas"/>
         <UnitName Value="bLights"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="784"/>
         <CursorPos X="36" Y="793"/>
-        <UsageCount Value="19"/>
-      </Unit10>
-      <Unit11>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <EditorIndex Value="2"/>
-        <TopLine Value="1246"/>
-        <CursorPos Y="1266"/>
-        <UsageCount Value="16"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="18"/>
       </Unit11>
       <Unit12>
+        <Filename Value="..\AvalancheProject\Common\avmesh.pas"/>
+        <UnitName Value="avMesh"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="1246"/>
+        <CursorPos Y="1266"/>
+        <UsageCount Value="18"/>
+      </Unit12>
+      <Unit13>
         <Filename Value="..\AvalancheProject\Common\avtexloader.pas"/>
         <UnitName Value="avTexLoader"/>
         <EditorIndex Value="-1"/>
         <CursorPos X="21" Y="4"/>
-        <UsageCount Value="6"/>
-      </Unit12>
-      <Unit13>
+        <UsageCount Value="5"/>
+      </Unit13>
+      <Unit14>
         <Filename Value="..\AvalancheProject\Common\avmodel.pas"/>
         <UnitName Value="avModel"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="700"/>
         <CursorPos X="27" Y="713"/>
-        <UsageCount Value="6"/>
-      </Unit13>
-      <Unit14>
-        <Filename Value="..\AvalancheProject\Utils\mutils.pas"/>
-        <EditorIndex Value="3"/>
-        <TopLine Value="91"/>
-        <CursorPos X="17" Y="107"/>
-        <UsageCount Value="12"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="5"/>
       </Unit14>
       <Unit15>
+        <Filename Value="..\AvalancheProject\Utils\mutils.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="91"/>
+        <CursorPos X="17" Y="107"/>
+        <UsageCount Value="14"/>
+      </Unit15>
+      <Unit16>
         <Filename Value="..\AvalancheProject\Common\avcontext.pas"/>
         <UnitName Value="avContext"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="146"/>
         <CursorPos X="15" Y="170"/>
-        <UsageCount Value="21"/>
-      </Unit15>
-      <Unit16>
+        <UsageCount Value="20"/>
+      </Unit16>
+      <Unit17>
         <Filename Value="..\AvalancheProject\Common\avtypes.pas"/>
         <UnitName Value="avTypes"/>
         <EditorIndex Value="-1"/>
         <CursorPos X="6" Y="16"/>
-        <UsageCount Value="16"/>
-      </Unit16>
-      <Unit17>
+        <UsageCount Value="15"/>
+      </Unit17>
+      <Unit18>
         <Filename Value="..\AvalancheProject\Common\avcameracontroller.pas"/>
         <UnitName Value="avCameraController"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="24"/>
         <CursorPos X="10" Y="31"/>
-        <UsageCount Value="6"/>
-      </Unit17>
-      <Unit18>
+        <UsageCount Value="5"/>
+      </Unit18>
+      <Unit19>
         <Filename Value="..\AvalancheProject\Utils\avpathfinder.pas"/>
         <UnitName Value="avPathFinder"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="321"/>
         <CursorPos Y="330"/>
-        <UsageCount Value="16"/>
-      </Unit18>
-      <Unit19>
+        <UsageCount Value="15"/>
+      </Unit19>
+      <Unit20>
         <Filename Value="..\AvalancheProject\Common\avcontext_dx11.pas"/>
         <UnitName Value="avContext_DX11"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="1908"/>
-        <CursorPos X="24" Y="1914"/>
-        <UsageCount Value="8"/>
-      </Unit19>
-      <Unit20>
-        <Filename Value="..\AvalancheProject\Utils\intfutils.pas"/>
-        <UnitName Value="intfUtils"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="17"/>
-        <CursorPos X="3" Y="41"/>
-        <UsageCount Value="16"/>
+        <TopLine Value="228"/>
+        <CursorPos X="27" Y="252"/>
+        <UsageCount Value="12"/>
       </Unit20>
       <Unit21>
+        <Filename Value="..\AvalancheProject\Utils\intfutils.pas"/>
+        <UnitName Value="intfUtils"/>
+        <EditorIndex Value="8"/>
+        <TopLine Value="17"/>
+        <CursorPos X="3" Y="41"/>
+        <UsageCount Value="15"/>
+        <Loaded Value="True"/>
+      </Unit21>
+      <Unit22>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\inc\objpash.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="221"/>
         <CursorPos X="58" Y="248"/>
-        <UsageCount Value="7"/>
-      </Unit21>
-      <Unit22>
+        <UsageCount Value="6"/>
+      </Unit22>
+      <Unit23>
         <Filename Value="..\AvalancheProject\Utils\avcontnrsdefaults.pas"/>
         <UnitName Value="avContnrsDefaults"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="7"/>
         <CursorPos X="16" Y="18"/>
-        <UsageCount Value="18"/>
-      </Unit22>
-      <Unit23>
+        <UsageCount Value="17"/>
+      </Unit23>
+      <Unit24>
         <Filename Value="..\AvalancheProject\Common\avcontrols.pas"/>
         <UnitName Value="avControls"/>
         <EditorIndex Value="-1"/>
         <CursorPos X="30" Y="25"/>
-        <UsageCount Value="9"/>
-      </Unit23>
-      <Unit24>
+        <UsageCount Value="8"/>
+      </Unit24>
+      <Unit25>
         <Filename Value="..\AvalancheProject\Common\avminicontrols.pas"/>
         <UnitName Value="avMiniControls"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="49"/>
         <CursorPos X="25" Y="59"/>
-        <UsageCount Value="13"/>
-      </Unit24>
-      <Unit25>
-        <Filename Value="..\AvalancheProject\Common\avcanvas.pas"/>
-        <UnitName Value="avCanvas"/>
-        <EditorIndex Value="11"/>
-        <TopLine Value="204"/>
-        <CursorPos X="19" Y="203"/>
-        <UsageCount Value="16"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="12"/>
       </Unit25>
       <Unit26>
+        <Filename Value="..\AvalancheProject\Common\avcanvas.pas"/>
+        <UnitName Value="avCanvas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="203"/>
+        <CursorPos X="52" Y="221"/>
+        <UsageCount Value="18"/>
+      </Unit26>
+      <Unit27>
         <Filename Value="..\BackTerria\Src\bgraphicalobjects.pas"/>
         <UnitName Value="bGraphicalObjects"/>
         <EditorIndex Value="-1"/>
         <CursorPos X="12" Y="10"/>
-        <UsageCount Value="10"/>
-      </Unit26>
-      <Unit27>
+        <UsageCount Value="9"/>
+      </Unit27>
+      <Unit28>
         <Filename Value="..\BackTerria\Src\bminiparticles.pas"/>
         <UnitName Value="bMiniParticles"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="9"/>
         <CursorPos X="3" Y="45"/>
-        <UsageCount Value="9"/>
-      </Unit27>
-      <Unit28>
+        <UsageCount Value="8"/>
+      </Unit28>
+      <Unit29>
         <Filename Value="..\BackTerria\Src\bpostprocess.pas"/>
         <UnitName Value="bPostProcess"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="62"/>
         <CursorPos X="13" Y="91"/>
-        <UsageCount Value="9"/>
-      </Unit28>
-      <Unit29>
+        <UsageCount Value="8"/>
+      </Unit29>
+      <Unit30>
         <Filename Value="..\AvalancheProject\Utils\mutils_v.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="975"/>
         <CursorPos Y="1012"/>
-        <UsageCount Value="9"/>
-      </Unit29>
-      <Unit30>
-        <Filename Value="ui_unit.pas"/>
-        <IsPartOfProject Value="True"/>
-        <EditorIndex Value="7"/>
-        <TopLine Value="117"/>
-        <CursorPos X="40" Y="139"/>
-        <UsageCount Value="28"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="8"/>
       </Unit30>
       <Unit31>
         <Filename Value="..\AvalancheProject\Utils\mutils_v_d_Single.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="301"/>
         <CursorPos X="21" Y="17"/>
-        <UsageCount Value="10"/>
+        <UsageCount Value="9"/>
       </Unit31>
     </Units>
-    <JumpHistory Count="30" HistoryIndex="29">
+    <JumpHistory Count="29" HistoryIndex="28">
       <Position1>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="1194" Column="50" TopLine="1163"/>
+        <Filename Value="..\AvalancheProject\Common\avbase.pas"/>
       </Position1>
       <Position2>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="1404" TopLine="1374"/>
+        <Filename Value="..\AvalancheProject\Utils\intfutils.pas"/>
+        <Caret Line="41" Column="3" TopLine="17"/>
       </Position2>
       <Position3>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="10"/>
+        <Filename Value="untenemies.pas"/>
+        <Caret Line="12" Column="13"/>
       </Position3>
       <Position4>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="11" Column="18"/>
+        <Filename Value="untenemies.pas"/>
+        <Caret Line="164" TopLine="120"/>
       </Position4>
       <Position5>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="1194" Column="56" TopLine="1163"/>
+        <Filename Value="untenemies.pas"/>
+        <Caret Line="149" TopLine="120"/>
       </Position5>
       <Position6>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="1182" Column="40" TopLine="1164"/>
+        <Filename Value="untenemies.pas"/>
+        <Caret Line="151" TopLine="120"/>
       </Position6>
       <Position7>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="647" Column="17" TopLine="628"/>
+        <Filename Value="untenemies.pas"/>
+        <Caret Line="148" TopLine="120"/>
       </Position7>
       <Position8>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="11" Column="14"/>
+        <Filename Value="untenemies.pas"/>
+        <Caret Line="110" TopLine="87"/>
       </Position8>
       <Position9>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="1194" Column="57" TopLine="1163"/>
+        <Filename Value="untenemies.pas"/>
+        <Caret Line="111" TopLine="87"/>
       </Position9>
       <Position10>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="1404" Column="123" TopLine="1374"/>
+        <Filename Value="untenemies.pas"/>
+        <Caret Line="112" TopLine="87"/>
       </Position10>
       <Position11>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
+        <Filename Value="untenemies.pas"/>
+        <Caret Line="114" TopLine="87"/>
       </Position11>
       <Position12>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="11" Column="18"/>
+        <Filename Value="untenemies.pas"/>
+        <Caret Line="109" Column="16" TopLine="83"/>
       </Position12>
       <Position13>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="1189" Column="25" TopLine="1175"/>
+        <Filename Value="untenemies.pas"/>
+        <Caret Line="31" Column="20" TopLine="5"/>
       </Position13>
       <Position14>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="1194" Column="57" TopLine="1175"/>
+        <Filename Value="untenemies.pas"/>
+        <Caret Line="124" Column="22" TopLine="103"/>
       </Position14>
       <Position15>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="1396" Column="37" TopLine="1386"/>
+        <Filename Value="untenemies.pas"/>
+        <Caret Line="20" Column="56"/>
       </Position15>
       <Position16>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="670" Column="15" TopLine="653"/>
+        <Filename Value="untenemies.pas"/>
+        <Caret Line="134" Column="37" TopLine="100"/>
       </Position16>
       <Position17>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="1376" Column="3" TopLine="1368"/>
+        <Filename Value="untlevel.pas"/>
+        <Caret Line="375" Column="16" TopLine="333"/>
       </Position17>
       <Position18>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="668" Column="15" TopLine="652"/>
+        <Filename Value="untlevel.pas"/>
+        <Caret Line="1450" Column="18" TopLine="1418"/>
       </Position18>
       <Position19>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="1354" Column="3" TopLine="1342"/>
+        <Filename Value="untlevel.pas"/>
       </Position19>
       <Position20>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
-        <Caret Line="666" Column="15" TopLine="640"/>
+        <Filename Value="untlevel.pas"/>
+        <Caret Line="355" Column="7" TopLine="314"/>
       </Position20>
       <Position21>
-        <Filename Value="untenemies.pas"/>
-        <Caret Line="90" Column="14" TopLine="87"/>
+        <Filename Value="untlevel.pas"/>
+        <Caret Line="1335" Column="15" TopLine="1311"/>
       </Position21>
       <Position22>
-        <Filename Value="untenemies.pas"/>
+        <Filename Value="untlevel.pas"/>
       </Position22>
       <Position23>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="1069" TopLine="1056"/>
+        <Caret Line="354" Column="9" TopLine="345"/>
       </Position23>
       <Position24>
         <Filename Value="untlevel.pas"/>
+        <Caret Line="1327" Column="15" TopLine="1317"/>
       </Position24>
       <Position25>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="371" Column="46" TopLine="340"/>
+        <Caret Line="1331" Column="47" TopLine="1311"/>
       </Position25>
       <Position26>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="302" Column="17" TopLine="283"/>
+        <Caret Line="1332" Column="56" TopLine="1311"/>
       </Position26>
       <Position27>
-        <Filename Value="untenemies.pas"/>
-        <Caret Line="72" Column="21" TopLine="71"/>
+        <Filename Value="untlevel.pas"/>
+        <Caret Line="1335" Column="59" TopLine="1311"/>
       </Position27>
       <Position28>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="348" Column="22" TopLine="341"/>
+        <Caret Line="1400" Column="36" TopLine="1371"/>
       </Position28>
       <Position29>
-        <Filename Value="untlevel.pas"/>
+        <Filename Value="untenemies.pas"/>
+        <Caret Line="164" Column="42" TopLine="159"/>
       </Position29>
-      <Position30>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="246" Column="19" TopLine="225"/>
-      </Position30>
     </JumpHistory>
   </ProjectSession>
   <Debugging>
     <Watches Count="1">
       <Item1>
-        <Expression Value="Result"/>
-        <DisplayStyle Value="wdfPointer"/>
+        <Expression Value="FRoomPos"/>
       </Item1>
     </Watches>
   </Debugging>

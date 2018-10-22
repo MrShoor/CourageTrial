@@ -17,6 +17,7 @@ type
   IRoomMapPF  = {$IfDef FPC}specialize{$EndIf} IAStar<TVec2i>;
   TRoomMapPF  = {$IfDef FPC}specialize{$EndIf} TAStar<TVec2i>;
   IRoomPath = {$IfDef FPC}specialize{$EndIf} IArray<TVec2i>;
+  TRoomPath = {$IfDef FPC}specialize{$EndIf} TArray<TVec2i>;
 
   IBRA_Action = interface
     function ProcessAction: Boolean;
@@ -44,12 +45,14 @@ type
     function GetBlockedCell(AIndex: Integer): TVec2i; virtual;
     function GetAbsoluteBlockedCell(AIndex: Integer): TVec2i; overload;
     function GetAbsoluteBlockedCell(AIndex: Integer; APos: TVec2i; ADir: Integer): TVec2i; overload;
+    function RotateTileCoord(const APos: TVec2i; ADir: Integer): TVec2i;
 
     property Room: TRoomMap read FRoom;
     property RoomPos: TVec2i read FRoomPos write SetRoomPos;
     property RoomDir: Integer read FRoomDir write SetRoomDir;
     procedure SetRoomPosDir(const APos: TVec2i; const ADir: Integer; const AAutoRegister: Boolean = True); virtual;
     procedure RegisterAtRoom();
+    procedure UnregisterAtRoom();
 
     destructor Destroy; override;
   end;
@@ -69,12 +72,17 @@ type
     FMaxHP: Integer;
     FPreview96_128: string;
 
+    FViewAngle: Single;
+    FViewRange: Single;
+    FViewWholeRange: Single;
+
     procedure SetAP(const AValue: Integer);
     procedure SetHP(const AValue: Integer);
     procedure SetMaxAP(const AValue: Integer);
     procedure SetMaxHP(const AValue: Integer);
     procedure SetPreview96_128(const AValue: string);
   protected
+    procedure OnRegisterRoomObject(const ANewObject: TRoomObject); virtual;
   public
     property Preview96_128: string read FPreview96_128 write SetPreview96_128;
 
@@ -86,11 +94,20 @@ type
     function FindPath(const ATarget: TVec2i): IRoomPath;
     function FindPath(const ATarget: TVec2i; ATargetUnit: TRoomUnit): IRoomPath;
 
+    function IsDead(): Boolean;
+
     property MaxAP: Integer read FMaxAP write SetMaxAP;
     property AP: Integer read FAP write SetAP;
 
     property MaxHP: Integer read FMaxHP write SetMaxHP;
     property HP: Integer read FHP write SetHP;
+
+    property ViewAngle: Single read FViewAngle write FViewAngle;
+    property ViewRange: Single read FViewRange write FViewRange;
+    property ViewWholeRange: Single read FViewWholeRange write FViewWholeRange;
+    function InViewField(const APt: TVec2i): Boolean;
+    function CanSee(const AOtherUnit: TRoomUnit): Boolean;
+    function GetVisible(): Boolean; override;
 
     procedure DealDamage(ADmg: Integer);
   end;
@@ -188,6 +205,8 @@ type
     TObjectMap = {$IFDef FPC}specialize{$EndIf} THashMap<TVec2i, TRoomObject>;
     IObjectMap = {$IFDef FPC}specialize{$EndIf} IHashMap<TVec2i, TRoomObject>;
   private
+    FCurrentPlayer: TRoomUnit;
+
     FRadius: Integer;
 
     FRoomUI: TRoomUI;
@@ -196,6 +215,7 @@ type
     FObjects: IObjectMap;
 
     procedure SetRadius(const AValue: Integer);
+    function NextPointOnRay(const APt: TVec2i; const ADir, ADirStep: TVec2i): TVec2i;
   protected
     procedure AfterRegister; override;
   public
@@ -208,14 +228,19 @@ type
     function NeighbourTile(const ACurrent: TVec2i; const AIndex: Integer): TVec2i;
     function Distance(const APt1, APt2: TVec2i): Integer;
     function Direction(const APt1, APt2: TVec2i): Integer;
+    function RayCast(const APt1, APt2: TVec2i; const AllowHitBlockers: Boolean): IRoomPath;
+    function RayCastBoolean(const APt1, APt2: TVec2i): Boolean;
     function IsCellExists(const APos: TVec2i): Boolean;
     function IsCellBlocked(const APos: TVec2i): Boolean;
+    function IsCellBlockView(const APos: TVec2i): Boolean;
 
     procedure PutObject(const AObject: TRoomObject);
     procedure RemoveObject(const AObject: TRoomObject);
     function  ObjectAt(const APos: TVec2i): TRoomObject;
 
     procedure AddAction(AAction: IBRA_Action);
+
+    property CurrentPlayer: TRoomUnit read FCurrentPlayer write FCurrentPlayer;
   end;
 
   { TLantern }
@@ -286,6 +311,8 @@ type
     FActionTime : Integer;
     FDamageStartTime: Integer;
   public
+    class function CanUse(const AUnit, ATarget: TRoomUnit): Boolean;
+
     function ProcessAction: Boolean; override;
     constructor Create(const AUnit, ATarget: TRoomUnit; const ADurationTime, ADamageStartTime: Integer);
   end;
@@ -325,12 +352,14 @@ type
   protected
     FMovedTile: TVec2i;
     FMovePath : IRoomPath;
+    FRayPath : IRoomPath;
+
     function IsPlayerTurn: Boolean;
     function IsBotTurn: Boolean;
     function IsMouseOnUI: Boolean;
   protected
     procedure EMUps(var msg: TavMessage); message EM_UPS;
-  	procedure AfterRegister; override;
+    procedure AfterRegister; override;
 
     procedure OnAfterWorldDraw(Sender: TObject);
   public
@@ -375,6 +404,12 @@ end;
 
 { TBRA_UnitDefaultAttack }
 
+class function TBRA_UnitDefaultAttack.CanUse(const AUnit, ATarget: TRoomUnit): Boolean;
+begin
+  if ATarget = nil then Exit(False);
+  Result := (AUnit.AP >= cAPCost) and (AUnit.Room.Distance(AUnit.RoomPos, ATarget.RoomPos) = 1) and (not ATarget.IsDead());
+end;
+
 function TBRA_UnitDefaultAttack.ProcessAction: Boolean;
 begin
   if not FValidAction then Exit(False);
@@ -392,7 +427,7 @@ constructor TBRA_UnitDefaultAttack.Create(const AUnit, ATarget: TRoomUnit; const
 begin
   Assert(AUnit <> nil);
   Assert(ATarget <> nil);
-  FValidAction := (AUnit.AP >= cAPCost) and (AUnit.Room.Distance(AUnit.RoomPos, ATarget.RoomPos) = 1);
+  FValidAction := (AUnit.AP >= cAPCost) and (AUnit.Room.Distance(AUnit.RoomPos, ATarget.RoomPos) = 1) and (not ATarget.IsDead());
 
   FRoomUnit := AUnit;
   FTarget := ATarget;
@@ -545,13 +580,18 @@ begin
   FPreview96_128 := AValue;
 end;
 
-procedure TRoomUnit.LoadModels;
+procedure TRoomUnit.OnRegisterRoomObject(const ANewObject: TRoomObject);
 begin
 
 end;
 
-procedure TRoomUnit.SetAnimation(const ANameSequence: array of string;
-  const ALoopedLast: Boolean);
+procedure TRoomUnit.LoadModels();
+begin
+  FViewAngle := Pi / 3;
+  FViewRange := 10;
+end;
+
+procedure TRoomUnit.SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean);
 begin
 
 end;
@@ -579,6 +619,37 @@ begin
   Result := pf.FindPath(RoomPos, ATarget, Infinity, False);
 end;
 
+function TRoomUnit.IsDead(): Boolean;
+begin
+  Result := HP <= 0;
+end;
+
+function TRoomUnit.InViewField(const APt: TVec2i): Boolean;
+var v0, vView, vDir: TVec3;
+begin
+  if APt = RoomPos then Exit(True);
+  v0 := Room.UI.TilePosToWorldPos(RoomPos);
+  vDir := Room.UI.TilePosToWorldPos(APt) - v0;
+  if LenSqr(vDir) <= ViewWholeRange*ViewWholeRange then Exit(True);
+  if LenSqr(vDir) > ViewRange*ViewRange then Exit(False);
+  vView := Room.UI.TilePosToWorldPos(RotateTileCoord(Vec(1,0), RoomDir) + RoomPos) - v0;
+  vDir := normalize(vDir);
+  vView := normalize(vView);
+  Result := dot(vDir, vView) >= Cos(ViewAngle);
+end;
+
+function TRoomUnit.CanSee(const AOtherUnit: TRoomUnit): Boolean;
+begin
+  if not InViewField(AOtherUnit.RoomPos) then Exit(False);
+  Result := Room.RayCastBoolean(RoomPos, AOtherUnit.RoomPos);
+end;
+
+function TRoomUnit.GetVisible(): Boolean;
+begin
+  //Room.CurrentPlayer;
+  Result := inherited GetVisible();
+end;
+
 procedure TRoomUnit.DealDamage(ADmg: Integer);
 var msg: TbFlyOutMessage;
 begin
@@ -597,6 +668,13 @@ end;
 procedure TRoomUnit.SetHP(const AValue: Integer);
 begin
   if FHP = AValue then Exit;
+  if FRegistered then
+  begin
+    if (FHP > 0) and (AValue <= 0) then
+      FRoom.RemoveObject(Self);
+    if (FHP <= 0) and (AValue > 0) then
+      FRoom.PutObject(Self);
+  end;
   FHP := AValue;
 end;
 
@@ -644,44 +722,46 @@ begin
 end;
 
 function TRoomObject.GetAbsoluteBlockedCell(AIndex: Integer; APos: TVec2i; ADir: Integer): TVec2i;
+begin
+  Result := RotateTileCoord(GetBlockedCell(AIndex), ADir) + APos;
+end;
+
+function TRoomObject.RotateTileCoord(const APos: TVec2i; ADir: Integer): TVec2i;
 var dirmod: Integer;
-    v: TVec2i;
 begin
   dirmod := ADir mod 6;
   if dirmod < 0 then dirmod := dirmod + 6;
-  v := GetBlockedCell(AIndex);
   case dirmod of
-    0: Result := v;
+    0: Result := APos;
     1:
       begin
-        Result.x := v.x + v.y;
-        Result.y := -v.x;
+        Result.x := APos.x + APos.y;
+        Result.y := -APos.x;
       end;
     2:
       begin
-        Result.x := v.y;
-        Result.y := -v.x - v.y;
+        Result.x := APos.y;
+        Result.y := -APos.x - APos.y;
       end;
     3:
       begin
-        Result.x := -v.x;
-        Result.y := -v.y;
+        Result.x := -APos.x;
+        Result.y := -APos.y;
       end;
     4:
       begin
-        Result.x := -v.x - v.y;
-        Result.y := v.x;
+        Result.x := -APos.x - APos.y;
+        Result.y := APos.x;
       end;
     5:
       begin
-        Result.x := -v.y;
-        Result.y := v.x + v.y;
+        Result.x := -APos.y;
+        Result.y := APos.x + APos.y;
       end;
     else
       Assert(False);
-      Result := v;
+      Result := APos;
   end;
-  Result := Result + APos;
 end;
 
 procedure TRoomObject.SetRoomPosDir(const APos: TVec2i; const ADir: Integer; const AAutoRegister: Boolean);
@@ -695,11 +775,18 @@ begin
   Rot := Quat(Vec(0, 1, 0), 2 * Pi * (ADir / 6));
 end;
 
-procedure TRoomObject.RegisterAtRoom;
+procedure TRoomObject.RegisterAtRoom();
 begin
   if FRegistered then Exit;
   FRegistered := True;
   FRoom.PutObject(Self);
+end;
+
+procedure TRoomObject.UnregisterAtRoom();
+begin
+  if not FRegistered then Exit;
+  FRegistered := False;
+  FRoom.RemoveObject(Self);
 end;
 
 destructor TRoomObject.Destroy;
@@ -730,7 +817,7 @@ begin
   FTilesData.Add(epmty_tile);
 
   FTilesProg := TavProgram.Create(Self);
-  FTilesProg.Load('UI_DrawTiles', False, 'D:\Projects\CourageTrial\shaders\!Out');
+  FTilesProg.Load('UI_DrawTiles', False, '..\shaders\!Out');
   FTilesVB   := TavVB.Create(Self);
   FTilesVB.Vertices := FTilesData as IVerticesData;
 
@@ -749,9 +836,7 @@ procedure TRoomUI.ClearTileColors;
 var
   j, i: Integer;
   n: Integer;
-  w: Integer;
 begin
-  w := FRadius * 2 + 1;
   n := 0;
   for j := -FRadius to FRadius do
     for i := -FRadius to FRadius do
@@ -898,6 +983,36 @@ begin
   FRoomUI.Radius := AValue;
 end;
 
+function TRoomMap.NextPointOnRay(const APt: TVec2i; const ADir, ADirStep: TVec2i): TVec2i;
+var p: array [0..2] of TVec2i;
+    wp: TVec3;
+    wpStart, wpEnd: TVec3;
+    wpLine2D: TVec3;
+    mindist, dist: Single;
+    i: Integer;
+    n: Integer;
+begin
+  if ADirStep.x * ADirStep.y = 0 then Exit(APt + ADirStep);
+  p[0] := APt + Vec(ADirStep.x, 0);
+  p[1] := APt + Vec(0, ADirStep.y);
+  p[2] := APt + ADirStep;
+  if ADir.x * ADir.y >= 0 then n := 1 else n := 2;
+  wpStart := FRoomUI.TilePosToWorldPos(Vec(0, 0));
+  wpEnd := FRoomUI.TilePosToWorldPos(ADir);
+  wpLine2D := Cross(Vec(wpStart.x, wpStart.z, 1), Vec(wpEnd.x, wpEnd.z, 1));
+  mindist := HUGE;
+  for i := 0 to n do
+  begin
+    wp := FRoomUI.TilePosToWorldPos(p[i]);
+    dist := abs( wpLine2D.z + dot(wpLine2D.xy, Vec(wp.x, wp.z)) );
+    if dist < mindist then
+    begin
+      Result := p[i];
+      mindist := dist;
+    end;
+  end;
+end;
+
 function TRoomMap.NeighbourTile(const ACurrent: TVec2i; const AIndex: Integer): TVec2i;
 begin
   case AIndex of
@@ -944,7 +1059,7 @@ begin
   FObjects := TObjectMap.Create();
 end;
 
-procedure TRoomMap.Draw;
+procedure TRoomMap.Draw();
 begin
   FRoomUI.DrawUI();
 end;
@@ -972,6 +1087,50 @@ begin
   Result := Round(angle);
 end;
 
+function TRoomMap.RayCast(const APt1, APt2: TVec2i; const AllowHitBlockers: Boolean): IRoomPath;
+var dir: TVec2i;
+    dirStep: TVec2i;
+    pt: TVec2i;
+begin
+  Result := TRoomPath.Create();
+  if APt1 = APt2 then
+  begin
+    Result.Add(APt2);
+    Exit;
+  end;
+
+  dir := APt2 - APt1;
+  dirStep := Sign(dir);
+  pt := NextPointOnRay(Vec(0,0), dir, dirStep);
+  while pt <> dir do
+  begin
+    Result.Add(APt1 + pt);
+    if AllowHitBlockers then
+      if IsCellBlockView(APt1 + pt) then
+        Exit;
+    pt := NextPointOnRay(pt, dir, dirStep);
+  end;
+  Result.Add(APt2);
+end;
+
+function TRoomMap.RayCastBoolean(const APt1, APt2: TVec2i): Boolean;
+var dir: TVec2i;
+    dirStep: TVec2i;
+    pt: TVec2i;
+begin
+  if APt1 = APt2 then Exit(True);
+
+  dir := APt2 - APt1;
+  dirStep := Sign(dir);
+  pt := NextPointOnRay(Vec(0,0), dir, dirStep);
+  while pt <> dir do
+  begin
+    if IsCellBlockView(APt1 + pt) then Exit(False);
+    pt := NextPointOnRay(pt, dir, dirStep);
+  end;
+  Result := True;
+end;
+
 function TRoomMap.IsCellExists(const APos: TVec2i): Boolean;
 begin
   Result := Distance(Vec(0,0), APos) <= FRadius;
@@ -983,10 +1142,16 @@ begin
   Result := ObjectAt(APos) <> nil;
 end;
 
+function TRoomMap.IsCellBlockView(const APos: TVec2i): Boolean;
+begin
+  Result := IsCellBlocked(APos);
+end;
+
 procedure TRoomMap.PutObject(const AObject: TRoomObject);
 var
   i: Integer;
   v: TVec2i;
+  roomobj: TRoomObject;
 begin
   Assert(AObject <> nil);
   for i := 0 to AObject.BlockedCellsCount() - 1 do
@@ -995,6 +1160,11 @@ begin
     FObjects.Add(v, AObject);
     FRoomUI.TileColor[v] := TTileColorID.None;
   end;
+
+  FObjects.Reset;
+  while FObjects.NextValue(roomobj) do
+    if (roomobj is TRoomUnit) and (roomobj <> AObject) then
+      TRoomUnit(roomobj).OnRegisterRoomObject(AObject);
 end;
 
 procedure TRoomMap.RemoveObject(const AObject: TRoomObject);
@@ -1035,7 +1205,7 @@ begin
   inherited UpdateStep;
 
   for i := 0 to Length(FAnim) - 1 do
-	  FAnim[i].SetTime(World.GameTime);
+    FAnim[i].SetTime(World.GameTime);
 end;
 
 procedure TPlayer.SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean);
@@ -1044,7 +1214,7 @@ var
 begin
   inherited SetAnimation(ANameSequence, ALoopedLast);
   for i := 0 to Length(FAnim) - 1 do
-	  FAnim[i].AnimationSequence_StartAndStopOther(ANameSequence, ALoopedLast);
+    FAnim[i].AnimationSequence_StartAndStopOther(ANameSequence, ALoopedLast);
 end;
 
 function TPlayer.GetUnitMoveSpeed: Single;
@@ -1065,7 +1235,7 @@ begin
 
   SetLength(FAnim, FModels.Count);
   for i := 0 to FModels.Count - 1 do
-	  FAnim[i] := Create_IavAnimationController(FModels[i].Mesh.Pose, World.GameTime);
+    FAnim[i] := Create_IavAnimationController(FModels[i].Mesh.Pose, World.GameTime);
   SetAnimation(['Idle0'], True);
   SubscribeForUpdateStep;
 
@@ -1161,6 +1331,8 @@ begin
       FMovePath := FPlayer.FindPath(FMovedTile);
       if FMovePath <> nil then FMovePath.Add(FMovedTile);
     end;
+
+    //FRayPath := FMap.RayCast(FPlayer.RoomPos, FMovedTile, True);
   end;
 
   if (FActions.Count = 0) and IsBotTurn() then
@@ -1246,9 +1418,8 @@ begin
   unt := FUnits[FActiveUnit] as TRoomUnit;
   unt.AP := unt.MaxAP;
 
-  if unt.HP <= 0 then EndTurn();
-
   (FUnitMenu as TavmUnitMenu).RoomUnit := unt;
+  if unt.HP <= 0 then EndTurn();
 end;
 
 procedure TBattleRoom.AddAction(AAction: IBRA_Action);
@@ -1265,7 +1436,7 @@ procedure TBattleRoom.Draw();
     FMap.UI.ClearTileColors();
     if IsPlayerTurn then
     begin
-      if FMovePath <> nil then
+      if (FMovePath <> nil) and (FActions.Count = 0) then
         for i := 0 to FMovePath.Count - 1 do
         begin
           if i >= FPlayer.AP then
@@ -1273,8 +1444,14 @@ procedure TBattleRoom.Draw();
           else
             FMap.UI.TileColor[FMovePath[i]] := TTileColorID.HighlightedGreen;
         end;
-      if not IsMouseOnUI then
+      if (not IsMouseOnUI) and (FMovePath = nil) then
         FMap.UI.TileColor[FMovedTile] := TTileColorID.Hovered;
+
+      if FRayPath <> nil then
+        for i := 0 to FRayPath.Count - 1 do
+        begin
+          FMap.UI.TileColor[FRayPath[i]] := TTileColorID.Hovered;
+        end;
     end;
   end;
 
@@ -1368,13 +1545,13 @@ begin
 
   FPlayer := TPlayer.Create(FMap);
   //FPlayer.SetRoomPosDir(Vec(5, 5), 0);
-  FPlayer.SetRoomPosDir(Vec(2, 1), 0);
   FPlayer.LoadModels();
+  FPlayer.SetRoomPosDir(Vec(2, 1), 0);
   FUnits.Add(FPlayer);
 
   bot := TBotMutant1.Create(FMap);
-  bot.SetRoomPosDir(Vec(-4, 4), 0);
   bot.LoadModels();
+  bot.SetRoomPosDir(Vec(-4, 4), 0);
   FUnits.Add(bot);
 
   FActiveUnit := FUnits.Count - 1;

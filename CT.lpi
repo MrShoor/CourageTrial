@@ -54,6 +54,11 @@
               </Win32>
             </Options>
           </Linking>
+          <Other>
+            <CompilerMessages>
+              <IgnoredMessages idx5024="True"/>
+            </CompilerMessages>
+          </Other>
         </CompilerOptions>
       </Item2>
       <Item3 Name="Release">
@@ -95,13 +100,19 @@
         <FormatVersion Value="1"/>
       </local>
     </RunParams>
-    <RequiredPackages Count="2">
+    <RequiredPackages Count="4">
       <Item1>
-        <PackageName Value="BackTerria"/>
+        <PackageName Value="AvalancheUtils"/>
       </Item1>
       <Item2>
-        <PackageName Value="LCL"/>
+        <PackageName Value="Avalanche"/>
       </Item2>
+      <Item3>
+        <PackageName Value="BackTerria"/>
+      </Item3>
+      <Item4>
+        <PackageName Value="LCL"/>
+      </Item4>
     </RequiredPackages>
     <Units Count="6">
       <Unit0>
