@@ -1,0 +1,61 @@
+N BrokenPillar1
+O 0 0 1
+O -1 0 1
+O -1 1 1
+O 0 1 1
+O 1 0 1
+O 1 -1 1
+O 0 -1 1
+N BrokenPillar2
+O 0 0 1
+O -1 0 1
+O -1 1 1
+O 0 1 1
+O 1 0 1
+O 1 -1 1
+O 0 -1 1
+N CoveredWell
+O 0 0 1
+O -1 0 0
+O -1 1 0
+O 0 1 0
+O 1 0 0
+O 1 -1 0
+O 0 -1 0
+N Cross1
+O 0 0 0
+N Cross2
+O 0 0 1
+N Cross3
+O 0 0 1
+O 0 1 1
+O 1 0 1
+N Cross4
+O 0 0 0
+N Fence1
+O 0 0 0
+O 1 0 0
+N Fence2
+O 0 0 0
+O 1 0 0
+N LampPost
+O 0 0 0
+N Obelisk1
+O 0 0 1
+N Obelisk2
+O 0 0 0
+N Obelisk3
+O 0 0 1
+O 0 1 1
+O 1 0 1
+N RoadSign
+O 0 0 0
+N Tombstone1
+O 0 0 0
+N Tombstone2
+O 0 0 0
+N Tombstone3
+O 0 0 0
+N Trough
+O 0 0 0
+O 1 0 0

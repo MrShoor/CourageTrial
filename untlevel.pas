@@ -10,7 +10,8 @@ interface
 uses
   Math,
   Classes, SysUtils, avBase, avRes, bWorld, mutils, bLights, avMesh, avTypes, avTess, avContnrs, avContnrsDefaults,
-  avPathFinder, avMiniControls;
+  avPathFinder, avMiniControls,
+  untObstacles;
 
 type
   IRoomMapGraph = {$IfDef FPC}specialize{$EndIf} IMap<TVec2i>;
@@ -20,6 +21,7 @@ type
   TRoomPath = {$IfDef FPC}specialize{$EndIf} TArray<TVec2i>;
 
   IBRA_Action = interface
+    procedure TryCancel;
     function ProcessAction: Boolean;
   end;
   IBRA_ActionArr = {$IfDef FPC}specialize{$EndIf} IArray<IBRA_Action>;
@@ -43,9 +45,10 @@ type
   public
     function BlockedCellsCount: Integer; virtual;
     function GetBlockedCell(AIndex: Integer): TVec2i; virtual;
+    function BlockedViewCell(AIndex: Integer): Boolean; virtual;
     function GetAbsoluteBlockedCell(AIndex: Integer): TVec2i; overload;
     function GetAbsoluteBlockedCell(AIndex: Integer; APos: TVec2i; ADir: Integer): TVec2i; overload;
-    function RotateTileCoord(const APos: TVec2i; ADir: Integer): TVec2i;
+    class function RotateTileCoord(const APos: TVec2i; ADir: Integer): TVec2i;
 
     property Room: TRoomMap read FRoom;
     property RoomPos: TVec2i read FRoomPos write SetRoomPos;
@@ -106,6 +109,7 @@ type
     property ViewRange: Single read FViewRange write FViewRange;
     property ViewWholeRange: Single read FViewWholeRange write FViewWholeRange;
     function InViewField(const APt: TVec2i): Boolean;
+    function CanSee(const APos: TVec2i): Boolean;
     function CanSee(const AOtherUnit: TRoomUnit): Boolean;
     function GetVisible(): Boolean; override;
 
@@ -117,8 +121,8 @@ type
   IRoomUnitSet = {$IfDef FPC}specialize{$EndIf} IHashSet<TRoomObject>;
 
   {$ScopedEnums On}
-  {$Z4}
-  TTileColorID = (None, Normal, Selected, HighlightedGreen, HighlightedRed, Hovered);
+  {$Z4} //this enum must be 4 bytes for directly passing to shaders
+  TTileColorID = (None, Normal, Selected, HighlightedGreen, HighlightedRed, HighlightedYellow, Hovered);
   {$Z1}
   {$ScopedEnums Off}
 
@@ -141,12 +145,18 @@ type
     FTilesProg : TavProgram;
     FTilesVB   : TavVB;
     FTilesData : IHexTiles;
+    FTilesVBFogOfWar  : TavVB;
+    FTilesDataFogOfWar: IHexTiles;
     FAffinePack: TMat2;
     FAffinePackInv: TMat2;
 
+    FFogOfWarValid: Boolean;
+
     FColors: array [TTileColorID] of TVec4;
+    FColorsFogOfWar: array [TTileColorID] of TVec4;
     function  GetColors(ID: TTileColorID): TVec4;
     procedure SetColors(ID: TTileColorID; const AValue: TVec4);
+    procedure ValidateFogOfWar;
   protected
     function  PosToIndex(const APos: TVec2i): Integer;
     procedure SetTileColor(const APos: TVec2i; const AColorID: TTileColorID);
@@ -168,6 +178,8 @@ type
 
     function AutoTileColor(const APos: TVec2i): TTileColorID;
 
+    procedure InvalidateFogOfWar;
+
     procedure DrawUI();
   end;
 
@@ -184,7 +196,7 @@ type
     function NodeComparer: IEqualityComparer;
     function GetNeighbour(Index: Integer; const AFrom, ACurrent, ATarget: TVec2i; out ANeighbour: TVec2i; out MoveWeight, DistWeight: Single): Boolean; overload;
   protected
-    function IsNonBlockingObject(const AObj: TRoomObject): Boolean; virtual;
+    function IsNonBlockingObject(AObj: TRoomObject): Boolean; virtual;
   public
     constructor Create(const ARoomMap: TRoomMap); overload;
   end;
@@ -195,7 +207,7 @@ type
   protected
     FSelf: TRoomObject;
     FTarget: TRoomObject;
-    function IsNonBlockingObject(const AObj: TRoomObject): Boolean; override;
+    function IsNonBlockingObject(AObj: TRoomObject): Boolean; override;
   public
     constructor Create(const ARoomMap: TRoomMap; const ASelf, ATarget: TRoomObject); overload;
   end;
@@ -256,8 +268,21 @@ type
   public
     function BlockedCellsCount: Integer; override;
     function GetBlockedCell(AIndex: Integer): TVec2i; override;
+    function BlockedViewCell(AIndex: Integer): Boolean; override;
     procedure LoadModels();
     procedure SetRoomPosDir(const APos: TVec2i; const ADir: Integer; const AAutoRegister: Boolean = True); override;
+  end;
+
+  { TObstacle }
+
+  TObstacle = class (TRoomObject)
+  private
+    FObstacle: TObstacleDesc;
+  public
+    function BlockedCellsCount: Integer; override;
+    function GetBlockedCell(AIndex: Integer): TVec2i; override;
+    function BlockedViewCell(AIndex: Integer): Boolean; override;
+    procedure LoadModels(const AObstacle: TObstacleDesc);
   end;
 
   { TPlayer }
@@ -278,6 +303,7 @@ type
 
   TBRA_Action = class(TInterfacedObject, IBRA_Action)
   public
+    procedure TryCancel; virtual;
     function ProcessAction: Boolean; virtual; abstract;
   end;
 
@@ -293,8 +319,11 @@ type
 
     MoveSpeed: Single;
 
+    Cancelled: Boolean;
+
     function MoveToNextCell: Boolean;
   public
+    procedure TryCancel; override;
     function ProcessAction: Boolean; override;
     constructor Create(const AUnit: TRoomUnit; const APath: IRoomPath);
   end;
@@ -336,6 +365,7 @@ type
     FWorld: TbWorld;
 
     FFloor: TbGameObject;
+    FObstacles: IObstacleArr;
     FLanterns: IbGameObjArr;
 
     FPlayer: TPlayer;
@@ -376,10 +406,55 @@ type
     procedure Generate();
   end;
 
+function CanPlaceObstacle(const ARoom: TRoomMap; const AObstacle: TObstacleDesc; const APos: TVec2i; const ADir: Integer): Boolean;
+
 implementation
 
 uses
   untEnemies, untGraphics, ui_unit;
+
+function CanPlaceObstacle(const ARoom: TRoomMap; const AObstacle: TObstacleDesc; const APos: TVec2i; const ADir: Integer): Boolean;
+var cell: TVec2i;
+    i: Integer;
+begin
+  for i := 0 to AObstacle.cells.Count - 1 do
+  begin
+    cell := AObstacle.cells[i].xy;
+    cell := TRoomObject.RotateTileCoord(cell, ADir) + APos;
+    if ARoom.ObjectAt(cell) <> nil then Exit(False);
+  end;
+  Result := True;
+end;
+
+{ TObstacle }
+
+function TObstacle.BlockedCellsCount: Integer;
+begin
+  Result := FObstacle.cells.Count;
+end;
+
+function TObstacle.GetBlockedCell(AIndex: Integer): TVec2i;
+begin
+  Result := FObstacle.cells[AIndex].xy;
+end;
+
+function TObstacle.BlockedViewCell(AIndex: Integer): Boolean;
+begin
+  Result := FObstacle.cells[AIndex].z <> 0;
+end;
+
+procedure TObstacle.LoadModels(const AObstacle: TObstacleDesc);
+begin
+  FObstacle := AObstacle;
+  AddModel(FObstacle.name, mtDefault);
+end;
+
+{ TBRA_Action }
+
+procedure TBRA_Action.TryCancel;
+begin
+
+end;
 
 { TBRA_MakeDamage }
 
@@ -448,24 +523,23 @@ function TBRA_UnitMovementAction.MoveToNextCell: Boolean;
 begin
   RoomUnit.RoomPos := MovePath[MovePathIdx];
   RoomUnit.AP := RoomUnit.AP - 1;
-  if RoomUnit.AP <= 0 then
-  begin
-    RoomUnit.SetAnimation(['Idle0'], True);
-    Exit(False);
-  end;
-
+  if RoomUnit.AP <= 0 then Exit(False);
   if MovePath = nil then Exit(False);
+  if Cancelled then Exit(False);
 
   Inc(MovePathIdx);
-  if MovePathIdx > MovePath.Count - 1 then
-  begin
-    RoomUnit.SetAnimation(['Idle0'], True);
-    Exit(False);
-  end;
+  if MovePathIdx > MovePath.Count - 1 then Exit(False);
+
+  if RoomUnit.Room.ObjectAt(MovePath[MovePathIdx]) <> nil then Exit(False);
 
   RoomUnit.RoomDir := RoomUnit.Room.Direction(RoomUnit.RoomPos, MovePath[MovePathIdx]);
 
   MovePathWeight := 0;
+end;
+
+procedure TBRA_UnitMovementAction.TryCancel;
+begin
+  Cancelled := True;
 end;
 
 function TBRA_UnitMovementAction.ProcessAction: Boolean;
@@ -478,7 +552,11 @@ begin
   Result := True;
   MovePathWeight := MovePathWeight + RoomUnit.Main.UpdateStatesInterval / 1000 * MoveSpeed;
   if MovePathWeight >= 1 then
-    if not MoveToNextCell then Exit(False);
+    if not MoveToNextCell then
+    begin
+      RoomUnit.SetAnimation(['Idle0'], True);
+      Exit(False);
+    end;
 
   fromPt := RoomUnit.Room.UI.TilePosToWorldPos(RoomUnit.RoomPos);
   toPt := RoomUnit.Room.UI.TilePosToWorldPos(MovePath[MovePathIdx]);
@@ -501,8 +579,12 @@ end;
 
 { TRoomMapGraphExcludeSelfAndTarget }
 
-function TRoomMapGraphExcludeSelfAndTarget.IsNonBlockingObject(const AObj: TRoomObject): Boolean;
+function TRoomMapGraphExcludeSelfAndTarget.IsNonBlockingObject(AObj: TRoomObject): Boolean;
 begin
+  if (FSelf <> nil) and
+     (AObj is TRoomUnit) and
+     (FSelf.Room.CurrentPlayer = FSelf) and (not TRoomUnit(FSelf).CanSee(TRoomUnit(AObj))) then
+    AObj := nil;
   Result := (AObj = FSelf) or (AObj = nil) or (AObj = FTarget);
 end;
 
@@ -550,7 +632,7 @@ begin
   DistWeight := FRoomMap.Distance(ANeighbour, ATarget);
 end;
 
-function TRoomMapGraph.IsNonBlockingObject(const AObj: TRoomObject): Boolean;
+function TRoomMapGraph.IsNonBlockingObject(AObj: TRoomObject): Boolean;
 begin
   Result := AObj = nil;
 end;
@@ -638,6 +720,12 @@ begin
   Result := dot(vDir, vView) >= Cos(ViewAngle);
 end;
 
+function TRoomUnit.CanSee(const APos: TVec2i): Boolean;
+begin
+  if not InViewField(APos) then Exit(False);
+  Result := Room.RayCastBoolean(RoomPos, APos);
+end;
+
 function TRoomUnit.CanSee(const AOtherUnit: TRoomUnit): Boolean;
 begin
   if not InViewField(AOtherUnit.RoomPos) then Exit(False);
@@ -646,8 +734,10 @@ end;
 
 function TRoomUnit.GetVisible(): Boolean;
 begin
-  //Room.CurrentPlayer;
-  Result := inherited GetVisible();
+  if Room.CurrentPlayer = nil then
+    Result := inherited GetVisible()
+  else
+    Result := Room.CurrentPlayer.CanSee(Self);
 end;
 
 procedure TRoomUnit.DealDamage(ADmg: Integer);
@@ -716,6 +806,11 @@ begin
   Result := Vec(0,0);
 end;
 
+function TRoomObject.BlockedViewCell(AIndex: Integer): Boolean;
+begin
+  Result := True;
+end;
+
 function TRoomObject.GetAbsoluteBlockedCell(AIndex: Integer): TVec2i;
 begin
   Result := GetAbsoluteBlockedCell(AIndex, FRoomPos, FRoomDir);
@@ -726,7 +821,7 @@ begin
   Result := RotateTileCoord(GetBlockedCell(AIndex), ADir) + APos;
 end;
 
-function TRoomObject.RotateTileCoord(const APos: TVec2i; ADir: Integer): TVec2i;
+class function TRoomObject.RotateTileCoord(const APos: TVec2i; ADir: Integer): TVec2i;
 var dirmod: Integer;
 begin
   dirmod := ADir mod 6;
@@ -821,6 +916,11 @@ begin
   FTilesVB   := TavVB.Create(Self);
   FTilesVB.Vertices := FTilesData as IVerticesData;
 
+  FTilesDataFogOfWar := THexTiles.Create();
+  FTilesDataFogOfWar.Add(epmty_tile);
+  FTilesVBFogOfWar := TavVB.Create(Self);
+  FTilesVBFogOfWar.Vertices := FTilesDataFogOfWar as IVerticesData;
+
   FAffinePack.Row[0] := Vec(1,0);
   FAffinePack.Row[1] := Vec(0.5,0.86602540378443864676372317075294);
   //FAffinePack.Row[1] := Vec(0,1);
@@ -829,10 +929,17 @@ begin
   FColors[TTileColorID.Normal] := Vec(0,0,0,1);
   FColors[TTileColorID.HighlightedGreen] := Vec(0,0.5,0,1);
   FColors[TTileColorID.HighlightedRed] := Vec(0.5,0,0,1);
+  FColors[TTileColorID.HighlightedYellow] := Vec(0.5,0.5,0,1);
   FColors[TTileColorID.Hovered] := Vec(1,1,1,1);
+
+  FColorsFogOfWar[TTileColorID.Normal] := Vec(0,0,0,0.7);
+  FColorsFogOfWar[TTileColorID.HighlightedGreen] := Vec(0,0.5,0,1);
+  FColorsFogOfWar[TTileColorID.HighlightedRed] := Vec(0.5,0,0,1);
+  FColorsFogOfWar[TTileColorID.HighlightedYellow] := Vec(0.5,0.5,0,1);
+  FColorsFogOfWar[TTileColorID.Hovered] := Vec(1,1,1,1);
 end;
 
-procedure TRoomUI.ClearTileColors;
+procedure TRoomUI.ClearTileColors();
 var
   j, i: Integer;
   n: Integer;
@@ -898,22 +1005,43 @@ begin
   if not rm.IsCellExists(APos) then Exit(TTileColorID.None);
   obj := rm.ObjectAt(APos);
   if obj = nil then Exit(TTileColorID.Normal);
+  if obj is TRoomUnit then
+    if (rm.CurrentPlayer <> nil) then
+      if not rm.CurrentPlayer.CanSee(TRoomUnit(obj)) then Exit(TTileColorID.Normal);
   Result := TTileColorID.None;
 end;
 
-procedure TRoomUI.DrawUI;
+procedure TRoomUI.InvalidateFogOfWar;
+begin
+  FFogOfWarValid := False;
+end;
+
+procedure TRoomUI.DrawUI();
 var tmpColors: TVec4Arr;
   i: Integer;
 begin
   if FTilesData.Count = 0 then Exit;
   SetLength(tmpColors, Length(FColors));
-  for i := 0 to Length(FColors) - 1 do
-    tmpColors[i] := FColors[TTileColorID(i)];
+
+  ValidateFogOfWar;
 
   FTilesProg.Select();
+  FTilesProg.SetUniform('YPos', FPlaneY);
+
+  for i := 0 to Length(FColors) - 1 do
+    tmpColors[i] := FColorsFogOfWar[TTileColorID(i)];
+  FTilesProg.SetAttributes(nil, nil, FTilesVBFogOfWar);
+  FTilesProg.SetUniform('TileColors', tmpColors);
+  FTilesProg.SetUniform('gradPow', 1.0);
+  FTilesProg.SetUniform('minAlpha', 0.7);
+  FTilesProg.Draw(ptTriangles, cmNone, False, FTilesData.Count, 0, 18);
+
+  for i := 0 to Length(FColors) - 1 do
+    tmpColors[i] := FColors[TTileColorID(i)];
   FTilesProg.SetAttributes(nil, nil, FTilesVB);
   FTilesProg.SetUniform('TileColors', tmpColors);
-  FTilesProg.SetUniform('YPos', FPlaneY);
+  FTilesProg.SetUniform('gradPow', 4.0);
+  FTilesProg.SetUniform('minAlpha', 0.0);
   FTilesProg.Draw(ptTriangles, cmNone, False, FTilesData.Count, 0, 18);
 end;
 
@@ -925,6 +1053,38 @@ end;
 procedure TRoomUI.SetColors(ID: TTileColorID; const AValue: TVec4);
 begin
   FColors[ID] := AValue;
+end;
+
+procedure TRoomUI.ValidateFogOfWar;
+var
+  w, j, i: Integer;
+  new_tile: THexTile;
+  rm: TRoomMap;
+begin
+  if FFogOfWarValid then Exit;
+  rm := Parent as TRoomMap;
+
+  w := FRadius * 2 + 1;
+  FTilesDataFogOfWar.Clear();
+  FTilesDataFogOfWar.Capacity := w*w;
+  for j := -FRadius to FRadius do
+    for i := -FRadius to FRadius do
+    begin
+      new_tile.vsPos := Vec(i, j) * FAffinePack;
+      if rm.IsCellExists(Vec(i, j)) then
+      begin
+        new_tile.vsColor := TTileColorID.None;
+        if rm.CurrentPlayer <> nil then
+          if not rm.CurrentPlayer.CanSee(Vec(i, j)) then
+            new_tile.vsColor := TTileColorID.Normal;
+      end
+      else
+        new_tile.vsColor := TTileColorID.None;
+      FTilesDataFogOfWar.Add(new_tile);
+    end;
+  FTilesVBFogOfWar.Invalidate;
+
+  FFogOfWarValid := True;
 end;
 
 function TRoomUI.PosToIndex(const APos: TVec2i): Integer;
@@ -1143,8 +1303,16 @@ begin
 end;
 
 function TRoomMap.IsCellBlockView(const APos: TVec2i): Boolean;
+var obj: TRoomObject;
+    i: Integer;
 begin
-  Result := IsCellBlocked(APos);
+  obj := ObjectAt(APos);
+  if obj = nil then Exit(False);
+  for i := 0 to obj.BlockedCellsCount - 1 do
+    if obj.BlockedViewCell(i) then
+      if obj.GetAbsoluteBlockedCell(i) = APos then
+        Exit(True);
+  Result := False;
 end;
 
 procedure TRoomMap.PutObject(const AObject: TRoomObject);
@@ -1165,6 +1333,8 @@ begin
   while FObjects.NextValue(roomobj) do
     if (roomobj is TRoomUnit) and (roomobj <> AObject) then
       TRoomUnit(roomobj).OnRegisterRoomObject(AObject);
+
+  FRoomUI.InvalidateFogOfWar;
 end;
 
 procedure TRoomMap.RemoveObject(const AObject: TRoomObject);
@@ -1226,6 +1396,10 @@ procedure TPlayer.LoadModels();
 var
   i: Integer;
 begin
+  ViewAngle := 0.5 * Pi + EPS;
+  ViewRange := 20.5;
+  ViewWholeRange := 2.5;
+
   AddModel('Gop_Body', mtDefault);
   AddModel('Gop_Bottoms', mtDefault);
   AddModel('Gop_Hair', mtDefault);
@@ -1274,6 +1448,11 @@ begin
   end;
 end;
 
+function TLantern.BlockedViewCell(AIndex: Integer): Boolean;
+begin
+  Result := AIndex <> 1;
+end;
+
 procedure TLantern.LoadModels();
 begin
   AddModel('Lantern', mtDefault);
@@ -1281,7 +1460,7 @@ begin
   FLight.Pos := cLightSrcPos;
   FLight.Radius := 30;
   FLight.Color := Vec(1,1,1);
-  //FLight.CastShadows := True;
+  FLight.CastShadows := False;
 end;
 
 procedure TLantern.SetRoomPosDir(const APos: TVec2i; const ADir: Integer; const AAutoRegister: Boolean);
@@ -1368,11 +1547,15 @@ begin
 end;
 
 procedure TBattleRoom.OnAfterWorldDraw(Sender: TObject);
+var oldDepthWrite: Boolean;
 begin
   //  Main.States.DepthTest := False;
+    oldDepthWrite := Main.States.DepthWrite;
+    Main.States.DepthWrite := False;
     Main.States.Blending[0] := True;
     Main.States.SetBlendFunctions(bfSrcAlpha, bfInvSrcAlpha);
     FMap.Draw();
+    Main.States.DepthWrite := oldDepthWrite;
 end;
 
 procedure TBattleRoom.KeyPress(KeyCode: Integer);
@@ -1395,6 +1578,12 @@ begin
   if not IsPlayerTurn() then Exit;
   if IsMouseOnUI() then Exit;
 
+  if (button = 0) and (FActions.Count > 0) then
+  begin
+    FActions[0].TryCancel;
+    Exit;
+  end;
+
   if (button = 0) and (FActions.Count = 0) then
   begin
     obj := FMap.ObjectAt(FMovedTile);
@@ -1408,6 +1597,7 @@ begin
     end;
     if new_action <> nil then
       FActions.Add(new_action);
+    Exit;
   end;
 end;
 
@@ -1432,6 +1622,11 @@ procedure TBattleRoom.Draw();
   procedure DrawTileMap;
   var
     i: Integer;
+    unt: TRoomUnit;
+    bounds_min: TVec2i;
+    bounds_max: TVec2i;
+    x, y: Integer;
+    movedObj: TRoomObject;
   begin
     FMap.UI.ClearTileColors();
     if IsPlayerTurn then
@@ -1446,6 +1641,21 @@ procedure TBattleRoom.Draw();
         end;
       if (not IsMouseOnUI) and (FMovePath = nil) then
         FMap.UI.TileColor[FMovedTile] := TTileColorID.Hovered;
+
+      movedObj := FMap.ObjectAt(FMovedTile);
+      if (movedObj is TRoomUnit) and (movedObj <> FMap.CurrentPlayer) then
+      begin
+        unt := movedObj as TRoomUnit;
+        if FPlayer.CanSee(unt) then
+        begin
+          bounds_min := unt.RoomPos - Floor(Vec(unt.ViewRange, unt.ViewRange));
+          bounds_max := unt.RoomPos + Ceil(Vec(unt.ViewRange, unt.ViewRange));
+          for y := bounds_min.y to bounds_max.y do
+            for x := bounds_min.x to bounds_max.x do
+              if unt.CanSee(Vec(x, y)) then
+                FMap.UI.TileColor[Vec(x, y)] := TTileColorID.HighlightedYellow;
+        end;
+      end;
 
       if FRayPath <> nil then
         for i := 0 to FRayPath.Count - 1 do
@@ -1468,6 +1678,34 @@ begin
 end;
 
 procedure TBattleRoom.Generate();
+
+  procedure CreateObstacles();
+  var obs: TObstacle;
+      i, j: Integer;
+      obsDesc: PObstacleDesc;
+      newPos: TVec2i;
+      newDir: Integer;
+  begin
+    if FObstacles = nil then Exit;
+    if FObstacles.Count = 0 then Exit;
+    for i := 0 to 40 do
+    begin
+      obsDesc := FObstacles.PItem[Random(FObstacles.Count)];
+      for j := 0 to 10 do
+      begin
+        newPos.x := Random(FMap.Radius * 2 + 1) - FMap.Radius;
+        newPos.y := Random(FMap.Radius * 2 + 1) - FMap.Radius;
+        newDir := Random(6);
+        if not FMap.IsCellExists(newPos) then Continue;
+        if not CanPlaceObstacle(FMap, obsDesc^, newPos, newDir) then Continue;
+        obs := TObstacle.Create(FMap);
+        obs.LoadModels(obsDesc^);
+        obs.SetRoomPosDir(newPos, newDir);
+        Break;
+      end;
+    end;
+  end;
+
 var lantern: TLantern;
     bot: TBot;
 
@@ -1476,6 +1714,7 @@ begin
   FLanterns := TbGameObjArr.Create();
   FUnits := TRoomUnitArr.Create();
   FActions := TBRA_ActionArr.Create();
+  FObstacles := LoadObstacles('models\scene1_obstacles.txt');
 
   menu := TavmUnitMenu.Create(Self);
   menu.OnEndTurnClick := {$IfDef FPC}@{$EndIf}OnEndTurnBtnClick;
@@ -1556,6 +1795,10 @@ begin
 
   FActiveUnit := FUnits.Count - 1;
   EndTurn();
+
+  CreateObstacles();
+
+  FMap.CurrentPlayer := FPlayer;
 end;
 
 end.

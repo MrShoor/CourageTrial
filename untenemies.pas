@@ -68,19 +68,22 @@ end;
 function TBot.IsEnemy(const ARoomUnit: TRoomUnit): Boolean;
 begin
   Result := ARoomUnit is TPlayer;
+  //Result := False;
 end;
 
 function TBot.FindEnemy(): TRoomUnit;
 var i: Integer;
 begin
   for i := 0 to Room.ChildCount() - 1 do
-    if Room.Child[i] is TPlayer then
+  begin
+    if (Room.Child[i] is TRoomUnit) and IsEnemy(TRoomUnit(Room.Child[i])) then
     begin
       Result := Room.Child[i] as TRoomUnit;
       if not Result.IsDead() then
         if CanSee(Result) then
           Exit;
     end;
+  end;
   Result := nil;
 end;
 
@@ -208,7 +211,7 @@ end;
 procedure TBotMutant1.LoadModels;
 begin
   ViewRange := 10;
-  ViewAngle := Pi/3;
+  ViewAngle := Pi/3+EPS;
   ViewWholeRange := 2.5;
 
   AddModel('Mutant1', mtDefault);
