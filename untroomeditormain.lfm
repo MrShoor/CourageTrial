@@ -1,8 +1,83 @@
 object fmrMain: TfmrMain
   Left = 457
-  Height = 862
+  Height = 864
   Top = 250
   Width = 1249
   Caption = 'fmrMain'
-  LCLVersion = '1.8.4.0'
+  ClientHeight = 844
+  ClientWidth = 1249
+  Menu = MainMenu
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  LCLVersion = '1.8.0.3'
+  object RenderPanel: TPanel
+    Left = 292
+    Height = 844
+    Top = 0
+    Width = 957
+    Align = alClient
+    TabOrder = 0
+    OnPaint = RenderPanelPaint
+  end
+  object ToolPanel: TPanel
+    Left = 0
+    Height = 844
+    Top = 0
+    Width = 287
+    Align = alLeft
+    ClientHeight = 844
+    ClientWidth = 287
+    TabOrder = 1
+    object lbObjects: TListBox
+      Left = 1
+      Height = 554
+      Top = 1
+      Width = 285
+      Align = alClient
+      ItemHeight = 64
+      OnDrawItem = lbObjectsDrawItem
+      Style = lbOwnerDrawFixed
+      TabOrder = 0
+    end
+    object Splitter2: TSplitter
+      Cursor = crVSplit
+      Left = 1
+      Height = 5
+      Top = 555
+      Width = 285
+      Align = alBottom
+      ResizeAnchor = akBottom
+    end
+    object Panel1: TPanel
+      Left = 1
+      Height = 283
+      Top = 560
+      Width = 285
+      Align = alBottom
+      Caption = 'Panel1'
+      TabOrder = 2
+    end
+  end
+  object Splitter1: TSplitter
+    Left = 287
+    Height = 844
+    Top = 0
+    Width = 5
+  end
+  object MainMenu: TMainMenu
+    left = 304
+    top = 80
+    object MenuItem1: TMenuItem
+      Caption = 'File'
+      object miNew: TMenuItem
+        Caption = 'New'
+      end
+      object miOpen: TMenuItem
+        Caption = 'Open'
+      end
+      object miSave: TMenuItem
+        Caption = 'Save'
+      end
+    end
+  end
 end

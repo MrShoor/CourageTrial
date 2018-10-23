@@ -8,9 +8,10 @@ unit untLevel;
 interface
 
 uses
+  Graphics,
   Math,
   Classes, SysUtils, avBase, avRes, bWorld, mutils, bLights, avMesh, avTypes, avTess, avContnrs, avContnrsDefaults,
-  avPathFinder, avMiniControls,
+  avPathFinder, avMiniControls, avModel, avTexLoader,
   untObstacles;
 
 type
@@ -394,6 +395,7 @@ type
     procedure OnAfterWorldDraw(Sender: TObject);
   public
     property Player: TPlayer read FPlayer;
+    property Obstacles: IObstacleArr read FObstacles;
 
     procedure KeyPress(KeyCode: Integer);
     procedure MouseMove(xpos, ypos: Integer);
@@ -404,6 +406,8 @@ type
 
     procedure Draw();
     procedure Generate();
+    procedure GenerateEmpty();
+    procedure DrawObstaclePreview(const AName: String; const bmp: TBitmap);
   end;
 
 function CanPlaceObstacle(const ARoom: TRoomMap; const AObstacle: TObstacleDesc; const APos: TVec2i; const ADir: Integer): Boolean;
@@ -1479,6 +1483,7 @@ end;
 
 function TBattleRoom.IsPlayerTurn: Boolean;
 begin
+  if FUnits.Count = 0 then Exit(False);
   Result := FUnits[FActiveUnit] = FPlayer;
 end;
 
@@ -1500,6 +1505,7 @@ var bot: TBot;
     i: LongInt;
 begin
   FWorld.UpdateStep();
+  if FUnits.Count = 0 then Exit;
 
   if IsPlayerTurn then
   begin
@@ -1672,7 +1678,8 @@ begin
   Main.Clear(Black, True, Main.Projection.DepthRange.y, True);
   FWorld.Renderer.DrawWorld;
 
-  FUnitMenu.Draw();
+  if FUnitMenu <> nil then
+    FUnitMenu.Draw();
 
   Main.ActiveFrameBuffer.BlitToWindow();
 end;
@@ -1715,14 +1722,13 @@ begin
   FUnits := TRoomUnitArr.Create();
   FActions := TBRA_ActionArr.Create();
   FObstacles := LoadObstacles('models\scene1_obstacles.txt');
+  FWorld.Renderer.PreloadModels(['models\scene1.avm']);
+  FWorld.Renderer.PreloadModels(['chars\gop.avm']);
+  FWorld.Renderer.PreloadModels(['enemies\creature1.avm']);
 
   menu := TavmUnitMenu.Create(Self);
   menu.OnEndTurnClick := {$IfDef FPC}@{$EndIf}OnEndTurnBtnClick;
   FUnitMenu := menu;
-
-  FWorld.Renderer.PreloadModels(['models\scene1.avm']);
-  FWorld.Renderer.PreloadModels(['chars\gop.avm']);
-  FWorld.Renderer.PreloadModels(['enemies\creature1.avm']);
 
   FFloor := TbGameObject.Create(FWorld);
   FFloor.AddModel('Floor', mtDefault);
@@ -1799,6 +1805,93 @@ begin
   CreateObstacles();
 
   FMap.CurrentPlayer := FPlayer;
+end;
+
+procedure TBattleRoom.GenerateEmpty;
+var lantern: TLantern;
+begin
+  FLanterns := TbGameObjArr.Create();
+  FUnits := TRoomUnitArr.Create();
+  FActions := TBRA_ActionArr.Create();
+  FObstacles := LoadObstacles('models\scene1_obstacles.txt');
+  FWorld.Renderer.PreloadModels(['models\scene1.avm']);
+  FWorld.Renderer.PreloadModels(['chars\gop.avm']);
+  FWorld.Renderer.PreloadModels(['enemies\creature1.avm']);
+
+  FFloor := TbGameObject.Create(FWorld);
+  FFloor.AddModel('Floor', mtDefault);
+
+  lantern := TLantern.Create(FMap);
+  lantern.LoadModels();
+  lantern.SetRoomPosDir(Vec(0,0), 0);
+  FLanterns.Add(lantern);
+end;
+
+procedure TBattleRoom.DrawObstaclePreview(const AName: String; const bmp: TBitmap);
+var inst: IavModelInstanceArr;
+    bbox: TAABB;
+
+    oldAt: TVec3;
+    oldEye: TVec3;
+
+    tmpfbo: TavFrameBuffer;
+    texdata: ITextureData;
+    mipdata: ITextureMip;
+
+    pDst: PVec3b;
+    pSrc: PVec4b;
+    j, i: Integer;
+begin
+  Assert(bmp.Width * bmp.Height > 0);
+
+  inst := FWorld.Renderer.CreateModelInstances([AName]);
+  inst[0].Mesh.Transform := IdentityMat4;
+  bbox := inst[0].Mesh.Mesh.BBox;
+
+  oldAt := Main.Camera.At;
+  oldEye := Main.Camera.Eye;
+
+  Main.Camera.At := bbox.Center;
+  Main.Camera.Eye := Main.Camera.At + normalize(Vec(-1, 1, -1)) * (Len(bbox.Size) / tan(Main.Projection.Fov*0.5))*0.65;
+
+  Main.States.CullMode := cmNone;
+  Main.States.DepthWrite := True;
+  Main.States.DepthTest := True;
+  Main.States.Blending[0] := False;
+
+  tmpfbo := Create_FrameBuffer(Self, [TTextureFormat.RGBA, TTextureFormat.D32f], [true, false]);
+  try
+    tmpfbo.FrameRect := RectI(0, 0, bmp.Width, bmp.Height);
+    tmpfbo.Select();
+    tmpfbo.Clear(0, Vec(0,0,0,0));
+    tmpfbo.ClearDS(Main.Projection.DepthRange.y);
+
+    FWorld.Renderer.ModelsProgram_NoLight.Select();
+    FWorld.Renderer.ModelsCollection.Select();
+    FWorld.Renderer.ModelsCollection.Draw(inst);
+
+    texdata := EmptyTexData(bmp.Width, bmp.Height, TTextureFormat.RGBA, False, True);
+    tmpfbo.GetColor(0).ReadBack(texdata, 0, 0);
+    mipdata := texdata.MipData(0, 0);
+    bmp.PixelFormat := pf24bit;
+
+    pSrc := PVec4b(mipdata.Data);
+    for j := 0 to bmp.Height - 1 do
+    begin
+      pDst := bmp.ScanLine[j];
+      for i := 0 to bmp.Width - 1 do
+      begin
+        pDst^ := Vec(pSrc^.z, pSrc^.y, pSrc^.x);
+        Inc(pDst);
+        Inc(pSrc);
+      end;
+    end;
+  finally
+    FreeAndNil(tmpfbo);
+  end;
+
+  Main.Camera.At := oldAt;
+  Main.Camera.Eye := oldEye;
 end;
 
 end.
