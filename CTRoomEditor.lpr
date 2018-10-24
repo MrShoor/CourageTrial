@@ -1,5 +1,6 @@
 program CTRoomEditor;
 
+//{$AppType Console}
 {$mode objfpc}{$H+}
 
 uses

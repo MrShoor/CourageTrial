@@ -55,6 +55,7 @@ type
     property RoomPos: TVec2i read FRoomPos write SetRoomPos;
     property RoomDir: Integer read FRoomDir write SetRoomDir;
     procedure SetRoomPosDir(const APos: TVec2i; const ADir: Integer; const AAutoRegister: Boolean = True); virtual;
+    property Registred: Boolean read FRegistered;
     procedure RegisterAtRoom();
     procedure UnregisterAtRoom();
 
@@ -64,6 +65,8 @@ type
   IRoomObjectArr = {$IfDef FPC}specialize{$EndIf} IArray<TRoomObject>;
   TRoomObjectSet = {$IfDef FPC}specialize{$EndIf} THashSet<TRoomObject>;
   IRoomObjectSet = {$IfDef FPC}specialize{$EndIf} IHashSet<TRoomObject>;
+
+  TRoomObjectClass = class of TRoomObject;
 
   { TRoomUnit }
 
@@ -256,9 +259,26 @@ type
     property CurrentPlayer: TRoomUnit read FCurrentPlayer write FCurrentPlayer;
   end;
 
+  { TObstacle }
+
+  TObstacle = class (TRoomObject)
+  private
+    FObstacle: TObstacleDesc;
+  public
+    property Obstacle: TObstacleDesc read FObstacle;
+
+    function BlockedCellsCount: Integer; override;
+    function GetBlockedCell(AIndex: Integer): TVec2i; override;
+    function BlockedViewCell(AIndex: Integer): Boolean; override;
+    procedure LoadModels(const AObstacle: TObstacleDesc); virtual;
+
+    procedure WriteStream(const AStream: TStream); virtual;
+    procedure ReadStream(const AStream: TStream); virtual;
+  end;
+
   { TLantern }
 
-  TLantern = class (TRoomObject)
+  TLantern = class (TObstacle)
   private const
     cLightSrcPos: TVec3 = (x: 0.89635; y: 2.51368; z: 0.03713);
   private
@@ -267,23 +287,8 @@ type
     procedure SetRoomDir(const AValue: Integer); override;
     procedure SetRoomPos(const AValue: TVec2i); override;
   public
-    function BlockedCellsCount: Integer; override;
-    function GetBlockedCell(AIndex: Integer): TVec2i; override;
-    function BlockedViewCell(AIndex: Integer): Boolean; override;
-    procedure LoadModels();
+    procedure LoadModels(const AObstacle: TObstacleDesc); override;
     procedure SetRoomPosDir(const APos: TVec2i; const ADir: Integer; const AAutoRegister: Boolean = True); override;
-  end;
-
-  { TObstacle }
-
-  TObstacle = class (TRoomObject)
-  private
-    FObstacle: TObstacleDesc;
-  public
-    function BlockedCellsCount: Integer; override;
-    function GetBlockedCell(AIndex: Integer): TVec2i; override;
-    function BlockedViewCell(AIndex: Integer): Boolean; override;
-    procedure LoadModels(const AObstacle: TObstacleDesc);
   end;
 
   { TPlayer }
@@ -385,6 +390,8 @@ type
     FMovePath : IRoomPath;
     FRayPath : IRoomPath;
 
+    FEmptyLight: IavPointLight;
+
     function IsPlayerTurn: Boolean;
     function IsBotTurn: Boolean;
     function IsMouseOnUI: Boolean;
@@ -393,9 +400,12 @@ type
     procedure AfterRegister; override;
 
     procedure OnAfterWorldDraw(Sender: TObject);
+
+    procedure PreloadModels;
   public
     property Player: TPlayer read FPlayer;
     property Obstacles: IObstacleArr read FObstacles;
+    property Map: TRoomMap read FMap;
 
     procedure KeyPress(KeyCode: Integer);
     procedure MouseMove(xpos, ypos: Integer);
@@ -406,16 +416,32 @@ type
 
     procedure Draw();
     procedure Generate();
+    procedure GenerateWithLoad(const AFileName: string);
     procedure GenerateEmpty();
     procedure DrawObstaclePreview(const AName: String; const bmp: TBitmap);
+
+    procedure SaveRoomMap(const AStream: TStream);
+    procedure LoadRoomMap(const AStream: TStream);
+
+    function CreateRoomObject(const AClass: TRoomObjectClass): TRoomObject;
   end;
 
 function CanPlaceObstacle(const ARoom: TRoomMap; const AObstacle: TObstacleDesc; const APos: TVec2i; const ADir: Integer): Boolean;
+
+procedure RegRoomClass(const ARoomClass: TRoomObjectClass);
+function  FindRoomClass(const AName: string): TRoomObjectClass;
 
 implementation
 
 uses
   untEnemies, untGraphics, ui_unit;
+
+type
+  IRoomClassesMap = {$IfDef FPC}specialize{$EndIf}IHashMap<string, TRoomObjectClass>;
+  TRoomClassesMap = {$IfDef FPC}specialize{$EndIf}THashMap<string, TRoomObjectClass>;
+
+var
+  gvRegRommClasses: IRoomClassesMap;
 
 function CanPlaceObstacle(const ARoom: TRoomMap; const AObstacle: TObstacleDesc; const APos: TVec2i; const ADir: Integer): Boolean;
 var cell: TVec2i;
@@ -425,9 +451,22 @@ begin
   begin
     cell := AObstacle.cells[i].xy;
     cell := TRoomObject.RotateTileCoord(cell, ADir) + APos;
+    if not ARoom.IsCellExists(cell) then Exit(False);
     if ARoom.ObjectAt(cell) <> nil then Exit(False);
   end;
   Result := True;
+end;
+
+procedure RegRoomClass(const ARoomClass: TRoomObjectClass);
+begin
+  if gvRegRommClasses = nil then gvRegRommClasses := TRoomClassesMap.Create();
+  gvRegRommClasses.AddOrSet(ARoomClass.ClassName, ARoomClass);
+end;
+
+function FindRoomClass(const AName: string): TRoomObjectClass;
+begin
+  if gvRegRommClasses = nil then Exit(nil);
+  if not gvRegRommClasses.TryGetValue(AName, Result) then Result := nil;
 end;
 
 { TObstacle }
@@ -451,6 +490,30 @@ procedure TObstacle.LoadModels(const AObstacle: TObstacleDesc);
 begin
   FObstacle := AObstacle;
   AddModel(FObstacle.name, mtDefault);
+end;
+
+procedure TObstacle.WriteStream(const AStream: TStream);
+begin
+  FObstacle.WriteStream(AStream);
+  AStream.WriteBuffer(FRoomPos, SizeOf(FRoomPos));
+  AStream.WriteBuffer(FRoomDir, SizeOf(FRoomDir));
+end;
+
+procedure TObstacle.ReadStream(const AStream: TStream);
+var rPos: TVec2i;
+    rDir: Integer;
+begin
+  rPos := Vec(0,0);
+  rDir := 0;
+  UnregisterAtRoom();
+  FModels.Clear();
+
+  FObstacle.ReadStream(AStream);
+  AStream.ReadBuffer(rPos, SizeOf(rPos));
+  AStream.ReadBuffer(rDir, SizeOf(rDir));
+
+  LoadModels(FObstacle);
+  SetRoomPosDir(rPos, rDir);
 end;
 
 { TBRA_Action }
@@ -1339,6 +1402,7 @@ begin
       TRoomUnit(roomobj).OnRegisterRoomObject(AObject);
 
   FRoomUI.InvalidateFogOfWar;
+  Main.InvalidateWindow;
 end;
 
 procedure TRoomMap.RemoveObject(const AObject: TRoomObject);
@@ -1357,6 +1421,8 @@ begin
       FRoomUI.TileColor[v] := TTileColorID.Normal;
     end;
   end;
+  FRoomUI.InvalidateFogOfWar;
+  Main.InvalidateWindow;
 end;
 
 function TRoomMap.ObjectAt(const APos: TVec2i): TRoomObject;
@@ -1439,27 +1505,9 @@ begin
   FLight.Pos := cLightSrcPos * Transform();
 end;
 
-function TLantern.BlockedCellsCount: Integer;
+procedure TLantern.LoadModels(const AObstacle: TObstacleDesc);
 begin
-  Result := 2;
-end;
-
-function TLantern.GetBlockedCell(AIndex: Integer): TVec2i;
-begin
-  case AIndex mod 2 of
-    0: Result := Vec(0,0);
-    1: Result := Vec(1,0);
-  end;
-end;
-
-function TLantern.BlockedViewCell(AIndex: Integer): Boolean;
-begin
-  Result := AIndex <> 1;
-end;
-
-procedure TLantern.LoadModels();
-begin
-  AddModel('Lantern', mtDefault);
+  inherited LoadModels(AObstacle);
   FLight := World.Renderer.CreatePointLight();
   FLight.Pos := cLightSrcPos;
   FLight.Radius := 30;
@@ -1562,6 +1610,20 @@ begin
     Main.States.SetBlendFunctions(bfSrcAlpha, bfInvSrcAlpha);
     FMap.Draw();
     Main.States.DepthWrite := oldDepthWrite;
+end;
+
+procedure TBattleRoom.PreloadModels;
+begin
+  FLanterns := TbGameObjArr.Create();
+  FUnits := TRoomUnitArr.Create();
+  FActions := TBRA_ActionArr.Create();
+  FObstacles := LoadObstacles(ExeRelativeFileName('models\scene1_obstacles.txt'));
+  FWorld.Renderer.PreloadModels([ExeRelativeFileName('models\scene1.avm')]);
+  //FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
+  //FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\creature1.avm')]);
+
+  FFloor := TbGameObject.Create(FWorld);
+  FFloor.AddModel('Floor', mtDefault);
 end;
 
 procedure TBattleRoom.KeyPress(KeyCode: Integer);
@@ -1717,14 +1779,15 @@ var lantern: TLantern;
     bot: TBot;
 
     menu: TavmUnitMenu;
+    obsDescIdx, i: Integer;
 begin
   FLanterns := TbGameObjArr.Create();
   FUnits := TRoomUnitArr.Create();
   FActions := TBRA_ActionArr.Create();
-  FObstacles := LoadObstacles('models\scene1_obstacles.txt');
-  FWorld.Renderer.PreloadModels(['models\scene1.avm']);
-  FWorld.Renderer.PreloadModels(['chars\gop.avm']);
-  FWorld.Renderer.PreloadModels(['enemies\creature1.avm']);
+  FObstacles := LoadObstacles(ExeRelativeFileName('models\scene1_obstacles.txt'));
+  FWorld.Renderer.PreloadModels([ExeRelativeFileName('models\scene1.avm')]);
+  FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
+  FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\creature1.avm')]);
 
   menu := TavmUnitMenu.Create(Self);
   menu.OnEndTurnClick := {$IfDef FPC}@{$EndIf}OnEndTurnBtnClick;
@@ -1733,60 +1796,71 @@ begin
   FFloor := TbGameObject.Create(FWorld);
   FFloor.AddModel('Floor', mtDefault);
 
-  lantern := TLantern.Create(FMap);
-  lantern.LoadModels();
-  lantern.SetRoomPosDir(Vec(0,0), 0);
-  FLanterns.Add(lantern);
+  obsDescIdx := -1;
+  for i := 0 to FObstacles.Count - 1 do
+    if FObstacles[i].name = 'Lantern' then
+    begin
+      obsDescIdx := i;
+      Break;
+    end;
 
-  //lantern := TLantern.Create(FMap);
-  //lantern.LoadModels();
-  //lantern.SetRoomPosDir(Vec(3,0), 1);
-  //FLanterns.Add(lantern);
-  //
-  //lantern := TLantern.Create(FMap);
-  //lantern.LoadModels();
-  //lantern.SetRoomPosDir(Vec(6,0), 2);
-  //FLanterns.Add(lantern);
-  //
-  //lantern := TLantern.Create(FMap);
-  //lantern.LoadModels();
-  //lantern.SetRoomPosDir(Vec(9,0), 3);
-  //FLanterns.Add(lantern);
-  //
-  //lantern := TLantern.Create(FMap);
-  //lantern.LoadModels();
-  //lantern.SetRoomPosDir(Vec(12,0), 4);
-  //FLanterns.Add(lantern);
+  if obsDescIdx > 0 then
+  begin
+    lantern := TLantern.Create(FMap);
+    lantern.LoadModels(FObstacles[obsDescIdx]);
+    lantern.SetRoomPosDir(Vec(0,0), 0);
+    FLanterns.Add(lantern);
 
-  lantern := TLantern.Create(FMap);
-  lantern.LoadModels();
-  lantern.SetRoomPosDir(Vec(15,0), 5);
-  FLanterns.Add(lantern);
+    //lantern := TLantern.Create(FMap);
+    //lantern.LoadModels();
+    //lantern.SetRoomPosDir(Vec(3,0), 1);
+    //FLanterns.Add(lantern);
+    //
+    //lantern := TLantern.Create(FMap);
+    //lantern.LoadModels();
+    //lantern.SetRoomPosDir(Vec(6,0), 2);
+    //FLanterns.Add(lantern);
+    //
+    //lantern := TLantern.Create(FMap);
+    //lantern.LoadModels();
+    //lantern.SetRoomPosDir(Vec(9,0), 3);
+    //FLanterns.Add(lantern);
+    //
+    //lantern := TLantern.Create(FMap);
+    //lantern.LoadModels();
+    //lantern.SetRoomPosDir(Vec(12,0), 4);
+    //FLanterns.Add(lantern);
 
-  //lantern := TLantern.Create(FMap);
-  //lantern.LoadModels();
-  //lantern.SetRoomPosDir(Vec(0,3), 1);
-  //FLanterns.Add(lantern);
-  //
-  //lantern := TLantern.Create(FMap);
-  //lantern.LoadModels();
-  //lantern.SetRoomPosDir(Vec(0,6), 2);
-  //FLanterns.Add(lantern);
-  //
-  //lantern := TLantern.Create(FMap);
-  //lantern.LoadModels();
-  //lantern.SetRoomPosDir(Vec(0,9), 3);
-  //FLanterns.Add(lantern);
-  //
-  //lantern := TLantern.Create(FMap);
-  //lantern.LoadModels();
-  //lantern.SetRoomPosDir(Vec(0,12), 4);
-  //FLanterns.Add(lantern);
-  //
-  //lantern := TLantern.Create(FMap);
-  //lantern.LoadModels();
-  //lantern.SetRoomPosDir(Vec(0,15), 5);
-  //FLanterns.Add(lantern);
+    lantern := TLantern.Create(FMap);
+    lantern.LoadModels(FObstacles[obsDescIdx]);
+    lantern.SetRoomPosDir(Vec(15,0), 5);
+    FLanterns.Add(lantern);
+
+    //lantern := TLantern.Create(FMap);
+    //lantern.LoadModels();
+    //lantern.SetRoomPosDir(Vec(0,3), 1);
+    //FLanterns.Add(lantern);
+    //
+    //lantern := TLantern.Create(FMap);
+    //lantern.LoadModels();
+    //lantern.SetRoomPosDir(Vec(0,6), 2);
+    //FLanterns.Add(lantern);
+    //
+    //lantern := TLantern.Create(FMap);
+    //lantern.LoadModels();
+    //lantern.SetRoomPosDir(Vec(0,9), 3);
+    //FLanterns.Add(lantern);
+    //
+    //lantern := TLantern.Create(FMap);
+    //lantern.LoadModels();
+    //lantern.SetRoomPosDir(Vec(0,12), 4);
+    //FLanterns.Add(lantern);
+    //
+    //lantern := TLantern.Create(FMap);
+    //lantern.LoadModels();
+    //lantern.SetRoomPosDir(Vec(0,15), 5);
+    //FLanterns.Add(lantern);
+  end;
 
   FPlayer := TPlayer.Create(FMap);
   //FPlayer.SetRoomPosDir(Vec(5, 5), 0);
@@ -1807,24 +1881,77 @@ begin
   FMap.CurrentPlayer := FPlayer;
 end;
 
-procedure TBattleRoom.GenerateEmpty;
-var lantern: TLantern;
+procedure TBattleRoom.GenerateWithLoad(const AFileName: string);
+
+  procedure LoadObstacles;
+  var fs: TFileStream;
+  begin
+    fs := TFileStream.Create(ExeRelativeFileName(AFileName), fmOpenRead);
+    try
+      LoadRoomMap(fs);
+    finally
+      FreeAndNil(fs);
+    end;
+  end;
+
+  function GetSpawnPlace(): TVec2i;
+  begin
+    repeat
+      Result.x := Random(FMap.Radius*2+1) - FMap.Radius;
+      Result.y := Random(FMap.Radius*2+1) - FMap.Radius;
+      if FMap.IsCellExists(Result) and not FMap.IsCellBlocked(Result) then
+        Exit(Result);
+    until False;
+  end;
+
+  procedure SpawnBot();
+  var bot: TBot;
+  begin
+    bot := TBotArcher1.Create(FMap);
+    bot.LoadModels();
+    bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
+    FUnits.Add(bot);
+  end;
+
+var
+  i: Integer;
+  menu: TavmUnitMenu;
 begin
-  FLanterns := TbGameObjArr.Create();
-  FUnits := TRoomUnitArr.Create();
-  FActions := TBRA_ActionArr.Create();
-  FObstacles := LoadObstacles('models\scene1_obstacles.txt');
-  FWorld.Renderer.PreloadModels(['models\scene1.avm']);
-  FWorld.Renderer.PreloadModels(['chars\gop.avm']);
-  FWorld.Renderer.PreloadModels(['enemies\creature1.avm']);
+  PreloadModels;
+  FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
+  FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\creature1.avm')]);
+  FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\archer\archer.avm')]);
 
-  FFloor := TbGameObject.Create(FWorld);
-  FFloor.AddModel('Floor', mtDefault);
+  menu := TavmUnitMenu.Create(Self);
+  menu.OnEndTurnClick := {$IfDef FPC}@{$EndIf}OnEndTurnBtnClick;
+  FUnitMenu := menu;
 
-  lantern := TLantern.Create(FMap);
-  lantern.LoadModels();
-  lantern.SetRoomPosDir(Vec(0,0), 0);
-  FLanterns.Add(lantern);
+  LoadObstacles();
+
+  FPlayer := TPlayer.Create(FMap);
+  //FPlayer.SetRoomPosDir(Vec(5, 5), 0);
+  FPlayer.LoadModels();
+  FPlayer.SetRoomPosDir(GetSpawnPlace(), Random(6));
+  FUnits.Add(FPlayer);
+
+  for i := 0 to 6 do
+    SpawnBot();
+
+  FActiveUnit := FUnits.Count - 1;
+  EndTurn();
+
+  FMap.CurrentPlayer := FPlayer;
+end;
+
+procedure TBattleRoom.GenerateEmpty;
+begin
+  PreloadModels;
+
+  FEmptyLight := FWorld.Renderer.CreatePointLight();
+  FEmptyLight.Pos := Vec(0, 10, 0);
+  FEmptyLight.Radius := 50;
+  FEmptyLight.Color := Vec(1,1,1);
+  FEmptyLight.CastShadows := True;
 end;
 
 procedure TBattleRoom.DrawObstaclePreview(const AName: String; const bmp: TBitmap);
@@ -1893,6 +2020,55 @@ begin
   Main.Camera.At := oldAt;
   Main.Camera.Eye := oldEye;
 end;
+
+procedure TBattleRoom.SaveRoomMap(const AStream: TStream);
+var obs: TObstacle;
+    obsCount: Integer;
+    i: Integer;
+begin
+  obsCount := Map.ChildCount(TObstacle);
+  AStream.WriteBuffer(obsCount, SizeOf(obsCount));
+
+  for i := 0 to Map.ChildCount - 1 do
+  begin
+    if (Map.Child[i] is TObstacle) then
+    begin
+      obs := TObstacle(Map.Child[i]);
+      StreamWriteString(AStream, obs.ClassName);
+      obs.WriteStream(AStream);
+    end;
+  end;
+end;
+
+procedure TBattleRoom.LoadRoomMap(const AStream: TStream);
+var obs: TObstacle;
+    obsCount: Integer;
+    i: Integer;
+    clsName : string;
+    roomCls : TRoomObjectClass;
+begin
+  obsCount := 0;
+  AStream.ReadBuffer(obsCount, SizeOf(obsCount));
+
+  for i := 0 to obsCount - 1 do
+  begin
+    StreamReadString(AStream, clsName);
+    roomCls := FindRoomClass(clsName);
+    Assert(roomCls <> nil);
+    Assert(roomCls.InheritsFrom(TObstacle));
+    obs := CreateRoomObject(roomCls) as TObstacle;
+    obs.ReadStream(AStream);
+  end;
+end;
+
+function TBattleRoom.CreateRoomObject(const AClass: TRoomObjectClass): TRoomObject;
+begin
+  Result := AClass.Create(FMap);
+end;
+
+initialization
+  RegRoomClass(TObstacle);
+  RegRoomClass(TLantern);
 
 end.
 

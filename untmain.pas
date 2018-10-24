@@ -123,7 +123,7 @@ end;
 procedure TfrmMain.InitWorld;
 begin
   FRoom := TBattleRoom.Create(FMain);
-  FRoom.Generate();
+  FRoom.GenerateWithLoad('rooms\r1.room');
 end;
 
 end.

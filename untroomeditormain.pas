@@ -14,12 +14,26 @@ uses
   Menus, StdCtrls,
   avRes, avTypes, avCameraController,
   mutils,
-  untLevel, Types;
+  untLevel, untObstacles;
 
 const
   cPreviewSize = 96;
 
 type
+  TEditActionState = (easNone, easAddObject);
+
+  { TAddObjectState }
+
+  TAddObjectState = record
+    obstacleDesc: TObstacleDesc;
+    obstacle: TObstacle;
+    procedure SetStateNew(const ARoom: TBattleRoom; const AObstacleIndex: Integer); overload;
+    procedure SetStateNew(const ARoom: TBattleRoom; const AObstacle: TObstacleDesc); overload;
+    procedure SetState(const AObstacle: TObstacle); overload;
+    procedure UpdateState(const ARoomPos: TVec2i; const ARoomDir: Integer);
+    procedure ClearState();
+    procedure CancelState();
+  end;
 
   { TfmrMain }
 
@@ -30,15 +44,23 @@ type
     miNew: TMenuItem;
     miOpen: TMenuItem;
     miSave: TMenuItem;
+    OpenRoomDialog: TOpenDialog;
     Panel1: TPanel;
+    SaveRoomDialog: TSaveDialog;
     Splitter2: TSplitter;
     ToolPanel: TPanel;
     RenderPanel: TPanel;
     Splitter1: TSplitter;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
-    procedure lbObjectsDrawItem(Control: TWinControl; Index: Integer;
-      ARect: TRect; State: TOwnerDrawState);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure lbObjectsDblClick(Sender: TObject);
+    procedure lbObjectsDrawItem(Control: TWinControl; Index: Integer; ARect: TRect; State: TOwnerDrawState);
+    procedure miNewClick(Sender: TObject);
+    procedure miOpenClick(Sender: TObject);
+    procedure miSaveClick(Sender: TObject);
+    procedure RenderPanelDblClick(Sender: TObject);
+    procedure RenderPanelMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
     procedure RenderPanelPaint(Sender: TObject);
   private
     FMain: TavMainRender;
@@ -47,6 +69,11 @@ type
     FRoom: TBattleRoom;
 
     FObstaclePreviews: array of TBitmap;
+
+    FState: TEditActionState;
+    FState_AddObject: TAddObjectState;
+
+    procedure ClearEditState;
 
     procedure RenderScene;
     procedure CreateNewRoom;
@@ -63,11 +90,69 @@ implementation
 
 {$R *.lfm}
 
+{ TAddObjectState }
+
+procedure TAddObjectState.SetStateNew(const ARoom: TBattleRoom; const AObstacleIndex: Integer);
+begin
+  SetStateNew(ARoom, ARoom.Obstacles[AObstacleIndex]);
+end;
+
+procedure TAddObjectState.SetStateNew(const ARoom: TBattleRoom; const AObstacle: TObstacleDesc);
+var cls: TRoomObjectClass;
+begin
+  Assert(obstacle = nil);
+  obstacleDesc := AObstacle;
+  cls := FindRoomClass(obstacleDesc.clsname);
+  if cls = nil then
+    cls := TObstacle;
+  obstacle := ARoom.CreateRoomObject(cls) as TObstacle;
+  obstacle.LoadModels(obstacleDesc);
+end;
+
+procedure TAddObjectState.SetState(const AObstacle: TObstacle);
+begin
+  obstacle := AObstacle;
+  obstacleDesc := obstacle.Obstacle;
+end;
+
+procedure TAddObjectState.UpdateState(const ARoomPos: TVec2i; const ARoomDir: Integer);
+begin
+  if (obstacle.RoomPos = ARoomPos) and (obstacle.RoomDir = ARoomDir) then Exit;
+  obstacle.UnregisterAtRoom();
+  if CanPlaceObstacle(obstacle.Room, obstacleDesc, ARoomPos, ARoomDir) then
+  begin
+    obstacle.RoomPos := ARoomPos;
+    obstacle.RoomDir := ARoomDir;
+  end;
+  if CanPlaceObstacle(obstacle.Room, obstacleDesc, obstacle.RoomPos, obstacle.RoomDir) then
+    obstacle.RegisterAtRoom();
+end;
+
+procedure TAddObjectState.ClearState;
+begin
+  obstacle := nil;
+end;
+
+procedure TAddObjectState.CancelState;
+begin
+  FreeAndNil(obstacle);
+end;
+
 { TfmrMain }
 
 procedure TfmrMain.RenderPanelPaint(Sender: TObject);
 begin
   RenderScene();
+end;
+
+procedure TfmrMain.ClearEditState;
+begin
+  case FState of
+    easAddObject: begin
+      FState_AddObject.CancelState();
+      FState := easNone;
+    end;
+  end;
 end;
 
 procedure TfmrMain.FormCreate(Sender: TObject);
@@ -102,6 +187,29 @@ begin
   CleanObstaclePreview;
 end;
 
+procedure TfmrMain.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  case FState of
+    easAddObject : begin
+      if Key = VK_SPACE then
+        FState_AddObject.UpdateState(FState_AddObject.obstacle.RoomPos, (FState_AddObject.obstacle.RoomDir + 1) mod 6);
+      if (Key = VK_ESCAPE) or (Key = VK_DELETE) then
+      begin
+        FState := easNone;
+        FState_AddObject.CancelState();
+      end;
+    end;
+  end;
+end;
+
+procedure TfmrMain.lbObjectsDblClick(Sender: TObject);
+begin
+  if lbObjects.ItemIndex = -1 then Exit;
+  ClearEditState;
+  FState_AddObject.SetStateNew(FRoom, lbObjects.ItemIndex);
+  FState := easAddObject;
+end;
+
 procedure TfmrMain.lbObjectsDrawItem(Control: TWinControl; Index: Integer; ARect: TRect; State: TOwnerDrawState);
 var cnv: TCanvas;
     bgColor: TColor;
@@ -133,6 +241,83 @@ begin
   cnv.Rectangle(previewRect);
 end;
 
+procedure TfmrMain.miNewClick(Sender: TObject);
+begin
+  CreateNewRoom;
+end;
+
+procedure TfmrMain.miOpenClick(Sender: TObject);
+var fs: TFileStream;
+begin
+  if OpenRoomDialog.Execute then
+  begin
+    CreateNewRoom;
+    fs := TFileStream.Create(OpenRoomDialog.FileName, fmOpenRead);
+    try
+      FRoom.LoadRoomMap(fs);
+    finally
+      FreeAndNil(fs);
+    end;
+  end;
+end;
+
+procedure TfmrMain.miSaveClick(Sender: TObject);
+var fs: TFileStream;
+begin
+  if SaveRoomDialog.Execute then
+  begin
+    ClearEditState;
+    fs := TFileStream.Create(SaveRoomDialog.FileName, fmCreate);
+    try
+      FRoom.SaveRoomMap(fs);
+    finally
+      FreeAndNil(fs);
+    end;
+  end;
+end;
+
+procedure TfmrMain.RenderPanelDblClick(Sender: TObject);
+var movedTile: TVec2i;
+    obj: TRoomObject;
+begin
+  case FState of
+    easNone : begin
+      movedTile := FRoom.Map.UI.GetTileAtCoords(FMain.Cursor.Ray);
+      obj := FRoom.Map.ObjectAt(movedTile);
+      if obj is TObstacle then
+      begin
+        FState := easAddObject;
+        if ssShift in GetKeyShiftState then
+        begin
+          FState_AddObject.SetStateNew(FRoom, TObstacle(obj).Obstacle);
+          FState_AddObject.obstacle.RoomPos := obj.RoomPos;
+          FState_AddObject.obstacle.RoomDir := obj.RoomDir;
+        end
+        else
+          FState_AddObject.SetState(obj as TObstacle);
+      end;
+    end;
+    easAddObject: begin
+      FState := easNone;
+      if FState_AddObject.obstacle.Registred then
+        FState_AddObject.ClearState()
+      else
+        FState_AddObject.CancelState();
+    end;
+  end;
+end;
+
+procedure TfmrMain.RenderPanelMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
+var movedTile: TVec2i;
+begin
+  if FState = easNone then Exit;
+  if FState = easAddObject then
+  begin
+    movedTile := FRoom.Map.UI.GetTileAtCoords(FMain.Cursor.Ray);
+    FState_AddObject.UpdateState(movedTile, FState_AddObject.obstacle.RoomDir);
+  end;
+end;
+
 procedure TfmrMain.RenderScene;
 begin
   if FMain.Bind then
@@ -140,7 +325,10 @@ begin
     FDefFBO.FrameRect := RectI(0, 0, FMain.WindowSize.x, FMain.WindowSize.y);
     FDefFBO.Select();
 
-    FRoom.Draw();
+    if FRoom = nil then
+      FMain.Clear(Vec(0,0,0,0))
+    else
+      FRoom.Draw();
 
     FMain.Present;
   finally
@@ -152,7 +340,14 @@ procedure TfmrMain.CreateNewRoom;
 var
   i: Integer;
 begin
+  ClearEditState;
+
   FreeAndNil(FRoom);
+  if FMain.Inited3D then
+  begin
+    FMain.InvalidateWindow;
+    UpdateWindow(FMain.Window);
+  end;
   FRoom := TBattleRoom.Create(FMain);
   FRoom.GenerateEmpty();
 

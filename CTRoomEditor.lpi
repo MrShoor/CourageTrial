@@ -124,6 +124,7 @@
       <Unit4>
         <Filename Value="untgraphics.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="untGraphics"/>
       </Unit4>
       <Unit5>
         <Filename Value="untobstacles.pas"/>

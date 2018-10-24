@@ -59,3 +59,7 @@ O 0 0 0
 N Trough
 O 0 0 0
 O 1 0 0
+N Lantern
+C TLantern
+O 0 0 0
+O 1 0 0

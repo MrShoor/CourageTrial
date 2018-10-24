@@ -32,7 +32,7 @@ type
     procedure AddToLastSeenMap(const AUnit: TRoomUnit);
     procedure OnRegisterRoomObject(const ANewObject: TRoomObject); override;
   public
-    function DoAction(): IBRA_Action;
+    function DoAction(): IBRA_Action; virtual; abstract;
   end;
   TBotArr = {$IfDef FPC}specialize{$EndIf} TArray<TBot>;
   IBotArr = {$IfDef FPC}specialize{$EndIf} IArray<TBot>;
@@ -52,9 +52,91 @@ type
     function  GetUnitMoveSpeed: Single; override;
 
     procedure LoadModels(); override;
+
+    function DoAction(): IBRA_Action; override;
+  end;
+
+  { TBotArcher1 }
+
+  TBotArcher1 = class (TBot)
+  private
+    FAnim: array of IavAnimationController;
+  protected
+    procedure UpdateStep; override;
+  public
+    procedure SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean); override;
+    function  GetUnitMoveSpeed: Single; override;
+
+    procedure LoadModels(); override;
+
+    function DoAction(): IBRA_Action; override;
   end;
 
 implementation
+
+{ TBotArcher1 }
+
+procedure TBotArcher1.UpdateStep;
+var i: Integer;
+begin
+  inherited UpdateStep;
+  for i := 0 to Length(FAnim) - 1 do
+    FAnim[i].SetTime(World.GameTime);
+end;
+
+procedure TBotArcher1.SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean);
+var i: Integer;
+begin
+  inherited SetAnimation(ANameSequence, ALoopedLast);
+  for i := 0 to Length(FAnim) - 1 do
+    FAnim[i].AnimationSequence_StartAndStopOther(ANameSequence, ALoopedLast);
+end;
+
+function TBotArcher1.GetUnitMoveSpeed: Single;
+begin
+  Result := 5;
+end;
+
+procedure TBotArcher1.LoadModels;
+var
+  i: Integer;
+begin
+  ViewRange := 16;
+  ViewAngle := Pi/3+EPS;
+  ViewWholeRange := 2.5;
+
+  AddModel('Erika_Archer_Body_Mesh', mtDefault);
+  AddModel('Erika_Archer_Bow_Mesh', mtDefault);
+  AddModel('Erika_Archer_Clothes_Mesh', mtDefault);
+  AddModel('Erika_Archer_Eyelashes_Mesh', mtDefault);
+  AddModel('Erika_Archer_Eyes_Mesh', mtDefault);
+
+  SetLength(FAnim, FModels.Count);
+  for i := 0 to FModels.Count - 1 do
+    FAnim[i] := Create_IavAnimationController(FModels[i].Mesh.Pose, World.GameTime);
+  SetAnimation(['Idle0'], True);
+
+  MaxAP := 8;
+  MaxHP := 100;
+  HP := MaxHP;
+
+  Preview96_128 := 'ui\units\archer.png';
+end;
+
+function TBotArcher1.DoAction: IBRA_Action;
+var
+  path: IRoomPath;
+begin
+  if AP = 0 then Exit(nil);
+
+  path := GetMovePath();
+  if (path <> nil) and (path.Count > 0) then
+  begin
+    Result := TBRA_UnitMovementAction.Create(Self, path);
+    Exit
+  end;
+  Exit(nil);
+end;
 
 { TBot }
 
@@ -155,39 +237,6 @@ begin
           AddToLastSeenMap(TRoomUnit(ANewObject));
 end;
 
-function TBot.DoAction(): IBRA_Action;
-var player: TRoomUnit;
-    path: IRoomPath;
-begin
-  player := FindEnemy();
-  if AP = 0 then Exit(nil);
-
-  if player = nil then
-  begin
-    path := GetMovePath();
-    if (path <> nil) and (path.Count > 0) then
-    begin
-      Result := TBRA_UnitMovementAction.Create(Self, path);
-      Exit
-    end;
-  end;
-
-  if TBRA_UnitDefaultAttack.CanUse(Self, player) then
-  begin
-    Result := TBRA_UnitDefaultAttack.Create(Self, player, 1000, 300);
-    Exit;
-  end;
-
-  if Room.Distance(player.RoomPos, RoomPos) > 1 then
-  begin
-    path := FindPath(player.RoomPos, player);
-    if (path <> nil) and (path.Count > 0) then
-    begin
-      Result := TBRA_UnitMovementAction.Create(Self, path);
-    end;
-  end;
-end;
-
 { TBotMutant1 }
 
 procedure TBotMutant1.UpdateStep;
@@ -216,13 +265,47 @@ begin
 
   AddModel('Mutant1', mtDefault);
   FAnim := Create_IavAnimationController(FModels[0].Mesh.Pose, World.GameTime);
-  SetAnimation(['Idle0'], False);
+  SetAnimation(['Idle0'], True);
 
   MaxAP := 8;
   MaxHP := 100;
   HP := MaxHP;
 
   Preview96_128 := 'ui\units\mutant1.png';
+end;
+
+function TBotMutant1.DoAction: IBRA_Action;
+var player: TRoomUnit;
+    path: IRoomPath;
+begin
+  player := FindEnemy();
+  if AP = 0 then Exit(nil);
+
+  if player = nil then
+  begin
+    path := GetMovePath();
+    if (path <> nil) and (path.Count > 0) then
+    begin
+      Result := TBRA_UnitMovementAction.Create(Self, path);
+      Exit
+    end;
+    Exit(nil);
+  end;
+
+  if TBRA_UnitDefaultAttack.CanUse(Self, player) then
+  begin
+    Result := TBRA_UnitDefaultAttack.Create(Self, player, 1000, 300);
+    Exit;
+  end;
+
+  if Room.Distance(player.RoomPos, RoomPos) > 1 then
+  begin
+    path := FindPath(player.RoomPos, player);
+    if (path <> nil) and (path.Count > 0) then
+    begin
+      Result := TBRA_UnitMovementAction.Create(Self, path);
+    end;
+  end;
 end;
 
 end.

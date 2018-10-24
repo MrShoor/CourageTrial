@@ -6,9 +6,11 @@ object fmrMain: TfmrMain
   Caption = 'fmrMain'
   ClientHeight = 844
   ClientWidth = 1249
+  KeyPreview = True
   Menu = MainMenu
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnKeyDown = FormKeyDown
   LCLVersion = '1.8.0.3'
   object RenderPanel: TPanel
     Left = 292
@@ -16,7 +18,10 @@ object fmrMain: TfmrMain
     Top = 0
     Width = 957
     Align = alClient
+    BevelOuter = bvNone
     TabOrder = 0
+    OnDblClick = RenderPanelDblClick
+    OnMouseMove = RenderPanelMouseMove
     OnPaint = RenderPanelPaint
   end
   object ToolPanel: TPanel
@@ -30,11 +35,12 @@ object fmrMain: TfmrMain
     TabOrder = 1
     object lbObjects: TListBox
       Left = 1
-      Height = 554
+      Height = 823
       Top = 1
       Width = 285
       Align = alClient
       ItemHeight = 64
+      OnDblClick = lbObjectsDblClick
       OnDrawItem = lbObjectsDrawItem
       Style = lbOwnerDrawFixed
       TabOrder = 0
@@ -43,15 +49,15 @@ object fmrMain: TfmrMain
       Cursor = crVSplit
       Left = 1
       Height = 5
-      Top = 555
+      Top = 824
       Width = 285
       Align = alBottom
       ResizeAnchor = akBottom
     end
     object Panel1: TPanel
       Left = 1
-      Height = 283
-      Top = 560
+      Height = 14
+      Top = 829
       Width = 285
       Align = alBottom
       Caption = 'Panel1'
@@ -71,13 +77,28 @@ object fmrMain: TfmrMain
       Caption = 'File'
       object miNew: TMenuItem
         Caption = 'New'
+        OnClick = miNewClick
       end
       object miOpen: TMenuItem
         Caption = 'Open'
+        OnClick = miOpenClick
       end
       object miSave: TMenuItem
         Caption = 'Save'
+        OnClick = miSaveClick
       end
     end
+  end
+  object SaveRoomDialog: TSaveDialog
+    DefaultExt = '.room'
+    Filter = 'Room|*.room'
+    left = 439
+    top = 76
+  end
+  object OpenRoomDialog: TOpenDialog
+    DefaultExt = '.room'
+    Filter = 'Room|*.room'
+    left = 439
+    top = 128
   end
 end
