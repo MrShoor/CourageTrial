@@ -86,18 +86,27 @@ type
   { TRoomBullet }
 
   TRoomBullet = class (TbGameObject)
+  private
+    procedure SetVisible(const AValue: Boolean);
   protected
     FDmg: Integer;
     FStartPt: TVec2i;
     FTarget: TVec2i;
     FMaxRange: Single;
     FVelocity: Single;
+    FVisible: Boolean;
   public
+    function GetVisible(): Boolean; override;
+  public
+    function Accuracy(const ADist: Single): Single; virtual;
+
     property Dmg: Integer read FDmg write FDmg;
     property StartPt: TVec2i read FStartPt write FStartPt;
     property Target: TVec2i read FTarget write FTarget;
     property Velocity: Single read FVelocity write FVelocity;
     property MaxRange: Single read FMaxRange write FMaxRange;
+
+    property Visible: Boolean read GetVisible write SetVisible;
 
     procedure LoadModels(const AModelName: string);
   end;
@@ -384,13 +393,23 @@ type
   { TBRA_Shoot }
 
   TBRA_Shoot = class (TBRA_Action)
+  private type
+      TBulletInfo = record
+        bullet: TRoomBullet;
+        start : TVec3;
+        stop  : TVec3;
+        hit   : TRoomUnit;
+      end;
+      PBulletInfo = ^TBulletInfo;
+      IBulletInfoArr = {$IfDef FPC}specialize{$EndIf} IArray<TBulletInfo>;
+      TBulletInfoArr = {$IfDef FPC}specialize{$EndIf} TArray<TBulletInfo>;
   private
     FRoomUint: TRoomUnit;
-    FBullets: IbGameObjArr;
-    FPaths  : IRoomPathArr;
+    FBullets: IBulletInfoArr;
+    FShootDelay: Integer;
   public
     function ProcessAction: Boolean; override;
-    constructor Create(const AUnit: TRoomUnit; const ABullets: array of TRoomBullet);
+    constructor Create(const AUnit: TRoomUnit; const ABullets: array of TRoomBullet; const AShootDelay: Integer; const ABulletY: Single);
   end;
 
   { TBRA_UnitDefaultAttack }
@@ -531,44 +550,148 @@ end;
 { TBRA_Shoot }
 
 function TBRA_Shoot.ProcessAction: Boolean;
+
+  procedure DealDamage(ABltInfo: PBulletInfo);
+  begin
+    if ABltInfo^.hit <> nil then
+    begin
+      ABltInfo^.hit.DealDamage(ABltInfo^.bullet.Dmg);
+      if ABltInfo^.hit.HP <= 0 then
+        ABltInfo^.hit.SetAnimation(['React0', 'Death0'], False)
+      else
+        ABltInfo^.hit.SetAnimation(['React0', 'Idle0'], True);
+    end;
+    FreeAndNil(ABltInfo^.bullet);
+  end;
+
 var
   i: Integer;
   blt: TRoomBullet;
+  bltDir: TVec3;
+  pBltInfo: PBulletInfo;
 begin
   if FBullets.Count = 0 then Exit(False);
+  Result := True;
+  if FRoomUint.World.GameTime < FShootDelay then Exit;
+
   for i := 0 to FBullets.Count - 1 do
   begin
-    blt := FBullets[i] as TRoomBullet;
-    //bla
+    blt := FBullets[i].bullet;
+    blt.Visible := True;
+    bltDir := FBullets[i].stop - FBullets[i].start;
+    if LenSqr(bltDir) > 0 then
+    begin
+      bltDir := normalize(bltDir);
+      blt.Pos := blt.Pos + bltDir * (FRoomUint.Main.UpdateStatesInterval/1000*blt.Velocity);
+      if LenSqr(blt.Pos - FBullets[i].start) > LenSqr(FBullets[i].stop - FBullets[i].start) then
+        DealDamage(PBulletInfo(FBullets.PItem[i]));
+    end
+    else
+      DealDamage(PBulletInfo(FBullets.PItem[i]));
   end;
 
   for i := FBullets.Count - 1 downto 0 do
-    if FBullets[i] = nil then FBullets.DeleteWithSwap(i);
+    if FBullets[i].bullet = nil then FBullets.DeleteWithSwap(i);
 end;
 
-constructor TBRA_Shoot.Create(const AUnit: TRoomUnit; const ABullets: array of TRoomBullet);
+constructor TBRA_Shoot.Create(const AUnit: TRoomUnit;
+  const ABullets: array of TRoomBullet; const AShootDelay: Integer;
+  const ABulletY: Single);
 var
-  i: Integer;
+  i, j: Integer;
+  path: IRoomPath;
+  obj: TRoomObject;
+  bInfo: TBulletInfo;
+  pt: TVec3;
+  dir: TVec3;
 begin
   Assert(AUnit <> nil);
   Assert(Length(ABullets) > 0);
 
+  AUnit.SetAnimation(['Attack0', 'Idle0'], True);
+
   FRoomUint := AUnit;
-  FBullets := TbGameObjArr.Create();
+  FShootDelay := FRoomUint.World.GameTime + AShootDelay;
+  FBullets := TBulletInfoArr.Create();
   FBullets.Capacity := Length(ABullets);
-  FPaths := TRoomPathArr.Create();
-  FPaths.Capacity := Length(ABullets);
   for i := 0 to Length(ABullets) - 1 do
     if ABullets[i] <> nil then
     begin
-      FBullets.Add(ABullets[i]);
-      FPaths.Add(
-        FRoomUint.Room.RayCastDist(ABullets[i].StartPt, ABullets[i].Target, ABullets[i].MaxRange, False)
-      );
+      bInfo.bullet := ABullets[i];
+      bInfo.bullet.Visible := False;
+      bInfo.start := FRoomUint.Room.UI.TilePosToWorldPos(ABullets[i].StartPt);
+      bInfo.start.y := ABulletY;
+      bInfo.bullet.Pos := bInfo.start;
+      bInfo.hit := Nil;
+
+      FRoomUint.RoomDir := FRoomUint.Room.Direction(FRoomUint.RoomPos, ABullets[i].Target);
+
+      path := FRoomUint.Room.RayCastDist(ABullets[i].StartPt, ABullets[i].Target, ABullets[i].MaxRange, False);
+      path.Insert(0, ABullets[i].StartPt);
+
+      bInfo.stop := FRoomUint.Room.UI.TilePosToWorldPos(ABullets[i].Target);
+      bInfo.stop.y := ABulletY;
+
+      if ABullets[i].Target = ABullets[i].StartPt then
+      begin
+        obj := FRoomUint.Room.ObjectAt(ABullets[i].Target);
+        if (obj <> nil) and (obj is TRoomUnit) and (Random < ABullets[i].Accuracy(0)) then
+          bInfo.hit := TRoomUnit(obj);
+        FBullets.Add(bInfo);
+        Continue;
+      end;
+
+      dir := normalize(bInfo.stop - bInfo.start);
+      bInfo.stop := dir * ABullets[i].MaxRange + bInfo.start;
+      bInfo.bullet.Rot := Quat(Vec(0,-1,0), arctan2(dir.z, dir.x));
+
+      for j := 0 to path.Count - 1 do
+      begin
+        obj := FRoomUint.Room.ObjectAt(path[j]);
+        if obj = FRoomUint then Continue;
+
+        if (obj <> nil) and (obj is TRoomUnit) then
+        begin
+          pt := FRoomUint.Room.UI.TilePosToWorldPos(path[j]);
+          pt.y := ABulletY;
+          pt := Projection(pt, Line(bInfo.start, bInfo.stop - bInfo.start));
+          if Random < ABullets[i].Accuracy(Len(pt - bInfo.start)) then
+          begin
+            bInfo.stop := pt;
+            bInfo.hit := TRoomUnit(obj);
+            Break;
+          end;
+        end;
+
+        if FRoomUint.Room.IsCellBlockView(path[j]) then
+        begin
+          pt := FRoomUint.Room.UI.TilePosToWorldPos(path[j]);
+          pt.y := ABulletY;
+          bInfo.stop := Projection(pt, Line(bInfo.start, bInfo.stop - bInfo.start));
+          Break;
+        end;
+      end;
+
+      FBullets.Add(bInfo);
     end;
 end;
 
 { TRoomBullet }
+
+procedure TRoomBullet.SetVisible(const AValue: Boolean);
+begin
+  FVisible := AValue;
+end;
+
+function TRoomBullet.GetVisible: Boolean;
+begin
+  Result := FVisible;
+end;
+
+function TRoomBullet.Accuracy(const ADist: Single): Single;
+begin
+  Result := 1;
+end;
 
 procedure TRoomBullet.LoadModels(const AModelName: string);
 begin

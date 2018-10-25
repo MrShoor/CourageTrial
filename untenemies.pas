@@ -195,6 +195,7 @@ function TBotArcher1.DoAction(): IBRA_Action;
 var
   path: IRoomPath;
   availPts: Integer;
+  bullet: TRoomBullet;
 begin
   if AP = 0 then Exit(nil);
 
@@ -216,15 +217,15 @@ begin
       if (FOptimalPosPath.Count = 0) or
          (FRoom.Distance(RoomPos, FPlayer.RoomPos) < FRoom.Distance(FOptimalPosPath.Last, FPlayer.RoomPos)) then
       begin
-        WriteLn('Shooot!');
+        bullet := TRoomBullet.Create(Room);
+        bullet.LoadModels('Erika_Archer_Arrow_Mesh');
+        bullet.Velocity := 20;
+        bullet.Dmg := 10;
+        bullet.MaxRange := 20;
+        bullet.Target := FPlayer.RoomPos;
+        bullet.StartPt := RoomPos;
+        Result := TBRA_Shoot.Create(Self, [bullet], 1150, 1.37);
         AP := AP - 3;
-
-        if (FOptimalPosPath.Count > 0) then
-        begin
-          Result := TBRA_UnitMovementAction.Create(Self, FOptimalPosPath);
-          FOptimalPosPath := TRoomPath.Create();
-          FNeedTurnToPlayer := True;
-        end;
       end
       else
       begin
