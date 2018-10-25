@@ -22,16 +22,35 @@ type
     TLastSeenMap = {$IfDef FPC}specialize{$EndIf}THashMap<IWeakRef, TVec2i>;
     ILastSeenArr = {$IfDef FPC}specialize{$EndIf}IArray<IWeakRef>;
     TLastSeenArr = {$IfDef FPC}specialize{$EndIf}TArray<IWeakRef>;
+
+    IVec2iArr = {$IfDef FPC}specialize{$EndIf}IArray<TVec2i>;
+    TVec2iArr = {$IfDef FPC}specialize{$EndIf}TArray<TVec2i>;
+
+    IVec4iArr = {$IfDef FPC}specialize{$EndIf}IArray<TVec4i>;
+    TVec4iArr = {$IfDef FPC}specialize{$EndIf}TArray<TVec4i>;
+
+    IVec2iWeightMap = {$IfDef FPC}specialize{$EndIf}IHashMap<TVec2i, Integer>;
+    TVec2iWeightMap = {$IfDef FPC}specialize{$EndIf}THashMap<TVec2i, Integer>;
+
+    TMovePtsComparer = class(TInterfacedObject, IComparer)
+    public
+      function Compare(const Left, Right): Integer;
+    end;
+
   protected
     procedure AfterRegister; override;
     function IsEnemy(const ARoomUnit: TRoomUnit): Boolean;
     function FindEnemy(): TRoomUnit; virtual;
+
+    function GetPointsOnRange(const AStartPoint: TVec2i; const ARange: Integer): IVec2iArr;
   protected
+    FBotID: Integer;
     FLastSeen: ILastSeenMap;
     function GetMovePath(): IRoomPath;
     procedure AddToLastSeenMap(const AUnit: TRoomUnit);
     procedure OnRegisterRoomObject(const ANewObject: TRoomObject); override;
   public
+    procedure NewTurn(); virtual;
     function DoAction(): IBRA_Action; virtual; abstract;
   end;
   TBotArr = {$IfDef FPC}specialize{$EndIf} TArray<TBot>;
@@ -61,6 +80,10 @@ type
   TBotArcher1 = class (TBot)
   private
     FAnim: array of IavAnimationController;
+
+    FOptimalPosPath: IRoomPath;
+    FPlayer: TRoomUnit;
+    FNeedTurnToPlayer: Boolean;
   protected
     procedure UpdateStep; override;
   public
@@ -69,10 +92,24 @@ type
 
     procedure LoadModels(); override;
 
+    procedure NewTurn(); override;
     function DoAction(): IBRA_Action; override;
   end;
 
 implementation
+
+var gvBotID: Integer = 0;
+
+{ TBot.TMovePtsComparer }
+
+function TBot.TMovePtsComparer.Compare(const Left, Right): Integer;
+var L: TVec4i absolute Left;
+    R: TVec4i absolute Right;
+begin
+  Result := L.z - R.z;
+  if Result = 0 then
+    Result := L.w - R.w;
+end;
 
 { TBotArcher1 }
 
@@ -97,7 +134,7 @@ begin
   Result := 5;
 end;
 
-procedure TBotArcher1.LoadModels;
+procedure TBotArcher1.LoadModels();
 var
   i: Integer;
 begin
@@ -123,17 +160,95 @@ begin
   Preview96_128 := 'ui\units\archer.png';
 end;
 
-function TBotArcher1.DoAction: IBRA_Action;
+procedure TBotArcher1.NewTurn();
+
+const
+  cBestDistance = 9;
+
+  function GetOptimalRangePosition(const ATargetPos: TVec2i): IRoomPath;
+  var points: IVec2iArr;
+      i: Integer;
+  begin
+    points := GetPointsOnRange(ATargetPos, cBestDistance);
+    for i := 0 to points.Count - 1 do
+      if FRoom.RayCastBoolean(points[i], ATargetPos) then
+      begin
+        Result := FindPath(points[i]);
+        if RoomPos <> points[i] then
+          Result.Add(points[i]);
+        Exit;
+      end;
+    Result := TRoomPath.Create();
+  end;
+
+begin
+  inherited NewTurn();
+  FPlayer := FindEnemy();
+  if FPlayer <> nil then
+    FOptimalPosPath := GetOptimalRangePosition(FPlayer.RoomPos)
+  else
+    FOptimalPosPath := nil;
+  FNeedTurnToPlayer := False;
+end;
+
+function TBotArcher1.DoAction(): IBRA_Action;
 var
   path: IRoomPath;
+  availPts: Integer;
 begin
   if AP = 0 then Exit(nil);
+
+  if FNeedTurnToPlayer then
+  begin
+    FNeedTurnToPlayer := False;
+    if not CanSee(FPlayer) then
+    begin
+      Result := TBRA_UnitTurnAction.Create(Self, FPlayer.RoomPos);
+      Exit;
+    end;
+  end;
+
+  if FPlayer <> nil then
+  begin
+    availPts := AP - FOptimalPosPath.Count;
+    if availPts > 3 then
+    begin
+      if (FOptimalPosPath.Count = 0) or
+         (FRoom.Distance(RoomPos, FPlayer.RoomPos) < FRoom.Distance(FOptimalPosPath.Last, FPlayer.RoomPos)) then
+      begin
+        WriteLn('Shooot!');
+        AP := AP - 3;
+
+        if (FOptimalPosPath.Count > 0) then
+        begin
+          Result := TBRA_UnitMovementAction.Create(Self, FOptimalPosPath);
+          FOptimalPosPath := TRoomPath.Create();
+          FNeedTurnToPlayer := True;
+        end;
+      end
+      else
+      begin
+        Result := TBRA_UnitMovementAction.Create(Self, FOptimalPosPath);
+        FOptimalPosPath := TRoomPath.Create();
+        FNeedTurnToPlayer := True;
+      end;
+    end
+    else
+    begin
+      if (FOptimalPosPath.Count = 0) then
+        Exit(nil);
+      Result := TBRA_UnitMovementAction.Create(Self, FOptimalPosPath);
+      FOptimalPosPath := TRoomPath.Create();
+      FNeedTurnToPlayer := True;
+    end;
+    Exit;
+  end;
 
   path := GetMovePath();
   if (path <> nil) and (path.Count > 0) then
   begin
     Result := TBRA_UnitMovementAction.Create(Self, path);
-    Exit
+    Exit;
   end;
   Exit(nil);
 end;
@@ -145,6 +260,8 @@ begin
   inherited AfterRegister;
   FLastSeen := TLastSeenMap.Create();
   SubscribeForUpdateStep;
+  FBotID := gvBotID;
+  Inc(gvBotID);
 end;
 
 function TBot.IsEnemy(const ARoomUnit: TRoomUnit): Boolean;
@@ -167,6 +284,46 @@ begin
     end;
   end;
   Result := nil;
+end;
+
+function TBot.GetPointsOnRange(const AStartPoint: TVec2i; const ARange: Integer): IVec2iArr;
+var graph: IRoomMapNonWeightedGraph;
+    bfs: IRoomMapBFS;
+    pt: TVec2i;
+    depth, i: Integer;
+
+    enemySet: IVec2iWeightMap;
+    movePts: IVec4iArr;
+    movePt4: TVec4i;
+    moveCmp: IComparer;
+begin
+  enemySet := TVec2iWeightMap.Create();
+  movePts := TVec4iArr.Create();
+
+  graph := TRoomMapGraphExcludeSelfAndTarget.Create(FRoom, Self, nil);
+
+  bfs := TRoomMapBFS.Create(graph);
+  bfs.Reset(AStartPoint);
+  while bfs.Next(pt, depth) do
+    enemySet.Add(pt, abs(depth-ARange));
+
+  bfs := TRoomMapBFS.Create(graph);
+  bfs.Reset(RoomPos);
+  while bfs.Next(pt, depth) do
+  begin
+    movePt4.xy := pt;
+    if not enemySet.TryGetValue(pt, movePt4.z) then movePt4.z := 0;
+    movePt4.w := depth;
+    movePts.Add(movePt4);
+  end;
+
+  moveCmp := TMovePtsComparer.Create;
+  movePts.Sort(moveCmp);
+
+  Result := TVec2iArr.Create();
+  Result.Capacity := movePts.Count;
+  for i := 0 to movePts.Count - 1 do
+    Result.Add(movePts[i].xy);
 end;
 
 function TBot.GetMovePath(): IRoomPath;
@@ -235,6 +392,11 @@ begin
       if IsEnemy(TRoomUnit(ANewObject)) then
         if CanSee(TRoomUnit(ANewObject)) then
           AddToLastSeenMap(TRoomUnit(ANewObject));
+end;
+
+procedure TBot.NewTurn();
+begin
+
 end;
 
 { TBotMutant1 }

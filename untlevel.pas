@@ -16,10 +16,16 @@ uses
 
 type
   IRoomMapGraph = {$IfDef FPC}specialize{$EndIf} IMap<TVec2i>;
+  IRoomMapNonWeightedGraph = {$IfDef FPC}specialize{$EndIf}INonWeightedGraph<TVec2i>;
   IRoomMapPF  = {$IfDef FPC}specialize{$EndIf} IAStar<TVec2i>;
   TRoomMapPF  = {$IfDef FPC}specialize{$EndIf} TAStar<TVec2i>;
+  IRoomMapBFS = {$IfDef FPC}specialize{$EndIf} IBFS_Iterator<TVec2i>;
+  TRoomMapBFS = {$IfDef FPC}specialize{$EndIf} TBFS_Iterator<TVec2i>;
   IRoomPath = {$IfDef FPC}specialize{$EndIf} IArray<TVec2i>;
   TRoomPath = {$IfDef FPC}specialize{$EndIf} TArray<TVec2i>;
+  IRoomPathArr = {$IfDef FPC}specialize{$EndIf} IArray<IRoomPath>;
+  TRoomPathArr = {$IfDef FPC}specialize{$EndIf} TArray<IRoomPath>;
+
 
   IBRA_Action = interface
     procedure TryCancel;
@@ -30,6 +36,15 @@ type
 
   TRoomMap = class;
   TBattleRoom = class;
+
+  { TTileUtils }
+
+  TTileUtils = class
+  public
+    class function CircleLen(const ARadius: Integer): Integer;
+    class function PolarToTileCoord(const ARadius, AIndex: Integer): TVec2i;
+    class function RotateTileCoord(const APos: TVec2i; ADir: Integer): TVec2i;
+  end;
 
   { TRoomObject }
 
@@ -67,6 +82,25 @@ type
   IRoomObjectSet = {$IfDef FPC}specialize{$EndIf} IHashSet<TRoomObject>;
 
   TRoomObjectClass = class of TRoomObject;
+
+  { TRoomBullet }
+
+  TRoomBullet = class (TbGameObject)
+  protected
+    FDmg: Integer;
+    FStartPt: TVec2i;
+    FTarget: TVec2i;
+    FMaxRange: Single;
+    FVelocity: Single;
+  public
+    property Dmg: Integer read FDmg write FDmg;
+    property StartPt: TVec2i read FStartPt write FStartPt;
+    property Target: TVec2i read FTarget write FTarget;
+    property Velocity: Single read FVelocity write FVelocity;
+    property MaxRange: Single read FMaxRange write FMaxRange;
+
+    procedure LoadModels(const AModelName: string);
+  end;
 
   { TRoomUnit }
 
@@ -189,7 +223,7 @@ type
 
   { TRoomMapGraph }
 
-  TRoomMapGraph = class(TInterfacedObjectEx, IRoomMapGraph, IEqualityComparer)
+  TRoomMapGraph = class(TInterfacedObjectEx, IRoomMapGraph, IRoomMapNonWeightedGraph, IEqualityComparer)
   private
     FRoomMap: TRoomMap;
 
@@ -199,6 +233,7 @@ type
     function MaxNeighbourCount(const ANode: TVec2i): Integer;
     function NodeComparer: IEqualityComparer;
     function GetNeighbour(Index: Integer; const AFrom, ACurrent, ATarget: TVec2i; out ANeighbour: TVec2i; out MoveWeight, DistWeight: Single): Boolean; overload;
+    function GetNeighbour(Index: Integer; const ACurrent: TVec2i; out ANeighbour: TVec2i): Boolean; overload;
   protected
     function IsNonBlockingObject(AObj: TRoomObject): Boolean; virtual;
   public
@@ -245,6 +280,7 @@ type
     function Distance(const APt1, APt2: TVec2i): Integer;
     function Direction(const APt1, APt2: TVec2i): Integer;
     function RayCast(const APt1, APt2: TVec2i; const AllowHitBlockers: Boolean): IRoomPath;
+    function RayCastDist(const APt1, APt2: TVec2i; ADist: Single; const AllowHitBlockers: Boolean): IRoomPath;
     function RayCastBoolean(const APt1, APt2: TVec2i): Boolean;
     function IsCellExists(const APos: TVec2i): Boolean;
     function IsCellBlocked(const APos: TVec2i): Boolean;
@@ -332,6 +368,29 @@ type
     procedure TryCancel; override;
     function ProcessAction: Boolean; override;
     constructor Create(const AUnit: TRoomUnit; const APath: IRoomPath);
+  end;
+
+  { TBRA_UnitTurnAction }
+
+  TBRA_UnitTurnAction = class (TBRA_Action)
+  private
+    RoomUnit: TRoomUnit;
+    Target: TVec2i;
+  public
+    function ProcessAction: Boolean; override;
+    constructor Create(const AUnit: TRoomUnit; const ATargetPt: TVec2i);
+  end;
+
+  { TBRA_Shoot }
+
+  TBRA_Shoot = class (TBRA_Action)
+  private
+    FRoomUint: TRoomUnit;
+    FBullets: IbGameObjArr;
+    FPaths  : IRoomPathArr;
+  public
+    function ProcessAction: Boolean; override;
+    constructor Create(const AUnit: TRoomUnit; const ABullets: array of TRoomBullet);
   end;
 
   { TBRA_UnitDefaultAttack }
@@ -467,6 +526,126 @@ function FindRoomClass(const AName: string): TRoomObjectClass;
 begin
   if gvRegRommClasses = nil then Exit(nil);
   if not gvRegRommClasses.TryGetValue(AName, Result) then Result := nil;
+end;
+
+{ TBRA_Shoot }
+
+function TBRA_Shoot.ProcessAction: Boolean;
+var
+  i: Integer;
+  blt: TRoomBullet;
+begin
+  if FBullets.Count = 0 then Exit(False);
+  for i := 0 to FBullets.Count - 1 do
+  begin
+    blt := FBullets[i] as TRoomBullet;
+    //bla
+  end;
+
+  for i := FBullets.Count - 1 downto 0 do
+    if FBullets[i] = nil then FBullets.DeleteWithSwap(i);
+end;
+
+constructor TBRA_Shoot.Create(const AUnit: TRoomUnit; const ABullets: array of TRoomBullet);
+var
+  i: Integer;
+begin
+  Assert(AUnit <> nil);
+  Assert(Length(ABullets) > 0);
+
+  FRoomUint := AUnit;
+  FBullets := TbGameObjArr.Create();
+  FBullets.Capacity := Length(ABullets);
+  FPaths := TRoomPathArr.Create();
+  FPaths.Capacity := Length(ABullets);
+  for i := 0 to Length(ABullets) - 1 do
+    if ABullets[i] <> nil then
+    begin
+      FBullets.Add(ABullets[i]);
+      FPaths.Add(
+        FRoomUint.Room.RayCastDist(ABullets[i].StartPt, ABullets[i].Target, ABullets[i].MaxRange, False)
+      );
+    end;
+end;
+
+{ TRoomBullet }
+
+procedure TRoomBullet.LoadModels(const AModelName: string);
+begin
+  AddModel(AModelName, mtDefault);
+  FMaxRange := 100;
+end;
+
+{ TBRA_UnitTurnAction }
+
+function TBRA_UnitTurnAction.ProcessAction: Boolean;
+begin
+  if RoomUnit.AP > 0 then
+  begin
+    RoomUnit.RoomDir := RoomUnit.Room.Direction(RoomUnit.RoomPos, Target);
+    RoomUnit.AP := RoomUnit.AP - 1;
+  end;
+  Result := False;
+end;
+
+constructor TBRA_UnitTurnAction.Create(const AUnit: TRoomUnit; const ATargetPt: TVec2i);
+begin
+  RoomUnit := AUnit;
+  Target := ATargetPt;
+end;
+
+{ TTileUtils }
+
+class function TTileUtils.CircleLen(const ARadius: Integer): Integer;
+begin
+  Result := ARadius * 6;
+end;
+
+class function TTileUtils.PolarToTileCoord(const ARadius, AIndex: Integer): TVec2i;
+var dir: Integer;
+    idx: Integer;
+begin
+  dir := AIndex div ARadius;
+  idx := AIndex mod ARadius;
+  Result := RotateTileCoord(Vec(idx, ARadius - idx), dir);
+end;
+
+class function TTileUtils.RotateTileCoord(const APos: TVec2i; ADir: Integer): TVec2i;
+var dirmod: Integer;
+begin
+  dirmod := ADir mod 6;
+  if dirmod < 0 then dirmod := dirmod + 6;
+  case dirmod of
+    0: Result := APos;
+    1:
+      begin
+        Result.x := APos.x + APos.y;
+        Result.y := -APos.x;
+      end;
+    2:
+      begin
+        Result.x := APos.y;
+        Result.y := -APos.x - APos.y;
+      end;
+    3:
+      begin
+        Result.x := -APos.x;
+        Result.y := -APos.y;
+      end;
+    4:
+      begin
+        Result.x := -APos.x - APos.y;
+        Result.y := APos.x;
+      end;
+    5:
+      begin
+        Result.x := -APos.y;
+        Result.y := APos.x + APos.y;
+      end;
+    else
+      Assert(False);
+      Result := APos;
+  end;
 end;
 
 { TObstacle }
@@ -699,6 +878,14 @@ begin
   DistWeight := FRoomMap.Distance(ANeighbour, ATarget);
 end;
 
+function TRoomMapGraph.GetNeighbour(Index: Integer; const ACurrent: TVec2i; out ANeighbour: TVec2i): Boolean;
+begin
+  ANeighbour := FRoomMap.NeighbourTile(ACurrent, Index);
+  Result := FRoomMap.IsCellExists(ANeighbour);
+  if not Result then Exit;
+  Result := IsNonBlockingObject(FRoomMap.ObjectAt(ANeighbour));
+end;
+
 function TRoomMapGraph.IsNonBlockingObject(AObj: TRoomObject): Boolean;
 begin
   Result := AObj = nil;
@@ -801,10 +988,10 @@ end;
 
 function TRoomUnit.GetVisible(): Boolean;
 begin
-  if Room.CurrentPlayer = nil then
+  //if Room.CurrentPlayer = nil then
     Result := inherited GetVisible()
-  else
-    Result := Room.CurrentPlayer.CanSee(Self);
+  //else
+    //Result := Room.CurrentPlayer.CanSee(Self);
 end;
 
 procedure TRoomUnit.DealDamage(ADmg: Integer);
@@ -889,41 +1076,8 @@ begin
 end;
 
 class function TRoomObject.RotateTileCoord(const APos: TVec2i; ADir: Integer): TVec2i;
-var dirmod: Integer;
 begin
-  dirmod := ADir mod 6;
-  if dirmod < 0 then dirmod := dirmod + 6;
-  case dirmod of
-    0: Result := APos;
-    1:
-      begin
-        Result.x := APos.x + APos.y;
-        Result.y := -APos.x;
-      end;
-    2:
-      begin
-        Result.x := APos.y;
-        Result.y := -APos.x - APos.y;
-      end;
-    3:
-      begin
-        Result.x := -APos.x;
-        Result.y := -APos.y;
-      end;
-    4:
-      begin
-        Result.x := -APos.x - APos.y;
-        Result.y := APos.x;
-      end;
-    5:
-      begin
-        Result.x := -APos.y;
-        Result.y := APos.x + APos.y;
-      end;
-    else
-      Assert(False);
-      Result := APos;
-  end;
+  Result := TTileUtils.RotateTileCoord(APos, ADir);
 end;
 
 procedure TRoomObject.SetRoomPosDir(const APos: TVec2i; const ADir: Integer; const AAutoRegister: Boolean);
@@ -1107,7 +1261,7 @@ begin
     tmpColors[i] := FColors[TTileColorID(i)];
   FTilesProg.SetAttributes(nil, nil, FTilesVB);
   FTilesProg.SetUniform('TileColors', tmpColors);
-  FTilesProg.SetUniform('gradPow', 4.0);
+  FTilesProg.SetUniform('gradPow', 8.0);
   FTilesProg.SetUniform('minAlpha', 0.0);
   FTilesProg.Draw(ptTriangles, cmNone, False, FTilesData.Count, 0, 18);
 end;
@@ -1338,6 +1492,29 @@ begin
     pt := NextPointOnRay(pt, dir, dirStep);
   end;
   Result.Add(APt2);
+end;
+
+function TRoomMap.RayCastDist(const APt1, APt2: TVec2i; ADist: Single; const AllowHitBlockers: Boolean): IRoomPath;
+var dir: TVec2i;
+    dirStep: TVec2i;
+    pt: TVec2i;
+begin
+  Result := TRoomPath.Create();
+  if APt1 = APt2 then
+    Exit;
+
+  dir := APt2 - APt1;
+  dirStep := Sign(dir);
+  pt := NextPointOnRay(Vec(0,0), dir, dirStep);
+  while Distance(Vec(0,0), pt) < ADist do
+  begin
+    if not IsCellExists(APt1 + pt) then Exit;
+    Result.Add(APt1 + pt);
+    if AllowHitBlockers then
+      if IsCellBlockView(APt1 + pt) then
+        Exit;
+    pt := NextPointOnRay(pt, dir, dirStep);
+  end;
 end;
 
 function TRoomMap.RayCastBoolean(const APt1, APt2: TVec2i): Boolean;
@@ -1677,7 +1854,12 @@ begin
   unt.AP := unt.MaxAP;
 
   (FUnitMenu as TavmUnitMenu).RoomUnit := unt;
-  if unt.HP <= 0 then EndTurn();
+  if unt.HP <= 0 then
+    EndTurn()
+  else
+  begin
+    if (unt is TBot) then TBot(unt).NewTurn();
+  end;
 end;
 
 procedure TBattleRoom.AddAction(AAction: IBRA_Action);
@@ -1781,13 +1963,10 @@ var lantern: TLantern;
     menu: TavmUnitMenu;
     obsDescIdx, i: Integer;
 begin
-  FLanterns := TbGameObjArr.Create();
-  FUnits := TRoomUnitArr.Create();
-  FActions := TBRA_ActionArr.Create();
-  FObstacles := LoadObstacles(ExeRelativeFileName('models\scene1_obstacles.txt'));
-  FWorld.Renderer.PreloadModels([ExeRelativeFileName('models\scene1.avm')]);
+  PreloadModels;
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\creature1.avm')]);
+  FWorld.Renderer.PreloadModels([ExeRelativeFileName('bullets\bullets.avm')]);
 
   menu := TavmUnitMenu.Create(Self);
   menu.OnEndTurnClick := {$IfDef FPC}@{$EndIf}OnEndTurnBtnClick;
@@ -1921,6 +2100,7 @@ begin
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\creature1.avm')]);
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\archer\archer.avm')]);
+  FWorld.Renderer.PreloadModels([ExeRelativeFileName('bullets\bullets.avm')]);
 
   menu := TavmUnitMenu.Create(Self);
   menu.OnEndTurnClick := {$IfDef FPC}@{$EndIf}OnEndTurnBtnClick;
@@ -1934,7 +2114,7 @@ begin
   FPlayer.SetRoomPosDir(GetSpawnPlace(), Random(6));
   FUnits.Add(FPlayer);
 
-  for i := 0 to 6 do
+  for i := 0 to 0 do
     SpawnBot();
 
   FActiveUnit := FUnits.Count - 1;
