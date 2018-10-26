@@ -36,6 +36,7 @@ type
 
   TRoomMap = class;
   TBattleRoom = class;
+  TRoomUnit = class;
 
   { TTileUtils }
 
@@ -111,6 +112,22 @@ type
     procedure LoadModels(const AModelName: string);
   end;
 
+  TRoomUnitEqSlot = (esLeftHand, esRightHand, esBothHands);
+
+  { IUnitItem }
+
+  IUnitItem = interface
+    function Slot       : TRoomUnitEqSlot;
+    function Model      : string;
+
+    function SkillsCount: Integer;
+    function Animation(ASkillIndex: Integer): string;
+    function ActionCost(ASkillIndex: Integer): Integer;
+    function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
+    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): Boolean;
+  end;
+  IUnitItems10 = array [0..9] of IUnitItem;
+
   { TRoomUnit }
 
   TRoomUnit = class (TRoomObject)
@@ -132,9 +149,22 @@ type
     procedure SetMaxHP(const AValue: Integer);
     procedure SetPreview96_128(const AValue: string);
   protected
+    FAnimationPrefix: string;
+    FEquippedItem : array [TRoomUnitEqSlot] of IUnitItem;
+    FEquippedModel: array [TRoomUnitEqSlot] of IavModelInstance;
+
+    FSlots10: IUnitItems10;
+    procedure Unequip(const ASlot: TRoomUnitEqSlot);
+    function  Equip(const AItem: IUnitItem): Boolean;
     procedure OnRegisterRoomObject(const ANewObject: TRoomObject); virtual;
+
+    function AddAnimationPrefix(const ANameSequence: array of string): TStringArray;
+  public
+    procedure WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType); override;
   public
     property Preview96_128: string read FPreview96_128 write SetPreview96_128;
+
+    function SkillSlots(): IUnitItems10;
 
     procedure LoadModels(); virtual;
 
@@ -409,7 +439,11 @@ type
     FShootDelay: Integer;
   public
     function ProcessAction: Boolean; override;
-    constructor Create(const AUnit: TRoomUnit; const ABullets: array of TRoomBullet; const AShootDelay: Integer; const ABulletY: Single);
+    constructor Create(const AUnit: TRoomUnit;
+                       const ABullets: array of TRoomBullet;
+                       const ASkillAnimation: string;
+                       const AShootDelay: Integer;
+                       const ABulletY: Single);
   end;
 
   { TBRA_UnitDefaultAttack }
@@ -427,7 +461,9 @@ type
     class function CanUse(const AUnit, ATarget: TRoomUnit): Boolean;
 
     function ProcessAction: Boolean; override;
-    constructor Create(const AUnit, ATarget: TRoomUnit; const ADurationTime, ADamageStartTime: Integer);
+    constructor Create(const AUnit, ATarget: TRoomUnit;
+                       const ASkillAnimation: string;
+                       const ADurationTime, ADamageStartTime: Integer);
   end;
 
   { TBRA_MakeDamage }
@@ -469,6 +505,8 @@ type
     FRayPath : IRoomPath;
 
     FEmptyLight: IavPointLight;
+
+    FPlayerSkillSlot: Integer;
 
     function IsPlayerTurn: Boolean;
     function IsBotTurn: Boolean;
@@ -512,7 +550,7 @@ function  FindRoomClass(const AName: string): TRoomObjectClass;
 implementation
 
 uses
-  untEnemies, untGraphics, ui_unit;
+  untEnemies, untGraphics, ui_unit, untItems;
 
 type
   IRoomClassesMap = {$IfDef FPC}specialize{$EndIf}IHashMap<string, TRoomObjectClass>;
@@ -595,8 +633,8 @@ begin
 end;
 
 constructor TBRA_Shoot.Create(const AUnit: TRoomUnit;
-  const ABullets: array of TRoomBullet; const AShootDelay: Integer;
-  const ABulletY: Single);
+  const ABullets: array of TRoomBullet; const ASkillAnimation: string;
+  const AShootDelay: Integer; const ABulletY: Single);
 var
   i, j: Integer;
   path: IRoomPath;
@@ -608,7 +646,7 @@ begin
   Assert(AUnit <> nil);
   Assert(Length(ABullets) > 0);
 
-  AUnit.SetAnimation(['Attack0', 'Idle0'], True);
+  AUnit.SetAnimation([ASkillAnimation, 'Idle0'], True);
 
   FRoomUint := AUnit;
   FShootDelay := FRoomUint.World.GameTime + AShootDelay;
@@ -867,7 +905,8 @@ begin
   Result := FRoomUnit.World.GameTime < FActionTime;
 end;
 
-constructor TBRA_UnitDefaultAttack.Create(const AUnit, ATarget: TRoomUnit; const ADurationTime, ADamageStartTime: Integer);
+constructor TBRA_UnitDefaultAttack.Create(const AUnit, ATarget: TRoomUnit;
+  const ASkillAnimation: string; const ADurationTime, ADamageStartTime: Integer);
 begin
   Assert(AUnit <> nil);
   Assert(ATarget <> nil);
@@ -880,8 +919,7 @@ begin
 
   if FValidAction then
   begin
-    FRoomUnit.AP := FRoomUnit.AP - cAPCost;
-    FRoomUnit.SetAnimation(['Attack0', 'Idle0'], True);
+    FRoomUnit.SetAnimation([ASkillAnimation, 'Idle0'], True);
     FRoomUnit.RoomDir := FRoomUnit.Room.Direction(FRoomUnit.RoomPos, FTarget.RoomPos);
   end;
 end;
@@ -1039,9 +1077,62 @@ begin
   FPreview96_128 := AValue;
 end;
 
+procedure TRoomUnit.Unequip(const ASlot: TRoomUnitEqSlot);
+begin
+  FEquippedModel[ASlot] := nil;
+  FEquippedItem[ASlot] := nil;
+end;
+
+function TRoomUnit.Equip(const AItem: IUnitItem): Boolean;
+var
+  m: TMat4;
+  inst: IavModelInstanceArr;
+begin
+  Unequip(AItem.Slot);
+
+  m := FModels[0].Mesh.BindPoseTransform;
+  inst := World.Renderer.CreateModelInstances([AItem.Model]);
+  inst[0].Mesh.Transform := m;
+  inst[0].Mesh.Pose := FModels[0].Mesh.Pose;
+  inst[0].Mesh.Transform := Transform();
+
+  FEquippedModel[AItem.Slot] := inst[0];
+  FEquippedItem[AItem.Slot] := AItem;
+
+  Result := True;
+end;
+
 procedure TRoomUnit.OnRegisterRoomObject(const ANewObject: TRoomObject);
 begin
 
+end;
+
+function TRoomUnit.AddAnimationPrefix(const ANameSequence: array of string): TStringArray;
+var i: Integer;
+begin
+  SetLength(Result, Length(ANameSequence));
+  for i := 0 to Length(ANameSequence) - 1 do
+    Result[i] := FAnimationPrefix + ANameSequence[i];
+end;
+
+procedure TRoomUnit.WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType);
+var i: TRoomUnitEqSlot;
+begin
+  inherited WriteModels(ACollection, AType);
+  if AType = mtDefault then
+  begin
+    for i := Low(TRoomUnitEqSlot) to High(TRoomUnitEqSlot) do
+      if FEquippedModel[i] <> nil then
+      begin
+        FEquippedModel[i].Mesh.Transform := Transform();
+        ACollection.Add(FEquippedModel[i]);
+      end;
+  end;
+end;
+
+function TRoomUnit.SkillSlots: IUnitItems10;
+begin
+  Result := FSlots10;
 end;
 
 procedure TRoomUnit.LoadModels();
@@ -1111,10 +1202,10 @@ end;
 
 function TRoomUnit.GetVisible(): Boolean;
 begin
-  //if Room.CurrentPlayer = nil then
+  if Room.CurrentPlayer = nil then
     Result := inherited GetVisible()
-  //else
-    //Result := Room.CurrentPlayer.CanSee(Self);
+  else
+    Result := Room.CurrentPlayer.CanSee(Self);
 end;
 
 procedure TRoomUnit.DealDamage(ADmg: Integer);
@@ -1754,28 +1845,44 @@ var
 begin
   inherited SetAnimation(ANameSequence, ALoopedLast);
   for i := 0 to Length(FAnim) - 1 do
-    FAnim[i].AnimationSequence_StartAndStopOther(ANameSequence, ALoopedLast);
+    FAnim[i].AnimationSequence_StartAndStopOther(AddAnimationPrefix(ANameSequence), ALoopedLast);
 end;
 
 function TPlayer.GetUnitMoveSpeed: Single;
 begin
-  Result := 2;
+  Result := 4;
 end;
 
 procedure TPlayer.LoadModels();
 var
   i: Integer;
+  bow: IUnitItem;
 begin
   ViewAngle := 0.5 * Pi + EPS;
   ViewRange := 20.5;
   ViewWholeRange := 2.5;
 
-  AddModel('Gop_Body', mtDefault);
-  AddModel('Gop_Bottoms', mtDefault);
-  AddModel('Gop_Hair', mtDefault);
-  AddModel('Gop_Hats', mtDefault);
-  AddModel('Gop_Shoes', mtDefault);
-  AddModel('Gop_Tops', mtDefault);
+  AddModel('EXO_Body', mtDefault);
+  AddModel('EXO_BrowsLashes', mtDefault);
+  AddModel('EXO_Eyes', mtDefault);
+  AddModel('EXO_EyesSpec', mtDefault);
+  AddModel('EXO_HeadMask', mtDefault);
+  AddModel('EXO_Suit', mtDefault);
+
+  FAnimationPrefix := 'Hero_';
+
+  FSlots10[0] := TDefaultKick.Create;
+
+  bow := TArcherBow.Create;
+  Equip(bow);
+  FSlots10[1] := bow;
+
+  //AddModel('Gop_Body', mtDefault);
+  //AddModel('Gop_Bottoms', mtDefault);
+  //AddModel('Gop_Hair', mtDefault);
+  //AddModel('Gop_Hats', mtDefault);
+  //AddModel('Gop_Shoes', mtDefault);
+  //AddModel('Gop_Tops', mtDefault);
 
   SetLength(FAnim, FModels.Count);
   for i := 0 to FModels.Count - 1 do
@@ -1783,7 +1890,6 @@ begin
   SetAnimation(['Idle0'], True);
   SubscribeForUpdateStep;
 
-  Scale := 0.5;
   MaxAP := 10;
   MaxHP := 100;
   HP := MaxHP;
@@ -1931,6 +2037,13 @@ begin
   if not IsPlayerTurn() then Exit;
   if (KeyCode = Ord('E')) then
     EndTurn();
+  case KeyCode of
+    Ord('1') : FPlayerSkillSlot := 0;
+    Ord('2') : FPlayerSkillSlot := 1;
+    //Ord('1') : FPlayerSkillSlot := 0;
+    //Ord('1') : FPlayerSkillSlot := 0;
+    //Ord('1') : FPlayerSkillSlot := 0;
+  end;
 end;
 
 procedure TBattleRoom.MouseMove(xpos, ypos: Integer);
@@ -1942,6 +2055,7 @@ end;
 procedure TBattleRoom.MouseClick(button: Integer; xpos, ypos: Integer);
 var obj: TRoomObject;
     new_action: IBRA_Action;
+    item: IUnitItem;
 begin
   if not IsPlayerTurn() then Exit;
   if IsMouseOnUI() then Exit;
@@ -1959,9 +2073,11 @@ begin
     begin
       new_action := TBRA_UnitMovementAction.Create(FPlayer, FMovePath);
     end;
-    if obj is TRoomUnit then
+    if (obj is TRoomUnit) and (FPlayer <> obj) then
     begin
-      new_action := TBRA_UnitDefaultAttack.Create(FPlayer, obj as TRoomUnit, 1000, 300);
+      new_action := FPlayer.SkillSlots[FPlayerSkillSlot].DoAction(0, FPlayer, obj as TRoomUnit);
+      //new_action := FPlayer.FEquippedItem[esBothHands].DoAction(0, FPlayer, obj as TRoomUnit);
+      //new_action := TBRA_UnitDefaultAttack.Create(FPlayer, obj as TRoomUnit, 1000, 300);
     end;
     if new_action <> nil then
       FActions.Add(new_action);
@@ -2087,7 +2203,7 @@ var lantern: TLantern;
     obsDescIdx, i: Integer;
 begin
   PreloadModels;
-  FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
+  //FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\creature1.avm')]);
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('bullets\bullets.avm')]);
 
@@ -2209,7 +2325,10 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string);
   procedure SpawnBot();
   var bot: TBot;
   begin
-    bot := TBotArcher1.Create(FMap);
+    //if Random(2) = 0 then
+      bot := TBotArcher1.Create(FMap);
+    //else
+    //  bot := TBotMutant1.Create(FMap);
     bot.LoadModels();
     bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
     FUnits.Add(bot);
@@ -2220,7 +2339,7 @@ var
   menu: TavmUnitMenu;
 begin
   PreloadModels;
-  FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
+  //FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\creature1.avm')]);
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\archer\archer.avm')]);
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('bullets\bullets.avm')]);
@@ -2237,7 +2356,7 @@ begin
   FPlayer.SetRoomPosDir(GetSpawnPlace(), Random(6));
   FUnits.Add(FPlayer);
 
-  for i := 0 to 0 do
+  for i := 0 to 6 do
     SpawnBot();
 
   FActiveUnit := FUnits.Count - 1;

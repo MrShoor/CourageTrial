@@ -11,6 +11,7 @@ uses
   Math,
   intfUtils,
   Classes, SysUtils, avBase, avRes, bWorld, mutils, bLights, avMesh, avTypes, avTess, avContnrs, avContnrsDefaults,
+  avModel,
   avPathFinder, untLevel;
 
 type
@@ -64,6 +65,8 @@ type
   TBotMutant1 = class (TBot)
   private
     FAnim: IavAnimationController;
+
+    FKick: IUnitItem;
   protected
     procedure UpdateStep; override;
   public
@@ -98,6 +101,9 @@ type
 
 implementation
 
+uses
+  untItems;
+
 var gvBotID: Integer = 0;
 
 { TBot.TMovePtsComparer }
@@ -126,7 +132,7 @@ var i: Integer;
 begin
   inherited SetAnimation(ANameSequence, ALoopedLast);
   for i := 0 to Length(FAnim) - 1 do
-    FAnim[i].AnimationSequence_StartAndStopOther(ANameSequence, ALoopedLast);
+    FAnim[i].AnimationSequence_StartAndStopOther(AddAnimationPrefix(ANameSequence), ALoopedLast);
 end;
 
 function TBotArcher1.GetUnitMoveSpeed: Single;
@@ -137,16 +143,21 @@ end;
 procedure TBotArcher1.LoadModels();
 var
   i: Integer;
+  bow: IUnitItem;
 begin
   ViewRange := 16;
   ViewAngle := Pi/3+EPS;
   ViewWholeRange := 2.5;
 
-  AddModel('Erika_Archer_Body_Mesh', mtDefault);
-  AddModel('Erika_Archer_Bow_Mesh', mtDefault);
-  AddModel('Erika_Archer_Clothes_Mesh', mtDefault);
-  AddModel('Erika_Archer_Eyelashes_Mesh', mtDefault);
-  AddModel('Erika_Archer_Eyes_Mesh', mtDefault);
+  AddModel('Archer_Body', mtDefault);
+  AddModel('Archer_Clothes', mtDefault);
+  AddModel('Archer_Eyelashes', mtDefault);
+  AddModel('Archer_Eyes', mtDefault);
+
+  bow := TArcherBow.Create;
+  Equip(bow);
+
+  FAnimationPrefix := 'Archer_';
 
   SetLength(FAnim, FModels.Count);
   for i := 0 to FModels.Count - 1 do
@@ -217,15 +228,7 @@ begin
       if (FOptimalPosPath.Count = 0) or
          (FRoom.Distance(RoomPos, FPlayer.RoomPos) < FRoom.Distance(FOptimalPosPath.Last, FPlayer.RoomPos)) then
       begin
-        bullet := TRoomBullet.Create(Room);
-        bullet.LoadModels('Erika_Archer_Arrow_Mesh');
-        bullet.Velocity := 20;
-        bullet.Dmg := 10;
-        bullet.MaxRange := 20;
-        bullet.Target := FPlayer.RoomPos;
-        bullet.StartPt := RoomPos;
-        Result := TBRA_Shoot.Create(Self, [bullet], 1150, 1.37);
-        AP := AP - 3;
+        Result := FEquippedItem[esBothHands].DoAction(0, Self, FPlayer);
       end
       else
       begin
@@ -435,6 +438,8 @@ begin
   HP := MaxHP;
 
   Preview96_128 := 'ui\units\mutant1.png';
+
+  FKick := TDefaultKick.Create;
 end;
 
 function TBotMutant1.DoAction: IBRA_Action;
@@ -455,9 +460,9 @@ begin
     Exit(nil);
   end;
 
-  if TBRA_UnitDefaultAttack.CanUse(Self, player) then
+  if FKick.CanUse(0, Self, player) then
   begin
-    Result := TBRA_UnitDefaultAttack.Create(Self, player, 1000, 300);
+    Result := FKick.DoAction(0, Self, player);
     Exit;
   end;
 
