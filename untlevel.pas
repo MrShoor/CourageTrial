@@ -2265,6 +2265,9 @@ end;
 procedure TBattleRoom.KeyPress(KeyCode: Integer);
 var inv_objs: IRoomObjectArr;
 begin
+  if KeyCode = Ord(' ') then
+    FWorld.Renderer.InvalidateShaders;
+
   if not IsPlayerTurn() then Exit;
   if (KeyCode = Ord('E')) then
     EndTurn();
