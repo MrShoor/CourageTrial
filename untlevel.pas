@@ -9,7 +9,7 @@ interface
 
 uses
   Graphics,
-  Math,
+  Math, intfUtils,
   Classes, SysUtils, avBase, avRes, bWorld, mutils, bLights, avMesh, avTypes, avTess, avContnrs, avContnrsDefaults,
   avPathFinder, avMiniControls, avModel, avTexLoader,
   untObstacles;
@@ -112,7 +112,7 @@ type
     procedure LoadModels(const AModelName: string);
   end;
 
-  TRoomUnitEqSlot = (esLeftHand, esRightHand, esBothHands);
+  TRoomUnitEqSlot = (esNone, esLeftHand, esRightHand, esBothHands);
 
   { IUnitItem }
 
@@ -131,9 +131,48 @@ type
   IUnitItemArr = {$IfDef FPC}specialize{$EndIf}IArray<IUnitItem>;
   TUnitItemArr = {$IfDef FPC}specialize{$EndIf}TArray<IUnitItem>;
 
+  IInventory = interface
+    function StateID: Integer;
+    function Items: IUnitItemArr;
+    function PopFromInventory(const AIndex: Integer): IUnitItem;
+    function PushToInventory(const AItem: IUnitItem; const AIndex: Integer): Integer;
+  end;
+
+  { TRoomInventoryObject }
+
+  TRoomInventoryObject = class (TRoomObject)
+  private
+    function GetInventory: IInventory;
+  protected type
+    TInventoryAdapter = class(TInterfacedObject, IInventory)
+    private
+      FOwner: IWeakRef;
+      function Owner: TRoomInventoryObject;
+    public
+      function StateID: Integer;
+      function Items: IUnitItemArr;
+      function PopFromInventory(const AIndex: Integer): IUnitItem;
+      function PushToInventory(const AItem: IUnitItem; const AIndex: Integer): Integer;
+      constructor Create(const AOwner: TRoomInventoryObject);
+    end;
+  protected
+    FInventoryStateID: Integer;
+    FInventory: IUnitItemArr;
+
+    FInventoryAdapter: IInventory;
+  protected
+    procedure AfterRegister; override;
+  public
+    property Inventory: IInventory read GetInventory;
+    function PopFromInventory(const AIndex: Integer): IUnitItem; virtual;
+    function PushToInventory(const AItem: IUnitItem; const AIndex: Integer = -1): Integer; virtual;
+
+    destructor Destroy; override;
+  end;
+
   { TRoomUnit }
 
-  TRoomUnit = class (TRoomObject)
+  TRoomUnit = class (TRoomInventoryObject)
   private
     FAP: Integer;
     FMaxAP: Integer;
@@ -156,8 +195,6 @@ type
     FEquippedItem : array [TRoomUnitEqSlot] of IUnitItem;
     FEquippedModel: array [TRoomUnitEqSlot] of IavModelInstance;
 
-    FInventory: IUnitItemArr;
-
     FSlots10: IUnitItems10;
     procedure Unequip(const ASlot: TRoomUnitEqSlot);
     function  Equip(const AItem: IUnitItem): Boolean;
@@ -170,10 +207,8 @@ type
     procedure WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType); override;
   public
     property Preview96_128: string read FPreview96_128 write SetPreview96_128;
-    property Inventory: IUnitItemArr read FInventory;
 
-    function PopFromInventory(const AIndex: Integer): IUnitItem;
-    function PushToInventory(const AItem: IUnitItem): Integer;
+    function PopFromInventory(const AIndex: Integer): IUnitItem; override;
 
     function SkillSlots(): IUnitItems10;
 
@@ -315,6 +350,8 @@ type
 
     FObjects: IObjectMap;
 
+    FInventoryObjects: IRoomObjectSet;
+
     procedure SetRadius(const AValue: Integer);
     function NextPointOnRay(const APt: TVec2i; const ADir, ADirStep: TVec2i): TVec2i;
   protected
@@ -339,6 +376,10 @@ type
     procedure PutObject(const AObject: TRoomObject);
     procedure RemoveObject(const AObject: TRoomObject);
     function  ObjectAt(const APos: TVec2i): TRoomObject;
+
+    procedure RegInventoryObject(const AObject: TRoomInventoryObject);
+    procedure UnRegInventoryObject(const AObject: TRoomInventoryObject);
+    function  InventoryObjectsAt(const APos: TVec2i; const ANonEmpty: Boolean): IRoomObjectArr;
 
     procedure AddAction(AAction: IBRA_Action);
 
@@ -460,17 +501,12 @@ type
   { TBRA_UnitDefaultAttack }
 
   TBRA_UnitDefaultAttack = class(TBRA_Action)
-  private const
-    cAPCost = 3;
   private
-    FValidAction: Boolean;
     FRoomUnit   : TRoomUnit;
     FTarget     : TRoomUnit;
     FActionTime : Integer;
     FDamageStartTime: Integer;
   public
-    class function CanUse(const AUnit, ATarget: TRoomUnit): Boolean;
-
     function ProcessAction: Boolean; override;
     constructor Create(const AUnit, ATarget: TRoomUnit;
                        const ASkillAnimation: string;
@@ -509,6 +545,7 @@ type
     FRootControl: TavmBaseControl;
     FUnitMenu: TavmCustomControl;
     FPlayerInventory: TavmCustomControl;
+    FOtherInventory: TavmCustomControl;
 
     procedure OnEndTurnBtnClick(ASender: TObject);
   private
@@ -598,6 +635,104 @@ function FindRoomClass(const AName: string): TRoomObjectClass;
 begin
   if gvRegRommClasses = nil then Exit(nil);
   if not gvRegRommClasses.TryGetValue(AName, Result) then Result := nil;
+end;
+
+{ TRoomInventoryObject.TInventoryAdapter }
+
+function TRoomInventoryObject.TInventoryAdapter.Owner: TRoomInventoryObject;
+begin
+  Result := nil;
+  if FOwner = nil then Exit;
+  Result := TRoomInventoryObject(FOwner.Obj);
+  if Result = nil then
+    FOwner := nil;
+end;
+
+function TRoomInventoryObject.TInventoryAdapter.StateID: Integer;
+var o: TRoomInventoryObject;
+begin
+  o := Owner;
+  if o <> nil then
+    Result := o.FInventoryStateID
+  else
+    Result := -1;
+end;
+
+function TRoomInventoryObject.TInventoryAdapter.Items: IUnitItemArr;
+var o: TRoomInventoryObject;
+begin
+  o := Owner;
+  if o <> nil then
+    Result := o.FInventory
+  else
+    Result := nil;
+end;
+
+function TRoomInventoryObject.TInventoryAdapter.PopFromInventory(const AIndex: Integer): IUnitItem;
+var o: TRoomInventoryObject;
+begin
+  o := Owner;
+  if o <> nil then
+    Result := o.PopFromInventory(AIndex)
+  else
+    Result := nil;
+end;
+
+function TRoomInventoryObject.TInventoryAdapter.PushToInventory(const AItem: IUnitItem; const AIndex: Integer): Integer;
+var o: TRoomInventoryObject;
+begin
+  o := Owner;
+  if o <> nil then
+    Result := o.PushToInventory(AItem, AIndex)
+  else
+    Result := -1;
+end;
+
+constructor TRoomInventoryObject.TInventoryAdapter.Create(const AOwner: TRoomInventoryObject);
+begin
+  FOwner := AOwner.WeakRef;
+end;
+
+{ TRoomInventoryObject }
+
+function TRoomInventoryObject.GetInventory: IInventory;
+begin
+  if FInventoryAdapter = nil then
+    FInventoryAdapter := TInventoryAdapter.Create(Self);
+  Result := FInventoryAdapter;
+end;
+
+procedure TRoomInventoryObject.AfterRegister;
+begin
+  inherited AfterRegister;
+  FInventory := TUnitItemArr.Create();
+  //FRoom.RegInventoryObject(self);
+end;
+
+function TRoomInventoryObject.PopFromInventory(const AIndex: Integer): IUnitItem;
+begin
+  Result := FInventory[AIndex];
+  FInventory.Delete(AIndex);
+  Inc(FInventoryStateID);
+end;
+
+function TRoomInventoryObject.PushToInventory(const AItem: IUnitItem; const AIndex: Integer): Integer;
+begin
+  Assert(FInventory.IndexOf(AItem) = -1);
+  if AIndex = -1 then
+    Result := FInventory.Add(AItem)
+  else
+  begin
+    FInventory.Insert(AIndex, AItem);
+    Result := AIndex;
+  end;
+  Inc(FInventoryStateID);
+end;
+
+destructor TRoomInventoryObject.Destroy;
+begin
+  inherited Destroy;
+  FRoom.UnRegInventoryObject(Self);
 end;
 
 { TBRA_Shoot }
@@ -901,16 +1036,8 @@ end;
 
 { TBRA_UnitDefaultAttack }
 
-class function TBRA_UnitDefaultAttack.CanUse(const AUnit, ATarget: TRoomUnit): Boolean;
-begin
-  if ATarget = nil then Exit(False);
-  Result := (AUnit.AP >= cAPCost) and (AUnit.Room.Distance(AUnit.RoomPos, ATarget.RoomPos) = 1) and (not ATarget.IsDead());
-end;
-
 function TBRA_UnitDefaultAttack.ProcessAction: Boolean;
 begin
-  if not FValidAction then Exit(False);
-
   if FRoomUnit.World.GameTime > FDamageStartTime then
   begin
     FDamageStartTime := HUGE;
@@ -925,18 +1052,14 @@ constructor TBRA_UnitDefaultAttack.Create(const AUnit, ATarget: TRoomUnit;
 begin
   Assert(AUnit <> nil);
   Assert(ATarget <> nil);
-  FValidAction := (AUnit.AP >= cAPCost) and (AUnit.Room.Distance(AUnit.RoomPos, ATarget.RoomPos) = 1) and (not ATarget.IsDead());
 
   FRoomUnit := AUnit;
   FTarget := ATarget;
   FActionTime := FRoomUnit.World.GameTime + ADurationTime;
   FDamageStartTime := FRoomUnit.World.GameTime + ADamageStartTime;
 
-  if FValidAction then
-  begin
-    FRoomUnit.SetAnimation([ASkillAnimation, 'Idle0'], True);
-    FRoomUnit.RoomDir := FRoomUnit.Room.Direction(FRoomUnit.RoomPos, FTarget.RoomPos);
-  end;
+  FRoomUnit.SetAnimation([ASkillAnimation, 'Idle0'], True);
+  FRoomUnit.RoomDir := FRoomUnit.Room.Direction(FRoomUnit.RoomPos, FTarget.RoomPos);
 end;
 
 { TBRA_UnitMovementAction }
@@ -1155,20 +1278,18 @@ function TRoomUnit.PopFromInventory(const AIndex: Integer): IUnitItem;
 var
   i: Integer;
 begin
-  Result := FInventory[AIndex];
-  FInventory.Delete(AIndex);
+  Result := inherited PopFromInventory(AIndex);
+
   for i := 0 to 9 do
     if FSlots10[i] = Result then
       FSlots10[i] := nil;
+
   if Result <> nil then
     if FEquippedItem[Result.Slot] = Result then
+    begin
       FEquippedItem[Result.Slot] := nil;
-end;
-
-function TRoomUnit.PushToInventory(const AItem: IUnitItem): Integer;
-begin
-  Assert(FInventory.IndexOf(AItem) = -1);
-  Result := FInventory.Add(AItem);
+      FEquippedModel[Result.Slot] := nil;
+    end;
 end;
 
 function TRoomUnit.SkillSlots: IUnitItems10;
@@ -1270,9 +1391,15 @@ begin
   if FRegistered then
   begin
     if (FHP > 0) and (AValue <= 0) then
+    begin
       FRoom.RemoveObject(Self);
+      FRoom.RegInventoryObject(self);
+    end;
     if (FHP <= 0) and (AValue > 0) then
+    begin
       FRoom.PutObject(Self);
+      FRoom.UnRegInventoryObject(self);
+    end;
   end;
   FHP := AValue;
 end;
@@ -1693,6 +1820,7 @@ begin
   FRoomUI := TRoomUI.Create(Self);
 
   FObjects := TObjectMap.Create();
+  FInventoryObjects := TRoomObjectSet.Create;
 end;
 
 procedure TRoomMap.Draw();
@@ -1863,6 +1991,33 @@ begin
     Exit(nil);
 end;
 
+procedure TRoomMap.RegInventoryObject(const AObject: TRoomInventoryObject);
+begin
+  FInventoryObjects.Add(AObject);
+end;
+
+procedure TRoomMap.UnRegInventoryObject(const AObject: TRoomInventoryObject);
+begin
+  FInventoryObjects.Delete(AObject);
+end;
+
+function TRoomMap.InventoryObjectsAt(const APos: TVec2i; const ANonEmpty: Boolean): IRoomObjectArr;
+var obj: TRoomObject;
+begin
+  Result := TRoomObjectArr.Create();
+  FInventoryObjects.Reset;
+  while FInventoryObjects.Next(obj) do
+  begin
+    if ANonEmpty then
+    begin
+      if TRoomInventoryObject(obj).Inventory.Items.Count > 0 then
+        Result.Add(obj);
+    end
+    else
+      Result.Add(obj);
+  end;
+end;
+
 procedure TRoomMap.AddAction(AAction: IBRA_Action);
 begin
   FBattleRoom.AddAction(AAction);
@@ -1898,6 +2053,7 @@ procedure TPlayer.LoadModels();
 var
   i: Integer;
   bow: IUnitItem;
+  axe: IUnitItem;
 begin
   ViewAngle := 0.5 * Pi + EPS;
   ViewRange := 20.5;
@@ -1918,6 +2074,11 @@ begin
   Equip(bow);
   PushToInventory(bow);
   FSlots10[1] := bow;
+
+  axe := TAxe.Create;
+  PushToInventory(axe);
+  axe := TAxe.Create;
+  PushToInventory(axe);
 
   //AddModel('Gop_Body', mtDefault);
   //AddModel('Gop_Bottoms', mtDefault);
@@ -2094,9 +2255,15 @@ begin
   inv_ui := TavmInventory.Create(FRootControl);
   inv_ui.Inventory := FPlayer.Inventory;
   FPlayerInventory := inv_ui;
+
+  inv_ui := TavmInventory.Create(FRootControl);
+  inv_ui.Pos := Vec(inv_ui.Pos.x + 500, inv_ui.Pos.y);
+  inv_ui.Visible := False;
+  FOtherInventory := inv_ui;
 end;
 
 procedure TBattleRoom.KeyPress(KeyCode: Integer);
+var inv_objs: IRoomObjectArr;
 begin
   if not IsPlayerTurn() then Exit;
   if (KeyCode = Ord('E')) then
@@ -2104,6 +2271,24 @@ begin
   case KeyCode of
     Ord('1') : FPlayerSkillSlot := 0;
     Ord('2') : FPlayerSkillSlot := 1;
+    Ord('G') : begin
+      if FPlayer <> nil then
+      begin
+        if FOtherInventory.Visible then
+        begin
+          FOtherInventory.Visible := False;
+        end
+        else
+        begin
+          inv_objs := FMap.InventoryObjectsAt(FPlayer.RoomPos, True);
+          if inv_objs.Count > 0 then
+          begin
+            (FOtherInventory as TavmInventory).Inventory := (inv_objs[0] as TRoomInventoryObject).Inventory;
+            FOtherInventory.Visible := True;
+          end;
+        end;
+      end;
+    end;
     //Ord('1') : FPlayerSkillSlot := 0;
     //Ord('1') : FPlayerSkillSlot := 0;
     //Ord('1') : FPlayerSkillSlot := 0;
@@ -2140,8 +2325,6 @@ begin
     if (obj is TRoomUnit) and (FPlayer <> obj) then
     begin
       new_action := FPlayer.SkillSlots[FPlayerSkillSlot].DoAction(0, FPlayer, obj as TRoomUnit);
-      //new_action := FPlayer.FEquippedItem[esBothHands].DoAction(0, FPlayer, obj as TRoomUnit);
-      //new_action := TBRA_UnitDefaultAttack.Create(FPlayer, obj as TRoomUnit, 1000, 300);
     end;
     if new_action <> nil then
       FActions.Add(new_action);
@@ -2225,11 +2408,8 @@ begin
   Main.Clear(Black, True, Main.Projection.DepthRange.y, True);
   FWorld.Renderer.DrawWorld;
 
-  if FUnitMenu <> nil then
-    FUnitMenu.Draw();
-
-  if FPlayerInventory <> nil then
-    FPlayerInventory.Draw();
+  if FRootControl <> nil then
+    FRootControl.Draw();
 
   Main.ActiveFrameBuffer.BlitToWindow();
 end;

@@ -5,7 +5,7 @@ unit untMain;
 interface
 
 uses
-  Classes, SysUtils, Forms, Controls, Graphics, Dialogs, untLevel, avRes, avTypes, mutils, avCameraController;
+  Classes, SysUtils, Forms, Controls, Graphics, Dialogs, untLevel, avRes, avTypes, mutils;
 
 type
 
@@ -46,13 +46,6 @@ procedure TfrmMain.FormCreate(Sender: TObject);
 begin
   FMain := TavMainRender.Create(nil);
   FDefFBO := Create_FrameBuffer(FMain, [TTextureFormat.RGBA, TTextureFormat.D32f], [True, False]);
-
-  //with TavCameraController.Create(FMain) do
-  //begin
-  //  MovePlane := Plane(0,1,0,0);
-  //  CanRotate := True;
-  //  CanMove := True;
-  //end;
 
   InitWorld;
 end;

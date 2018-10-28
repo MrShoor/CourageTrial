@@ -58,13 +58,70 @@ type
     function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): Boolean; override;
   end;
 
+  { TAxe }
+
+  TAxe = class(TUnitItem)
+  public
+    function Slot  : TRoomUnitEqSlot; override;
+    function Model : string;          override;
+    function Ico48 : string;          override;
+
+    function SkillsCount: Integer; override;
+    function Animation(ASkillIndex: Integer): string; override;
+    function ActionCost(ASkillIndex: Integer): Integer; override;
+    function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; override;
+    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): Boolean; override;
+  end;
+
 implementation
+
+{ TAxe }
+
+function TAxe.Slot: TRoomUnitEqSlot;
+begin
+  Result := esNone;
+end;
+
+function TAxe.Model: string;
+begin
+  Result := '';
+end;
+
+function TAxe.Ico48: string;
+begin
+  Result := 'axe.png';
+end;
+
+function TAxe.SkillsCount: Integer;
+begin
+  Result := 0;
+end;
+
+function TAxe.Animation(ASkillIndex: Integer): string;
+begin
+  Result := '';
+end;
+
+function TAxe.ActionCost(ASkillIndex: Integer): Integer;
+begin
+  Result := 0;
+end;
+
+function TAxe.DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
+begin
+  Result := nil;
+end;
+
+function TAxe.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): Boolean;
+begin
+  Result := False;
+end;
 
 { TDefaultKick }
 
 function TDefaultKick.Slot: TRoomUnitEqSlot;
 begin
-  Result := esBothHands;
+  Result := esNone;
 end;
 
 function TDefaultKick.Model: string;

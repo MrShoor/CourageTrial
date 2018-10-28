@@ -8,7 +8,7 @@ unit ui_gamecamera;
 interface
 
 uses
-  Classes, SysUtils, avMiniControls, avCanvas, untLevel, mutils, avTypes;
+  Classes, SysUtils, avMiniControls, mutils, avTypes;
 
 type
 

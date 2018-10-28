@@ -33,14 +33,16 @@ type
 
     FGridHeight: Integer;
     FGridWidth: Integer;
-    FInventory: IUnitItemArr;
+
+    FInventory: IInventory;
+    FLastStateID: Integer;
 
     FDraggedItem: Integer;
     FDraggetItemCoord: TVec2;
-
+  private
     procedure SetGridHeight(const AValue: Integer);
     procedure SetGridWidth(const AValue: Integer);
-    procedure SetInventory(const AValue: IUnitItemArr);
+    procedure SetInventory(const AValue: IInventory);
     procedure UpdateSize;
     procedure UpdateScroll;
     procedure ScrollEvent(ASender: TObject);
@@ -55,10 +57,22 @@ type
   protected
     procedure DoValidate; override;
     procedure AfterRegister; override;
+    procedure DrawControl(const AMat: TMat3); override;
   public
     property GridWidth : Integer read FGridWidth write SetGridWidth;
     property GridHeight: Integer read FGridHeight write SetGridHeight;
-    property Inventory: IUnitItemArr read FInventory write SetInventory;
+    property Inventory: IInventory read FInventory write SetInventory;
+  private
+    FDropPosition: Integer;
+    FDropTarget: TavmInventory;
+    procedure SetDropPosition(const AValue: Integer);
+    function  FindDropTarget(const APt: TVec2): TavmInventory;
+    procedure SetDropTarget(const AValue: TavmInventory);
+    property  DropTarget: TavmInventory read FDropTarget write SetDropTarget;
+  public
+    procedure DropItem(const AFrom: IInventory; const AIndex: Integer);
+    procedure SetDropPoint(const APt: TVec2);
+    property DropPosition: Integer read FDropPosition write SetDropPosition;
   end;
 
 implementation
@@ -80,10 +94,12 @@ end;
 
 { TavmInventory }
 
-procedure TavmInventory.SetInventory(const AValue: IUnitItemArr);
+procedure TavmInventory.SetInventory(const AValue: IInventory);
 begin
   if FInventory = AValue then Exit;
   FInventory := AValue;
+  if FInventory <> nil then
+    FLastStateID := FInventory.StateID;
   UpdateScroll;
   Invalidate;
 end;
@@ -109,7 +125,7 @@ begin
     FScroll.ViewportWidth := 1;
     Exit;
   end;
-  FScroll.Range := (FInventory.Count + GridWidth - 1) div GridWidth;
+  FScroll.Range := (FInventory.Items.Count + GridWidth - 1) div GridWidth;
   FScroll.ViewportWidth := GridHeight;
 end;
 
@@ -140,7 +156,7 @@ begin
   Result := -1;
   if FInventory = nil then Exit;
 
-  for i := 0 to FInventory.Count - 1 do
+  for i := 0 to FInventory.Items.Count - 1 do
   begin
     rct := ItemRect(i);
     if rct.PtInRect(APt) then Exit(i);
@@ -152,6 +168,7 @@ begin
   inherited Notify_DragStart(ABtn, APt, AShifts);
   if (ABtn <> 1) then Exit;
   FDraggedItem := HitToItems(APt);
+  BringToFront;
 end;
 
 procedure TavmInventory.Notify_DragMove(ABtn: Integer; const APt: TVec2; AShifts: TShifts);
@@ -159,6 +176,11 @@ begin
   inherited Notify_DragMove(ABtn, APt, AShifts);
   if (ABtn <> 1) then Exit;
   FDraggetItemCoord := APt;
+
+  DropTarget := FindDropTarget(APt);
+  if DropTarget <> nil then
+    DropTarget.SetDropPoint((APt * Transform) * DropTarget.TransformInv); //to do fix for non siblings objects
+
   Invalidate;
 end;
 
@@ -166,7 +188,10 @@ procedure TavmInventory.Notify_DragStop(ABtn: Integer; const APt: TVec2; AShifts
 begin
   inherited Notify_DragStop(ABtn, APt, AShifts);
   if (ABtn <> 1) then Exit;
+  if DropTarget <> nil then
+    DropTarget.DropItem(Inventory, FDraggedItem);
   FDraggedItem := -1;
+  DropTarget := nil;
   Invalidate;
 end;
 
@@ -177,6 +202,28 @@ begin
   UpdateSize;
   UpdateScroll;
   Invalidate;
+end;
+
+function TavmInventory.FindDropTarget(const APt: TVec2): TavmInventory;
+var rootPt: TVec2;
+    rCtrl: TavmBaseControl;
+    hit: TavmBaseControl;
+begin
+  rCtrl := RootControl;
+  rootPt := Space_LocalToRootControl(APt);
+  hit := rCtrl.HitTest(rootPt, True);
+  if hit is TavmInventory then
+    Result := TavmInventory(hit)
+  else
+    Result := nil;
+end;
+
+procedure TavmInventory.SetDropTarget(const AValue: TavmInventory);
+begin
+  if FDropTarget = AValue then Exit;
+  if FDropTarget <> nil then
+    FDropTarget.DropPosition := -1;
+  FDropTarget := AValue;
 end;
 
 procedure TavmInventory.SetGridHeight(const AValue: Integer);
@@ -194,8 +241,8 @@ procedure TavmInventory.DoValidate;
   begin
     if FInventory = nil then Exit('');
     if AIndex < 0 then Exit('');
-    if AIndex >= FInventory.Count then Exit('');
-    Result := ExeRelativeFileName('ui\items\48\'+FInventory[AIndex].Ico48);
+    if AIndex >= FInventory.Items.Count then Exit('');
+    Result := ExeRelativeFileName('ui\items\48\'+FInventory.Items[AIndex].Ico48);
   end;
 
   function GetCellSpriteFile(x,y: Integer): string;
@@ -254,11 +301,23 @@ begin
     cellPos := FDraggetItemCoord - Vec(cCellSize*0.5, cCellSize*0.5);
     DrawItemSprite(cellPos, itemSprite);
   end;
+
+  if FDropPosition >= 0 then
+  begin
+    i := FDropPosition mod GridWidth;
+    j := FDropPosition div GridHeight - FScroll.ViewportPos;
+    cellPos.x := cCellBorderSize + (cCellSize + cCellBorderSize) * i - cCellBorderSize*0.5;
+    cellPos.y := cCellBorderSize + (cCellSize + cCellBorderSize) * j - cCellBorderSize*0.5;
+    Canvas.Pen.Width := 3;
+    Canvas.Pen.Color := Vec(1,0,0,1);
+    Canvas.AddLine(cellPos, Vec(cellPos.x, cellPos.y + cCellSize + cCellBorderSize*0.5));
+  end;
 end;
 
 procedure TavmInventory.AfterRegister;
 begin
   inherited AfterRegister;
+  FDropPosition := -1;
   FDraggedItem := -1;
 
   FScroll := TavmInventoryScroll.Create(Self);
@@ -268,6 +327,59 @@ begin
   Pos := Vec(10, 10);
   GridWidth := 5;
   GridHeight := 10;
+end;
+
+procedure TavmInventory.DrawControl(const AMat: TMat3);
+begin
+  if FInventory <> nil then
+    if FLastStateID <> FInventory.StateID then
+    begin
+      FLastStateID := FInventory.StateID;
+      Invalidate;
+    end;
+  inherited DrawControl(AMat);
+end;
+
+procedure TavmInventory.SetDropPosition(const AValue: Integer);
+begin
+  if FDropPosition = AValue then Exit;
+  FDropPosition := AValue;
+  Invalidate;
+end;
+
+procedure TavmInventory.DropItem(const AFrom: IInventory; const AIndex: Integer);
+var item: IUnitItem;
+begin
+  if FDropPosition < 0 then Exit;
+  item := AFrom.PopFromInventory(AIndex);
+
+  if (AFrom = FInventory) and (FDropPosition > AIndex) then
+    Dec(FDropPosition);
+
+  FInventory.PushToInventory(item, FDropPosition);
+end;
+
+procedure TavmInventory.SetDropPoint(const APt: TVec2);
+var minDist, Dist: Single;
+    item, i: Integer;
+    rct: TRectF;
+begin
+  if FInventory = nil then Exit;
+  item := -1;
+  minDist := HUGE;
+  for i := 0 to FInventory.Items.Count do
+  begin
+    rct := ItemRect(i);
+    dist := LenSqr(Vec(rct.min.x - cCellBorderSize*0.5, (rct.min.y+rct.max.y)*0.5) - APt);
+    if dist < minDist then
+    begin
+      item := i;
+      minDist := dist;
+    end;
+  end;
+
+  if item >= 0 then
+    DropPosition := item;
 end;
 
 end.
