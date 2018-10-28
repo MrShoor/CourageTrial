@@ -9,7 +9,7 @@ uses
   {$ENDIF}{$ENDIF}
   Interfaces, // this includes the LCL widgetset
   Forms, untMain, untLevel, untEnemies, untGraphics, ui_unit, untObstacles,
-  untItems
+  untItems, ui_inventory, ui_gamecamera
   { you can add units after this };
 
 {$R *.res}

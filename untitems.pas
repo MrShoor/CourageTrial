@@ -19,6 +19,7 @@ type
   public
     function Slot  : TRoomUnitEqSlot; virtual; abstract;
     function Model : string;          virtual; abstract;
+    function Ico48 : string;          virtual; abstract;
 
     function SkillsCount: Integer; virtual; abstract;
     function Animation(ASkillIndex: Integer): string; virtual; abstract;
@@ -33,6 +34,7 @@ type
   public
     function Slot  : TRoomUnitEqSlot; override;
     function Model : string;          override;
+    function Ico48 : string;          override;
 
     function SkillsCount: Integer; override;
     function Animation(ASkillIndex: Integer): string; override;
@@ -47,6 +49,7 @@ type
   public
     function Slot  : TRoomUnitEqSlot; override;
     function Model : string;          override;
+    function Ico48 : string;          override;
 
     function SkillsCount: Integer; override;
     function Animation(ASkillIndex: Integer): string; override;
@@ -65,6 +68,11 @@ begin
 end;
 
 function TDefaultKick.Model: string;
+begin
+  Result := '';
+end;
+
+function TDefaultKick.Ico48: string;
 begin
   Result := '';
 end;
@@ -110,6 +118,11 @@ end;
 function TArcherBow.Model: string;
 begin
   Result := 'Archer_Bow';
+end;
+
+function TArcherBow.Ico48: string;
+begin
+  Result := 'bow.png';
 end;
 
 function TArcherBow.SkillsCount: Integer;

@@ -119,6 +119,7 @@ type
   IUnitItem = interface
     function Slot       : TRoomUnitEqSlot;
     function Model      : string;
+    function Ico48      : string;
 
     function SkillsCount: Integer;
     function Animation(ASkillIndex: Integer): string;
@@ -127,6 +128,8 @@ type
     function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): Boolean;
   end;
   IUnitItems10 = array [0..9] of IUnitItem;
+  IUnitItemArr = {$IfDef FPC}specialize{$EndIf}IArray<IUnitItem>;
+  TUnitItemArr = {$IfDef FPC}specialize{$EndIf}TArray<IUnitItem>;
 
   { TRoomUnit }
 
@@ -153,16 +156,24 @@ type
     FEquippedItem : array [TRoomUnitEqSlot] of IUnitItem;
     FEquippedModel: array [TRoomUnitEqSlot] of IavModelInstance;
 
+    FInventory: IUnitItemArr;
+
     FSlots10: IUnitItems10;
     procedure Unequip(const ASlot: TRoomUnitEqSlot);
     function  Equip(const AItem: IUnitItem): Boolean;
     procedure OnRegisterRoomObject(const ANewObject: TRoomObject); virtual;
 
     function AddAnimationPrefix(const ANameSequence: array of string): TStringArray;
+  protected
+    procedure AfterRegister; override;
   public
     procedure WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType); override;
   public
     property Preview96_128: string read FPreview96_128 write SetPreview96_128;
+    property Inventory: IUnitItemArr read FInventory;
+
+    function PopFromInventory(const AIndex: Integer): IUnitItem;
+    function PushToInventory(const AItem: IUnitItem): Integer;
 
     function SkillSlots(): IUnitItems10;
 
@@ -495,7 +506,10 @@ type
 
     FMap: TRoomMap;
 
+    FRootControl: TavmBaseControl;
     FUnitMenu: TavmCustomControl;
+    FPlayerInventory: TavmCustomControl;
+
     procedure OnEndTurnBtnClick(ASender: TObject);
   private
     FActions: IBRA_ActionArr;
@@ -518,6 +532,7 @@ type
     procedure OnAfterWorldDraw(Sender: TObject);
 
     procedure PreloadModels;
+    procedure CreateUI;
   public
     property Player: TPlayer read FPlayer;
     property Obstacles: IObstacleArr read FObstacles;
@@ -550,7 +565,7 @@ function  FindRoomClass(const AName: string): TRoomObjectClass;
 implementation
 
 uses
-  untEnemies, untGraphics, ui_unit, untItems;
+  untEnemies, untGraphics, ui_unit, ui_inventory, ui_gamecamera, untItems;
 
 type
   IRoomClassesMap = {$IfDef FPC}specialize{$EndIf}IHashMap<string, TRoomObjectClass>;
@@ -1115,6 +1130,12 @@ begin
     Result[i] := FAnimationPrefix + ANameSequence[i];
 end;
 
+procedure TRoomUnit.AfterRegister;
+begin
+  inherited AfterRegister;
+  FInventory := TUnitItemArr.Create();
+end;
+
 procedure TRoomUnit.WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType);
 var i: TRoomUnitEqSlot;
 begin
@@ -1128,6 +1149,26 @@ begin
         ACollection.Add(FEquippedModel[i]);
       end;
   end;
+end;
+
+function TRoomUnit.PopFromInventory(const AIndex: Integer): IUnitItem;
+var
+  i: Integer;
+begin
+  Result := FInventory[AIndex];
+  FInventory.Delete(AIndex);
+  for i := 0 to 9 do
+    if FSlots10[i] = Result then
+      FSlots10[i] := nil;
+  if Result <> nil then
+    if FEquippedItem[Result.Slot] = Result then
+      FEquippedItem[Result.Slot] := nil;
+end;
+
+function TRoomUnit.PushToInventory(const AItem: IUnitItem): Integer;
+begin
+  Assert(FInventory.IndexOf(AItem) = -1);
+  Result := FInventory.Add(AItem);
 end;
 
 function TRoomUnit.SkillSlots: IUnitItems10;
@@ -1875,6 +1916,7 @@ begin
 
   bow := TArcherBow.Create;
   Equip(bow);
+  PushToInventory(bow);
   FSlots10[1] := bow;
 
   //AddModel('Gop_Body', mtDefault);
@@ -1948,9 +1990,12 @@ end;
 
 function TBattleRoom.IsMouseOnUI: Boolean;
 var curpt: TVec2;
+    hit: TavmBaseControl;
 begin
   curpt := (Main.Cursor.WindowCur*Vec(0.5, -0.5) + Vec(0.5, 0.5) )*Main.WindowSize;
-  Result := FUnitMenu.HitTest(curpt, True) <> nil;
+  if FRootControl.InputConnector.Captured <> nil then Exit(True);
+  hit := FRootControl.HitTest(curpt, True);
+  Result := (hit <> nil) and (hit <> FRootControl);
 end;
 
 procedure TBattleRoom.EMUps(var msg: TavMessage);
@@ -2030,6 +2075,25 @@ begin
 
   FFloor := TbGameObject.Create(FWorld);
   FFloor.AddModel('Floor', mtDefault);
+end;
+
+procedure TBattleRoom.CreateUI;
+var
+  menu: TavmUnitMenu;
+  inv_ui: TavmInventory;
+begin
+  FRootControl := TavmCameraControl.Create(Self);
+  FRootControl.Size := Vec(10000, 10000);
+
+  TavmCameraControl(FRootControl).LookAt(FMap.UI.TilePosToWorldPos(FPlayer.RoomPos));
+
+  menu := TavmUnitMenu.Create(FRootControl);
+  menu.OnEndTurnClick := {$IfDef FPC}@{$EndIf}OnEndTurnBtnClick;
+  FUnitMenu := menu;
+
+  inv_ui := TavmInventory.Create(FRootControl);
+  inv_ui.Inventory := FPlayer.Inventory;
+  FPlayerInventory := inv_ui;
 end;
 
 procedure TBattleRoom.KeyPress(KeyCode: Integer);
@@ -2164,6 +2228,9 @@ begin
   if FUnitMenu <> nil then
     FUnitMenu.Draw();
 
+  if FPlayerInventory <> nil then
+    FPlayerInventory.Draw();
+
   Main.ActiveFrameBuffer.BlitToWindow();
 end;
 
@@ -2199,17 +2266,12 @@ procedure TBattleRoom.Generate();
 var lantern: TLantern;
     bot: TBot;
 
-    menu: TavmUnitMenu;
     obsDescIdx, i: Integer;
 begin
   PreloadModels;
   //FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\creature1.avm')]);
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('bullets\bullets.avm')]);
-
-  menu := TavmUnitMenu.Create(Self);
-  menu.OnEndTurnClick := {$IfDef FPC}@{$EndIf}OnEndTurnBtnClick;
-  FUnitMenu := menu;
 
   FFloor := TbGameObject.Create(FWorld);
   FFloor.AddModel('Floor', mtDefault);
@@ -2292,9 +2354,11 @@ begin
   FUnits.Add(bot);
 
   FActiveUnit := FUnits.Count - 1;
-  EndTurn();
 
   CreateObstacles();
+  CreateUI();
+
+  EndTurn();
 
   FMap.CurrentPlayer := FPlayer;
 end;
@@ -2336,17 +2400,12 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string);
 
 var
   i: Integer;
-  menu: TavmUnitMenu;
 begin
   PreloadModels;
   //FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\creature1.avm')]);
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\archer\archer.avm')]);
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('bullets\bullets.avm')]);
-
-  menu := TavmUnitMenu.Create(Self);
-  menu.OnEndTurnClick := {$IfDef FPC}@{$EndIf}OnEndTurnBtnClick;
-  FUnitMenu := menu;
 
   LoadObstacles();
 
@@ -2360,6 +2419,9 @@ begin
     SpawnBot();
 
   FActiveUnit := FUnits.Count - 1;
+
+  CreateUI();
+
   EndTurn();
 
   FMap.CurrentPlayer := FPlayer;

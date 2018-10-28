@@ -63,3 +63,7 @@ N Lantern
 C TLantern
 O 0 0 0
 O 1 0 0
+N Wall3
+O 0 0 1
+O 1 0 1
+O 2 0 1

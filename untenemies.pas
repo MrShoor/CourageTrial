@@ -156,6 +156,7 @@ begin
 
   bow := TArcherBow.Create;
   Equip(bow);
+  FInventory.Add(bow);
 
   FAnimationPrefix := 'Archer_';
 

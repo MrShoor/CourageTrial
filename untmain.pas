@@ -47,12 +47,12 @@ begin
   FMain := TavMainRender.Create(nil);
   FDefFBO := Create_FrameBuffer(FMain, [TTextureFormat.RGBA, TTextureFormat.D32f], [True, False]);
 
-  with TavCameraController.Create(FMain) do
-  begin
-    MovePlane := Plane(0,1,0,0);
-    CanRotate := True;
-    CanMove := True;
-  end;
+  //with TavCameraController.Create(FMain) do
+  //begin
+  //  MovePlane := Plane(0,1,0,0);
+  //  CanRotate := True;
+  //  CanMove := True;
+  //end;
 
   InitWorld;
 end;
