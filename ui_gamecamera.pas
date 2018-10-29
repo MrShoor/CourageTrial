@@ -63,7 +63,8 @@ end;
 procedure TavmCameraControl.AfterRegister;
 begin
   inherited AfterRegister;
-  FYPlane := 1;
+  //FYPlane := 1;
+  FYPlane := 0;
   FDragPlane := Plane(0, 1, 0, -FYPlane);
   FRotateSens := 0.005;
   FWheelSens := 1/1.15;
@@ -98,7 +99,8 @@ begin
     else
     begin
       FYaw := FYaw + delta.x * FRotateSens;
-      FPitch := Clamp(FPitch + delta.y * FRotateSens, 0.1*Pi, 0.49*Pi);
+      //FPitch := Clamp(FPitch + delta.y * FRotateSens, 0.1*Pi, 0.49*Pi);
+      FPitch := Clamp(FPitch + delta.y * FRotateSens, -0.49*Pi, 0.49*Pi);
       UpdateCameraPosition;
     end;
   end;

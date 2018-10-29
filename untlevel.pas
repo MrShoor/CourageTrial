@@ -547,6 +547,8 @@ type
     FPlayerInventory: TavmCustomControl;
     FOtherInventory: TavmCustomControl;
 
+    FSun: IavPointLight;
+
     procedure OnEndTurnBtnClick(ASender: TObject);
   private
     FActions: IBRA_ActionArr;
@@ -2119,9 +2121,9 @@ begin
   inherited LoadModels(AObstacle);
   FLight := World.Renderer.CreatePointLight();
   FLight.Pos := cLightSrcPos;
-  FLight.Radius := 30;
+  FLight.Radius := 10;
   FLight.Color := Vec(1,1,1);
-  FLight.CastShadows := False;
+  FLight.CastShadows := True;
 end;
 
 procedure TLantern.SetRoomPosDir(const APos: TVec2i; const ADir: Integer; const AAutoRegister: Boolean);
@@ -2236,6 +2238,12 @@ begin
 
   FFloor := TbGameObject.Create(FWorld);
   FFloor.AddModel('Floor', mtDefault);
+
+  FSun := FWorld.Renderer.CreatePointLight();
+  FSun.Pos := Vec(300, 300, 300)*0.1;
+  FSun.Radius := 3000*0.1;
+  FSun.Color := Vec(0.3,0.3,0.3)*3*3;
+  FSun.CastShadows := True;
 end;
 
 procedure TBattleRoom.CreateUI;
