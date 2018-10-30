@@ -33,6 +33,8 @@ type
   protected
     procedure AfterRegister; override;
 
+    procedure Notify_KeyDown(AKey: Word; const Ex: TKeyEventEx); override;
+
     procedure Notify_MouseMove(const APt: TVec2; AShifts: TShifts); override;
     procedure Notify_MouseWheel(const APt: TVec2; AWheelShift: Integer; AShifts: TShifts); override;
     procedure Notify_MouseDown(ABtn: Integer; const APt: TVec2; AShifts: TShifts); override;
@@ -75,6 +77,13 @@ begin
   FPitch := Pi*0.25;
   FDist := 4;
   UpdateCameraPosition;
+end;
+
+procedure TavmCameraControl.Notify_KeyDown(AKey: Word; const Ex: TKeyEventEx);
+begin
+  inherited Notify_KeyDown(AKey, Ex);
+  if sShift in Ex.shifts then
+    FHoldPtValid := Intersect(FDragPlane, Main.Cursor.Ray, FHoldPt);
 end;
 
 procedure TavmCameraControl.Notify_MouseMove(const APt: TVec2; AShifts: TShifts);
