@@ -547,7 +547,7 @@ type
     FPlayerInventory: TavmCustomControl;
     FOtherInventory: TavmCustomControl;
 
-    FSun: IavPointLight;
+    FSun: IavSpotLight;
 
     procedure OnEndTurnBtnClick(ASender: TObject);
   private
@@ -2122,8 +2122,10 @@ begin
   FLight := World.Renderer.CreatePointLight();
   FLight.Pos := cLightSrcPos;
   FLight.Radius := 10;
-  FLight.Color := Vec(1,1,1);
-  FLight.CastShadows := True;
+  FLight.Size := 0.1;
+  //FLight.Color := Vec(1,1,1.0)*4.41;
+  FLight.Color := Pow(Vec(1,0.655,0),1.0)*4.41;
+  FLight.CastShadows := st512;
 end;
 
 procedure TLantern.SetRoomPosDir(const APos: TVec2i; const ADir: Integer; const AAutoRegister: Boolean);
@@ -2236,14 +2238,20 @@ begin
   //FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
   //FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\creature1.avm')]);
 
+  FWorld.Renderer.SetEnviromentCubemap(ExeRelativeFileName('waterfall.dds'));
+
   FFloor := TbGameObject.Create(FWorld);
   FFloor.AddModel('Floor', mtDefault);
 
-  FSun := FWorld.Renderer.CreatePointLight();
-  FSun.Pos := Vec(300, 300, 300)*0.1;
-  FSun.Radius := 3000*0.1;
-  FSun.Color := Vec(0.3,0.3,0.3)*3*3;
-  FSun.CastShadows := True;
+//  //FSun := FWorld.Renderer.CreatePointLight();
+//  FSun := FWorld.Renderer.CreateSpotLight();
+////  FSun.Size := 2;
+//  FSun.Pos := Vec(300, 300, 300);
+//  FSun.Radius := 1500;
+//  FSun.Dir := normalize(Vec(0,0,0) - FSun.Pos);
+//  FSun.Color := Vec(0.3,0.3,0.3);
+//  FSun.Angles := Vec(0.027*Pi, 0.027*Pi);
+//  FSun.CastShadows := st2048;
 end;
 
 procedure TBattleRoom.CreateUI;
@@ -2272,9 +2280,23 @@ end;
 
 procedure TBattleRoom.KeyPress(KeyCode: Integer);
 var inv_objs: IRoomObjectArr;
+  m: TMat4;
 begin
   if KeyCode = Ord(' ') then
     FWorld.Renderer.InvalidateShaders;
+
+  //if KeyCode = Ord('R') then
+  //begin
+  //  Main.Camera.Eye := FSun.Pos;
+  //  Main.Camera.Up := Vec(0,0,1);
+  //  Main.Camera.At := FSun.Dir;
+  //  m := Main.Camera.Matrix;
+  //  Main.Projection.Fov := FSun.Angles.y;
+  //  Main.Projection.Aspect := 1;
+  //  Main.Projection.FarPlane := FSun.Radius;
+  //  Main.Projection.NearPlane := FSun.Radius/1000;
+  //  m := Main.Projection.Matrix;
+  //end;
 
   if not IsPlayerTurn() then Exit;
   if (KeyCode = Ord('E')) then
@@ -2626,7 +2648,7 @@ begin
   FEmptyLight.Pos := Vec(0, 10, 0);
   FEmptyLight.Radius := 50;
   FEmptyLight.Color := Vec(1,1,1);
-  FEmptyLight.CastShadows := True;
+  FEmptyLight.CastShadows := st1024;
 end;
 
 procedure TBattleRoom.DrawObstaclePreview(const AName: String; const bmp: TBitmap);

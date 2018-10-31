@@ -5,6 +5,7 @@ unit untMain;
 interface
 
 uses
+  Windows,
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, untLevel, avRes, avTypes, mutils;
 
 type
@@ -17,8 +18,7 @@ type
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
-    procedure FormMouseDown(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Integer);
+    procedure FormMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure FormPaint(Sender: TObject);
   private
     FMain: TavMainRender;
