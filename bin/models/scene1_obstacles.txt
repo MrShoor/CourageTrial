@@ -67,3 +67,11 @@ N Wall3
 O 0 0 1
 O 1 0 1
 O 2 0 1
+N Coll1
+O 0 0 1
+N Arc
+O 0 0 1
+O 2 0 1
+N Brazier
+C TBrazier
+O 0 0 0

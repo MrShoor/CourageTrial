@@ -6,12 +6,14 @@ object fmrMain: TfmrMain
   Caption = 'fmrMain'
   ClientHeight = 844
   ClientWidth = 1249
+  DoubleBuffered = False
   KeyPreview = True
   Menu = MainMenu
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnKeyDown = FormKeyDown
-  LCLVersion = '1.8.0.3'
+  ParentDoubleBuffered = False
+  LCLVersion = '2.0.0.1'
   object RenderPanel: TPanel
     Left = 292
     Height = 844

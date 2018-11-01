@@ -2,8 +2,8 @@
 <CONFIG>
   <ProjectSession>
     <PathDelim Value="\"/>
-    <Version Value="10"/>
-    <BuildModes Active="Debug"/>
+    <Version Value="11"/>
+    <BuildModes Active="Default"/>
     <Units Count="23">
       <Unit0>
         <Filename Value="CTRoomEditor.lpr"/>
@@ -19,8 +19,6 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="untRoomEditorMain"/>
-        <TopLine Value="246"/>
-        <CursorPos X="25" Y="254"/>
         <UsageCount Value="31"/>
         <Loaded Value="True"/>
         <LoadedDesigner Value="True"/>
@@ -31,8 +29,8 @@
         <UnitName Value="untLevel"/>
         <IsVisibleTab Value="True"/>
         <EditorIndex Value="1"/>
-        <TopLine Value="1897"/>
-        <CursorPos X="36" Y="1923"/>
+        <TopLine Value="671"/>
+        <CursorPos X="49" Y="679"/>
         <UsageCount Value="31"/>
         <Loaded Value="True"/>
       </Unit2>
@@ -139,7 +137,8 @@
         <Loaded Value="True"/>
       </Unit14>
       <Unit15>
-        <Filename Value="..\AvalancheProject\Common\avModel.pas"/>
+        <Filename Value="..\AvalancheProject\Common\avmodel.pas"/>
+        <UnitName Value="avModel"/>
         <EditorIndex Value="4"/>
         <TopLine Value="24"/>
         <CursorPos X="17" Y="35"/>
@@ -147,7 +146,8 @@
         <Loaded Value="True"/>
       </Unit15>
       <Unit16>
-        <Filename Value="..\AvalancheProject\Common\avMesh.pas"/>
+        <Filename Value="..\AvalancheProject\Common\avmesh.pas"/>
+        <UnitName Value="avMesh"/>
         <EditorIndex Value="5"/>
         <TopLine Value="77"/>
         <CursorPos X="22" Y="89"/>
@@ -204,124 +204,125 @@
     <JumpHistory Count="30" HistoryIndex="29">
       <Position1>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="417" Column="55" TopLine="411"/>
+        <Caret Line="2803" Column="24" TopLine="2770"/>
       </Position1>
       <Position2>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="1869" Column="3" TopLine="1855"/>
       </Position2>
       <Position3>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="422" Column="15" TopLine="399"/>
+        <Caret Line="421" Column="13" TopLine="391"/>
       </Position3>
       <Position4>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="1985" Column="3" TopLine="1971"/>
+        <Caret Line="423" Column="11" TopLine="393"/>
       </Position4>
       <Position5>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="416" Column="15" TopLine="405"/>
+        <Caret Line="657" Column="11" TopLine="627"/>
       </Position5>
       <Position6>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="1767" Column="3" TopLine="1732"/>
+        <Caret Line="659" Column="19" TopLine="629"/>
       </Position6>
       <Position7>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="418" Column="15" TopLine="398"/>
+        <Caret Line="665" Column="19" TopLine="635"/>
       </Position7>
       <Position8>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="1883" TopLine="1866"/>
+        <Caret Line="671" Column="19" TopLine="641"/>
       </Position8>
       <Position9>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="417" Column="15" TopLine="400"/>
+        <Caret Line="683" Column="19" TopLine="653"/>
       </Position9>
       <Position10>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="1874" TopLine="1867"/>
+        <Caret Line="2802" Column="24" TopLine="2770"/>
       </Position10>
       <Position11>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="404" Column="29" TopLine="390"/>
       </Position11>
       <Position12>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="1616" Column="3" TopLine="1614"/>
+        <Caret Line="429" Column="16" TopLine="403"/>
       </Position12>
       <Position13>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="418" Column="20" TopLine="389"/>
+        <Caret Line="661" Column="3" TopLine="659"/>
       </Position13>
       <Position14>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="1776" Column="29" TopLine="1749"/>
+        <Caret Line="430" Column="15" TopLine="411"/>
       </Position14>
       <Position15>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="420" Column="15" TopLine="400"/>
+        <Caret Line="667" Column="3" TopLine="665"/>
       </Position15>
       <Position16>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="1891" Column="17" TopLine="1889"/>
+        <Caret Line="432" Column="15" TopLine="412"/>
       </Position16>
       <Position17>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="404" Column="15" TopLine="386"/>
+        <Caret Line="673" Column="3" TopLine="671"/>
       </Position17>
       <Position18>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="1625" Column="39" TopLine="1614"/>
+        <Caret Line="430" Column="15" TopLine="414"/>
       </Position18>
       <Position19>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="419" Column="18" TopLine="398"/>
+        <Caret Line="667" Column="3" TopLine="665"/>
       </Position19>
       <Position20>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="1885" Column="17" TopLine="1883"/>
+        <Caret Line="429" Column="15" TopLine="412"/>
       </Position20>
       <Position21>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="418" Column="19" TopLine="401"/>
+        <Caret Line="661" Column="3" TopLine="659"/>
       </Position21>
       <Position22>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="1862" Column="19" TopLine="1851"/>
+        <Caret Line="432" Column="15" TopLine="411"/>
       </Position22>
       <Position23>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="419" Column="15" TopLine="400"/>
+        <Caret Line="673" Column="3" TopLine="671"/>
       </Position23>
       <Position24>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="1900" Column="3" TopLine="1880"/>
+        <Caret Line="433" Column="15" TopLine="414"/>
       </Position24>
       <Position25>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="418" Column="15" TopLine="401"/>
+        <Caret Line="686" Column="3" TopLine="683"/>
       </Position25>
       <Position26>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="1789" TopLine="1755"/>
+        <Caret Line="432" Column="15" TopLine="415"/>
       </Position26>
       <Position27>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="419" Column="15" TopLine="400"/>
+        <Caret Line="673" Column="3" TopLine="671"/>
       </Position27>
       <Position28>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="1889" Column="35" TopLine="1883"/>
+        <Caret Line="493" Column="36" TopLine="486"/>
       </Position28>
       <Position29>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="419" Column="15" TopLine="401"/>
       </Position29>
       <Position30>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="1884" TopLine="1883"/>
+        <Caret Line="432" Column="17" TopLine="406"/>
       </Position30>
     </JumpHistory>
+    <RunParams>
+      <FormatVersion Value="2"/>
+      <Modes Count="0" ActiveMode="default"/>
+    </RunParams>
   </ProjectSession>
 </CONFIG>

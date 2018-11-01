@@ -418,6 +418,21 @@ type
     procedure SetRoomPosDir(const APos: TVec2i; const ADir: Integer; const AAutoRegister: Boolean = True); override;
   end;
 
+  { TBrazier }
+
+  TBrazier = class (TObstacle)
+  private const
+    cLightSrcPos: TVec3 = (x: 0.0; y: 1.0; z: 0.0);
+  private
+    FLight: IavPointLight;
+  protected
+    procedure SetRoomDir(const AValue: Integer); override;
+    procedure SetRoomPos(const AValue: TVec2i); override;
+  public
+    procedure LoadModels(const AObstacle: TObstacleDesc); override;
+    procedure SetRoomPosDir(const APos: TVec2i; const ADir: Integer; const AAutoRegister: Boolean = True); override;
+  end;
+
   { TPlayer }
 
   TPlayer = class (TRoomUnit)
@@ -637,6 +652,39 @@ function FindRoomClass(const AName: string): TRoomObjectClass;
 begin
   if gvRegRommClasses = nil then Exit(nil);
   if not gvRegRommClasses.TryGetValue(AName, Result) then Result := nil;
+end;
+
+{ TBrazier }
+
+procedure TBrazier.SetRoomDir(const AValue: Integer);
+begin
+  inherited SetRoomDir(AValue);
+  FLight.Pos := cLightSrcPos * Transform();
+end;
+
+procedure TBrazier.SetRoomPos(const AValue: TVec2i);
+begin
+  inherited SetRoomPos(AValue);
+  FLight.Pos := cLightSrcPos * Transform();
+end;
+
+procedure TBrazier.LoadModels(const AObstacle: TObstacleDesc);
+begin
+  inherited LoadModels(AObstacle);
+  FLight := World.Renderer.CreatePointLight();
+  FLight.Pos := cLightSrcPos;
+  FLight.Radius := 5;
+  FLight.Size := 0.1;
+  //FLight.Color := Vec(1,1,1.0)*4.41;
+  FLight.Color := Pow(Vec(1,0.655,0),1.0)*4.41*2*4;
+  FLight.CastShadows := st512;
+end;
+
+procedure TBrazier.SetRoomPosDir(const APos: TVec2i; const ADir: Integer;
+  const AAutoRegister: Boolean);
+begin
+  inherited SetRoomPosDir(APos, ADir, AAutoRegister);
+  FLight.Pos := cLightSrcPos * Transform();
 end;
 
 { TRoomInventoryObject.TInventoryAdapter }
@@ -2124,7 +2172,7 @@ begin
   FLight.Radius := 10;
   FLight.Size := 0.1;
   //FLight.Color := Vec(1,1,1.0)*4.41;
-  FLight.Color := Pow(Vec(1,0.655,0),1.0)*4.41;
+  FLight.Color := Pow(Vec(1,0.655,0),1.0)*4.41*4;
   FLight.CastShadows := st512;
 end;
 
@@ -2280,23 +2328,9 @@ end;
 
 procedure TBattleRoom.KeyPress(KeyCode: Integer);
 var inv_objs: IRoomObjectArr;
-  m: TMat4;
 begin
   if KeyCode = Ord(' ') then
     FWorld.Renderer.InvalidateShaders;
-
-  //if KeyCode = Ord('R') then
-  //begin
-  //  Main.Camera.Eye := FSun.Pos;
-  //  Main.Camera.Up := Vec(0,0,1);
-  //  Main.Camera.At := FSun.Dir;
-  //  m := Main.Camera.Matrix;
-  //  Main.Projection.Fov := FSun.Angles.y;
-  //  Main.Projection.Aspect := 1;
-  //  Main.Projection.FarPlane := FSun.Radius;
-  //  Main.Projection.NearPlane := FSun.Radius/1000;
-  //  m := Main.Projection.Matrix;
-  //end;
 
   if not IsPlayerTurn() then Exit;
   if (KeyCode = Ord('E')) then
@@ -2337,7 +2371,6 @@ end;
 procedure TBattleRoom.MouseClick(button: Integer; xpos, ypos: Integer);
 var obj: TRoomObject;
     new_action: IBRA_Action;
-    item: IUnitItem;
 begin
   if not IsPlayerTurn() then Exit;
   if IsMouseOnUI() then Exit;
@@ -2702,6 +2735,7 @@ begin
     pSrc := PVec4b(mipdata.Data);
     for j := 0 to bmp.Height - 1 do
     begin
+      {$WARN 5044 off : Symbol "$1" is not portable}
       pDst := bmp.ScanLine[j];
       for i := 0 to bmp.Width - 1 do
       begin
@@ -2766,6 +2800,7 @@ end;
 initialization
   RegRoomClass(TObstacle);
   RegRoomClass(TLantern);
+  RegRoomClass(TBrazier);
 
 end.
 

@@ -207,7 +207,6 @@ function TBotArcher1.DoAction(): IBRA_Action;
 var
   path: IRoomPath;
   availPts: Integer;
-  bullet: TRoomBullet;
 begin
   if AP = 0 then Exit(nil);
 
