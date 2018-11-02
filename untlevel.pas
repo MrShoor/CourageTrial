@@ -26,6 +26,14 @@ type
   IRoomPathArr = {$IfDef FPC}specialize{$EndIf} IArray<IRoomPath>;
   TRoomPathArr = {$IfDef FPC}specialize{$EndIf} TArray<IRoomPath>;
 
+  IRoomCellFilter = interface
+    function IsValid(const ACell: TVec2i): Boolean;
+  end;
+
+  IVec2iArr = {$IfDef FPC}specialize{$EndIf}IArray<TVec2i>;
+  TVec2iArr = {$IfDef FPC}specialize{$EndIf}TArray<TVec2i>;
+  IVec2iSet = {$IfDef FPC}specialize{$EndIf}IHashSet<TVec2i>;
+  TVec2iSet = {$IfDef FPC}specialize{$EndIf}THashSet<TVec2i>;
 
   IBRA_Action = interface
     procedure TryCancel;
@@ -173,6 +181,14 @@ type
   { TRoomUnit }
 
   TRoomUnit = class (TRoomInventoryObject)
+  private type
+    TRoomCellComparer_MaxDistance = class (TInterfacedObject, IComparer)
+    private
+      FUnit: TRoomUnit;
+    public
+      function Compare(const Left, Right): Integer;
+      constructor Create(const AUnit: TRoomUnit);
+    end;
   private
     FAP: Integer;
     FMaxAP: Integer;
@@ -234,6 +250,7 @@ type
     function InViewField(const APt: TVec2i): Boolean;
     function CanSee(const APos: TVec2i): Boolean;
     function CanSee(const AOtherUnit: TRoomUnit): Boolean;
+    function GetShootPoints(): IVec2iArr;
     function GetVisible(): Boolean; override;
 
     procedure DealDamage(ADmg: Integer);
@@ -336,6 +353,16 @@ type
     constructor Create(const ARoomMap: TRoomMap; const ASelf, ATarget: TRoomObject); overload;
   end;
 
+  { TRoomCellFilter_ExcludeUnits }
+
+  TRoomCellFilter_ExcludeUnits = class(TInterfacedObject, IRoomCellFilter)
+  private
+    FRoom: TRoomMap;
+  public
+    function IsValid(const ACell: TVec2i): Boolean;
+    constructor Create(const ARoom: TRoomMap);
+  end;
+
   TRoomMap = class (TavMainRenderChild)
   private type
     TObjectMap = {$IFDef FPC}specialize{$EndIf} THashMap<TVec2i, TRoomObject>;
@@ -367,6 +394,7 @@ type
     function Distance(const APt1, APt2: TVec2i): Integer;
     function Direction(const APt1, APt2: TVec2i): Integer;
     function RayCast(const APt1, APt2: TVec2i; const AllowHitBlockers: Boolean): IRoomPath;
+    function RayCast(const APt1, APt2: TVec2i; const AFilter: IRoomCellFilter): IRoomPath;
     function RayCastDist(const APt1, APt2: TVec2i; ADist: Single; const AllowHitBlockers: Boolean): IRoomPath;
     function RayCastBoolean(const APt1, APt2: TVec2i): Boolean;
     function IsCellExists(const APos: TVec2i): Boolean;
@@ -652,6 +680,40 @@ function FindRoomClass(const AName: string): TRoomObjectClass;
 begin
   if gvRegRommClasses = nil then Exit(nil);
   if not gvRegRommClasses.TryGetValue(AName, Result) then Result := nil;
+end;
+
+{ TRoomUnit.TRoomCellComparer_MaxDistance }
+
+function TRoomUnit.TRoomCellComparer_MaxDistance.Compare(const Left, Right): Integer;
+var L: TVec2i absolute Left;
+    R: TVec2i absolute Right;
+    dL, dR: Integer;
+begin
+  dL := FUnit.Room.Distance(FUnit.RoomPos, L);
+  dR := FUnit.Room.Distance(FUnit.RoomPos, R);
+  Result := dR - dL;
+end;
+
+constructor TRoomUnit.TRoomCellComparer_MaxDistance.Create(const AUnit: TRoomUnit);
+begin
+  FUnit := AUnit;
+end;
+
+{ TRoomCellFilter_ExcludeUnits }
+
+function TRoomCellFilter_ExcludeUnits.IsValid(const ACell: TVec2i): Boolean;
+var
+  obj: TRoomObject;
+begin
+  obj := FRoom.ObjectAt(ACell);
+  if obj = nil then Exit(True);
+  if obj is TRoomUnit then Exit(True);
+  Result := False;
+end;
+
+constructor TRoomCellFilter_ExcludeUnits.Create(const ARoom: TRoomMap);
+begin
+  FRoom := ARoom;
 end;
 
 { TBrazier }
@@ -1342,7 +1404,7 @@ begin
     end;
 end;
 
-function TRoomUnit.SkillSlots: IUnitItems10;
+function TRoomUnit.SkillSlots(): IUnitItems10;
 begin
   Result := FSlots10;
 end;
@@ -1412,12 +1474,76 @@ begin
   Result := Room.RayCastBoolean(RoomPos, AOtherUnit.RoomPos);
 end;
 
+function TRoomUnit.GetShootPoints(): IVec2iArr;
+var i, j: Integer;
+    pt: TVec2i;
+    filter: IRoomCellFilter;
+    nonvisited_list: IVec2iArr;
+    nonvisited_set: IVec2iSet;
+    comp_maxdist: IComparer;
+    path: IRoomPath;
+    inShadow: Boolean;
+
+    visibleSet: IVec2iSet;
+    unitWorldPos: TVec3;
+begin
+  Result := TVec2iArr.Create();
+  filter := TRoomCellFilter_ExcludeUnits.Create(Room);
+  comp_maxdist := TRoomCellComparer_MaxDistance.Create(Self);
+
+  unitWorldPos := Room.UI.TilePosToWorldPos(RoomPos);
+
+  visibleSet := TVec2iSet.Create;
+
+  //get all cells in view range
+  nonvisited_set := TVec2iSet.Create();
+  nonvisited_list := TVec2iArr.Create();
+  for j := -FRoom.Radius to FRoom.Radius do
+    for i := -FRoom.Radius to FRoom.Radius do
+    begin
+      pt := Vec(i, j);
+      if not FRoom.IsCellExists(pt) then Continue;
+      if filter.IsValid(pt) then
+      begin
+        nonvisited_list.Add(pt);
+        nonvisited_set.Add(pt);
+      end;
+    end;
+
+  //collect visible set with raycast
+  nonvisited_list.Sort(comp_maxdist);
+  for i := 0 to nonvisited_list.Count - 1 do
+  begin
+    if not nonvisited_set.Contains(nonvisited_list[i]) then Continue;
+
+    path := Room.RayCast(RoomPos, nonvisited_list[i], False);
+    inShadow := False;
+    for j := 0 to path.Count - 1 do
+    begin
+      if not inShadow then
+      begin
+        if not filter.IsValid(path[j]) then
+          inShadow := True
+        else
+          if LenSqr( Room.UI.TilePosToWorldPos(path[j]) - unitWorldPos ) <= FViewRange*FViewRange then
+            visibleSet.Add(path[j]);
+      end;
+      nonvisited_set.Delete(path[j]);
+    end;
+  end;
+
+  //fill result
+  visibleSet.Reset;
+  while visibleSet.Next(pt) do
+    Result.Add(pt);
+end;
+
 function TRoomUnit.GetVisible(): Boolean;
 begin
-  if Room.CurrentPlayer = nil then
+  //if Room.CurrentPlayer = nil then
     Result := inherited GetVisible()
-  else
-    Result := Room.CurrentPlayer.CanSee(Self);
+  //else
+    //Result := Room.CurrentPlayer.CanSee(Self);
 end;
 
 procedure TRoomUnit.DealDamage(ADmg: Integer);
@@ -1927,6 +2053,32 @@ begin
   Result.Add(APt2);
 end;
 
+function TRoomMap.RayCast(const APt1, APt2: TVec2i; const AFilter: IRoomCellFilter): IRoomPath;
+var dir: TVec2i;
+    dirStep: TVec2i;
+    pt: TVec2i;
+begin
+  Result := TRoomPath.Create();
+  if APt1 = APt2 then
+  begin
+    Result.Add(APt2);
+    Exit;
+  end;
+
+  dir := APt2 - APt1;
+  dirStep := Sign(dir);
+  pt := NextPointOnRay(Vec(0,0), dir, dirStep);
+  while pt <> dir do
+  begin
+    Result.Add(APt1 + pt);
+    if AFilter <> nil then
+      if not AFilter.IsValid(APt1 + pt) then
+        Exit;
+    pt := NextPointOnRay(pt, dir, dirStep);
+  end;
+  Result.Add(APt2);
+end;
+
 function TRoomMap.RayCastDist(const APt1, APt2: TVec2i; ADist: Single; const AllowHitBlockers: Boolean): IRoomPath;
 var dir: TVec2i;
     dirStep: TVec2i;
@@ -2306,11 +2458,13 @@ procedure TBattleRoom.CreateUI;
 var
   menu: TavmUnitMenu;
   inv_ui: TavmInventory;
+  lookAt: TVec3;
 begin
   FRootControl := TavmCameraControl.Create(Self);
   FRootControl.Size := Vec(10000, 10000);
 
-  TavmCameraControl(FRootControl).LookAt(FMap.UI.TilePosToWorldPos(FPlayer.RoomPos));
+  lookAt := FMap.UI.TilePosToWorldPos(FPlayer.RoomPos);
+  TavmCameraControl(FRootControl).LookAt(lookAt, -lookAt);
 
   menu := TavmUnitMenu.Create(FRootControl);
   menu.OnEndTurnClick := {$IfDef FPC}@{$EndIf}OnEndTurnBtnClick;
@@ -2661,7 +2815,7 @@ begin
   FPlayer.SetRoomPosDir(GetSpawnPlace(), Random(6));
   FUnits.Add(FPlayer);
 
-  for i := 0 to 6 do
+  for i := 0 to 0 do
     SpawnBot();
 
   FActiveUnit := FUnits.Count - 1;

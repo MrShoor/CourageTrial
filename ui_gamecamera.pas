@@ -45,6 +45,7 @@ type
     property WheelSens : Single read FWheelSens  write FWheelSens;
 
     procedure LookAt(const APt: TVec3);
+    procedure LookAt(const APt, AViewDir: TVec3);
   end;
 
 implementation
@@ -139,6 +140,14 @@ end;
 procedure TavmCameraControl.LookAt(const APt: TVec3);
 begin
   Main.Camera.At := Vec(APt.x, FYPlane, APt.z);
+  FDist := 5;
+  UpdateCameraPosition;
+end;
+
+procedure TavmCameraControl.LookAt(const APt, AViewDir: TVec3);
+begin
+  Main.Camera.At := Vec(APt.x, FYPlane, APt.z);
+  FYaw  := -arctan2(-AViewDir.z, -AViewDir.x);
   FDist := 5;
   UpdateCameraPosition;
 end;
