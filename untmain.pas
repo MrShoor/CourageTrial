@@ -101,6 +101,9 @@ end;
 
 procedure TfrmMain.RenderScene;
 begin
+  if FRoom <> nil then
+    Caption := IntToStr(FRoom.MovedTile.x) + ' ' + IntToStr(FRoom.MovedTile.y);
+
 	if FMain.Bind then
   try
     FDefFBO.FrameRect := RectI(0, 0, ClientWidth, ClientHeight);

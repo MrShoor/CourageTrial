@@ -363,6 +363,16 @@ type
     constructor Create(const ARoom: TRoomMap);
   end;
 
+  { TRoomCellFilter_ViewableExcludeUnits }
+
+  TRoomCellFilter_ViewableExcludeUnits = class(TInterfacedObject, IRoomCellFilter)
+  private
+    FRoom: TRoomMap;
+  public
+    function IsValid(const ACell: TVec2i): Boolean;
+    constructor Create(const ARoom: TRoomMap);
+  end;
+
   TRoomMap = class (TavMainRenderChild)
   private type
     TObjectMap = {$IFDef FPC}specialize{$EndIf} THashMap<TVec2i, TRoomObject>;
@@ -616,6 +626,7 @@ type
     procedure PreloadModels;
     procedure CreateUI;
   public
+    property MovedTile: TVec2i read FMovedTile;
     property Player: TPlayer read FPlayer;
     property Obstacles: IObstacleArr read FObstacles;
     property Map: TRoomMap read FMap;
@@ -680,6 +691,28 @@ function FindRoomClass(const AName: string): TRoomObjectClass;
 begin
   if gvRegRommClasses = nil then Exit(nil);
   if not gvRegRommClasses.TryGetValue(AName, Result) then Result := nil;
+end;
+
+{ TRoomCellFilter_ViewableExcludeUnits }
+
+function TRoomCellFilter_ViewableExcludeUnits.IsValid(const ACell: TVec2i): Boolean;
+var
+  obj: TRoomObject;
+  i: Integer;
+begin
+  obj := FRoom.ObjectAt(ACell);
+  if obj = nil then Exit(True);
+  if obj is TRoomUnit then Exit(True);
+  for i := 0 to obj.BlockedCellsCount - 1 do
+    if obj.BlockedViewCell(i) then
+      if obj.GetAbsoluteBlockedCell(i) = ACell then
+        Exit(False);
+  Result := True;
+end;
+
+constructor TRoomCellFilter_ViewableExcludeUnits.Create(const ARoom: TRoomMap);
+begin
+  FRoom := ARoom;
 end;
 
 { TRoomUnit.TRoomCellComparer_MaxDistance }
@@ -1225,7 +1258,10 @@ begin
   RoomUnit := AUnit;
   MovePathIdx := 0;
   MovePathWeight := 0;
-  MovePath := APath;
+  if APath = nil then
+    MovePath := nil
+  else
+    MovePath := APath.Clone();
   MoveSpeed := RoomUnit.GetUnitMoveSpeed();
   if (MovePath <> nil) and (RoomUnit <> nil) and (RoomUnit.AP > 0) then
   begin
@@ -1488,7 +1524,7 @@ var i, j: Integer;
     unitWorldPos: TVec3;
 begin
   Result := TVec2iArr.Create();
-  filter := TRoomCellFilter_ExcludeUnits.Create(Room);
+  filter := TRoomCellFilter_ViewableExcludeUnits.Create(Room);
   comp_maxdist := TRoomCellComparer_MaxDistance.Create(Self);
 
   unitWorldPos := Room.UI.TilePosToWorldPos(RoomPos);
@@ -2389,9 +2425,15 @@ begin
     bot := FUnits[FActiveUnit] as TBot;
     new_action := bot.DoAction();
     if new_action = nil then
-      EndTurn()
+    begin
+      EndTurn();
+      bot.LogAction('EndTurn');
+    end
     else
+    begin
       FActions.Add(new_action);
+      bot.LogAction('Action accepted');
+    end;
   end;
 
   for i := FActions.Count - 1 downto 0 do
@@ -2583,6 +2625,7 @@ procedure TBattleRoom.Draw();
     bounds_max: TVec2i;
     x, y: Integer;
     movedObj: TRoomObject;
+    shootPts: IVec2iArr;
   begin
     FMap.UI.ClearTileColors();
     if IsPlayerTurn then
@@ -2597,6 +2640,14 @@ procedure TBattleRoom.Draw();
         end;
       if (not IsMouseOnUI) and (FMovePath = nil) then
         FMap.UI.TileColor[FMovedTile] := TTileColorID.Hovered;
+
+      shootPts := FPlayer.GetShootPoints();
+      for i := 0 to shootPts.Count - 1 do
+        FMap.UI.TileColor[shootPts[i]] := TTileColorID.HighlightedRed;
+
+      if gvDebugPoints <> nil then
+        for i := 0 to gvDebugPoints.Count - 1 do
+          FMap.UI.TileColor[gvDebugPoints[i]] := TTileColorID.HighlightedGreen;
 
       movedObj := FMap.ObjectAt(FMovedTile);
       if (movedObj is TRoomUnit) and (movedObj <> FMap.CurrentPlayer) then
@@ -2794,7 +2845,8 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string);
     //else
     //  bot := TBotMutant1.Create(FMap);
     bot.LoadModels();
-    bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
+    //bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
+    bot.SetRoomPosDir(Vec(0,0), Random(6));
     FUnits.Add(bot);
   end;
 
