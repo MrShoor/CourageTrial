@@ -75,3 +75,6 @@ O 2 0 1
 N Brazier
 C TBrazier
 O 0 0 0
+N WayPoint
+C TRoomWaypoint
+O 0 0 0

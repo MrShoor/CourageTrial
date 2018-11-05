@@ -100,7 +100,7 @@
         <PackageName Value="LCL"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="6">
+    <Units Count="7">
       <Unit0>
         <Filename Value="CTRoomEditor.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -132,6 +132,11 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="untObstacles"/>
       </Unit5>
+      <Unit6>
+        <Filename Value="untwaypoint.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="untWayPoint"/>
+      </Unit6>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

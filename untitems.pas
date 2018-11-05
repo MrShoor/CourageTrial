@@ -208,6 +208,7 @@ begin
 
   bullet := TRoomBullet.Create(AOwner.Room);
   bullet.LoadModels('Erika_Archer_Arrow_Mesh');
+  bullet.Owner := AOwner;
   bullet.Velocity := 20;
   bullet.Dmg := 10;
   bullet.MaxRange := 20;

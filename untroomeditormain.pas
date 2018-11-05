@@ -14,6 +14,7 @@ uses
   Menus, StdCtrls,
   avRes, avTypes, avCameraController,
   mutils,
+  untWayPoint,
   untLevel, untObstacles;
 
 const
@@ -349,6 +350,7 @@ begin
     UpdateWindow(FMain.Window);
   end;
   FRoom := TBattleRoom.Create(FMain);
+  FRoom.SetEditMode();
   FRoom.GenerateEmpty();
 
   lbObjects.Clear;

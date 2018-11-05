@@ -115,7 +115,7 @@
         <PackageName Value="LCL"/>
       </Item4>
     </RequiredPackages>
-    <Units Count="10">
+    <Units Count="11">
       <Unit0>
         <Filename Value="CT.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -165,6 +165,11 @@
         <Filename Value="ui_gamecamera.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit9>
+      <Unit10>
+        <Filename Value="untwaypoint.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="untWayPoint"/>
+      </Unit10>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
