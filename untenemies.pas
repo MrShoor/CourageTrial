@@ -622,7 +622,6 @@ function TBotArcher1.DoAction(): IBRA_Action;
   end;
 
 var
-  path: IRoomPath;
   availPts, i: Integer;
   enemy: TRoomUnit;
   lastSeen: TVec2i;
@@ -873,54 +872,6 @@ begin
         end;
       end;
   end;
-
-  Exit;
-
-  if FNeedTurnToPlayer then
-  begin
-    FNeedTurnToPlayer := False;
-    if not CanSee(FPlayer) then
-    begin
-      Result := TBRA_UnitTurnAction.Create(Self, FPlayer.RoomPos);
-      Exit;
-    end;
-  end;
-
-  if FPlayer <> nil then
-  begin
-    availPts := AP - FOptimalPosPath.Count;
-    if availPts > 3 then
-    begin
-      if (FOptimalPosPath.Count = 0) or
-         (FRoom.Distance(RoomPos, FPlayer.RoomPos) < FRoom.Distance(FOptimalPosPath.Last, FPlayer.RoomPos)) then
-      begin
-        Result := FEquippedItem[esBothHands].DoAction(0, Self, FPlayer);
-      end
-      else
-      begin
-        Result := TBRA_UnitMovementAction.Create(Self, FOptimalPosPath);
-        FOptimalPosPath := TRoomPath.Create();
-        FNeedTurnToPlayer := True;
-      end;
-    end
-    else
-    begin
-      if (FOptimalPosPath.Count = 0) then
-        Exit(nil);
-      Result := TBRA_UnitMovementAction.Create(Self, FOptimalPosPath);
-      FOptimalPosPath := TRoomPath.Create();
-      FNeedTurnToPlayer := True;
-    end;
-    Exit;
-  end;
-
-  path := GetMovePath();
-  if (path <> nil) and (path.Count > 0) then
-  begin
-    Result := TBRA_UnitMovementAction.Create(Self, path);
-    Exit;
-  end;
-  Exit(nil);
 end;
 
 { TBot }

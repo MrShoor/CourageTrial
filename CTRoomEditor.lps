@@ -4,13 +4,14 @@
     <PathDelim Value="\"/>
     <Version Value="11"/>
     <BuildModes Active="Default"/>
-    <Units Count="23">
+    <Units Count="24">
       <Unit0>
         <Filename Value="CTRoomEditor.lpr"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="-1"/>
-        <CursorPos X="3" Y="3"/>
+        <EditorIndex Value="2"/>
+        <CursorPos X="18" Y="11"/>
         <UsageCount Value="31"/>
+        <Loaded Value="True"/>
       </Unit0>
       <Unit1>
         <Filename Value="untroomeditormain.pas"/>
@@ -19,6 +20,7 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="untRoomEditorMain"/>
+        <CursorPos X="34" Y="10"/>
         <UsageCount Value="31"/>
         <Loaded Value="True"/>
         <LoadedDesigner Value="True"/>
@@ -28,9 +30,9 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="untLevel"/>
         <IsVisibleTab Value="True"/>
-        <EditorIndex Value="1"/>
-        <TopLine Value="671"/>
-        <CursorPos X="49" Y="679"/>
+        <EditorIndex Value="3"/>
+        <TopLine Value="714"/>
+        <CursorPos X="66" Y="732"/>
         <UsageCount Value="31"/>
         <Loaded Value="True"/>
       </Unit2>
@@ -47,7 +49,7 @@
         <Filename Value="untgraphics.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="untGraphics"/>
-        <EditorIndex Value="7"/>
+        <EditorIndex Value="9"/>
         <UsageCount Value="31"/>
         <Loaded Value="True"/>
       </Unit4>
@@ -55,269 +57,280 @@
         <Filename Value="untobstacles.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="untObstacles"/>
-        <EditorIndex Value="6"/>
+        <EditorIndex Value="8"/>
         <TopLine Value="48"/>
         <CursorPos X="26" Y="78"/>
         <UsageCount Value="31"/>
         <Loaded Value="True"/>
       </Unit5>
       <Unit6>
+        <Filename Value="untwaypoint.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="untWayPoint"/>
+        <EditorIndex Value="1"/>
+        <TopLine Value="45"/>
+        <CursorPos Y="81"/>
+        <UsageCount Value="20"/>
+        <Loaded Value="True"/>
+      </Unit6>
+      <Unit7>
         <Filename Value="C:\lazarus\lcl\extctrls.pp"/>
         <UnitName Value="ExtCtrls"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="1048"/>
         <CursorPos X="18" Y="1128"/>
         <UsageCount Value="10"/>
-      </Unit6>
-      <Unit7>
+      </Unit7>
+      <Unit8>
         <Filename Value="..\AvalancheProject\Utils\avcontnrs.pas"/>
         <UnitName Value="avContnrs"/>
-        <EditorIndex Value="8"/>
+        <EditorIndex Value="10"/>
         <TopLine Value="1891"/>
         <CursorPos Y="1910"/>
         <UsageCount Value="11"/>
         <Loaded Value="True"/>
-      </Unit7>
-      <Unit8>
+      </Unit8>
+      <Unit9>
         <Filename Value="..\AvalancheProject\Common\avres.pas"/>
         <UnitName Value="avRes"/>
-        <EditorIndex Value="10"/>
+        <EditorIndex Value="12"/>
         <TopLine Value="3431"/>
         <CursorPos Y="3450"/>
         <UsageCount Value="15"/>
         <Loaded Value="True"/>
-      </Unit8>
-      <Unit9>
+      </Unit9>
+      <Unit10>
         <Filename Value="..\AvalancheProject\Common\avminicontrols.pas"/>
         <UnitName Value="avMiniControls"/>
-        <EditorIndex Value="11"/>
+        <EditorIndex Value="13"/>
         <TopLine Value="956"/>
         <CursorPos X="21" Y="975"/>
         <UsageCount Value="15"/>
         <Loaded Value="True"/>
-      </Unit9>
-      <Unit10>
+      </Unit10>
+      <Unit11>
         <Filename Value="C:\lazarus\lcl\stdctrls.pp"/>
         <UnitName Value="StdCtrls"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="235"/>
         <CursorPos X="3" Y="254"/>
         <UsageCount Value="10"/>
-      </Unit10>
-      <Unit11>
+      </Unit11>
+      <Unit12>
         <Filename Value="C:\lazarus\lcl\include\customlistbox.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="523"/>
         <CursorPos X="14" Y="547"/>
         <UsageCount Value="10"/>
-      </Unit11>
-      <Unit12>
+      </Unit12>
+      <Unit13>
         <Filename Value="C:\lazarus\lcl\lcltype.pp"/>
         <UnitName Value="LCLType"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="1129"/>
         <CursorPos X="3" Y="1148"/>
         <UsageCount Value="10"/>
-      </Unit12>
-      <Unit13>
+      </Unit13>
+      <Unit14>
         <Filename Value="C:\lazarus\lcl\graphics.pp"/>
         <UnitName Value="Graphics"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="1134"/>
         <CursorPos X="24" Y="1165"/>
         <UsageCount Value="10"/>
-      </Unit13>
-      <Unit14>
+      </Unit14>
+      <Unit15>
         <Filename Value="..\BackTerria\Src\bworld.pas"/>
         <UnitName Value="bWorld"/>
-        <EditorIndex Value="9"/>
+        <EditorIndex Value="11"/>
         <TopLine Value="852"/>
         <CursorPos Y="872"/>
         <UsageCount Value="13"/>
         <Loaded Value="True"/>
-      </Unit14>
-      <Unit15>
+      </Unit15>
+      <Unit16>
         <Filename Value="..\AvalancheProject\Common\avmodel.pas"/>
         <UnitName Value="avModel"/>
-        <EditorIndex Value="4"/>
+        <EditorIndex Value="6"/>
         <TopLine Value="24"/>
         <CursorPos X="17" Y="35"/>
         <UsageCount Value="15"/>
         <Loaded Value="True"/>
-      </Unit15>
-      <Unit16>
+      </Unit16>
+      <Unit17>
         <Filename Value="..\AvalancheProject\Common\avmesh.pas"/>
         <UnitName Value="avMesh"/>
-        <EditorIndex Value="5"/>
+        <EditorIndex Value="7"/>
         <TopLine Value="77"/>
         <CursorPos X="22" Y="89"/>
         <UsageCount Value="15"/>
         <Loaded Value="True"/>
-      </Unit16>
-      <Unit17>
+      </Unit17>
+      <Unit18>
         <Filename Value="..\BackTerria\Src\bshaders.inc"/>
         <EditorIndex Value="-1"/>
         <CursorPos X="3" Y="8"/>
         <UsageCount Value="10"/>
-      </Unit17>
-      <Unit18>
+      </Unit18>
+      <Unit19>
         <Filename Value="..\AvalancheProject\Common\avtypes.pas"/>
         <UnitName Value="avTypes"/>
-        <EditorIndex Value="3"/>
+        <EditorIndex Value="5"/>
         <TopLine Value="515"/>
         <CursorPos X="41" Y="544"/>
         <UsageCount Value="11"/>
         <Loaded Value="True"/>
-      </Unit18>
-      <Unit19>
+      </Unit19>
+      <Unit20>
         <Filename Value="..\AvalancheProject\Common\avcontext_dx11.pas"/>
         <UnitName Value="avContext_DX11"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="2146"/>
         <CursorPos X="22" Y="2171"/>
         <UsageCount Value="11"/>
-      </Unit19>
-      <Unit20>
+      </Unit20>
+      <Unit21>
         <Filename Value="..\AvalancheProject\Common\DX_JSB\D3D11_JSB.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="2650"/>
         <CursorPos X="25" Y="2681"/>
         <UsageCount Value="10"/>
-      </Unit20>
-      <Unit21>
+      </Unit21>
+      <Unit22>
         <Filename Value="C:\lazarus\fpc\3.0.2\source\rtl\objpas\sysutils\finah.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="6"/>
         <CursorPos X="10" Y="29"/>
         <UsageCount Value="10"/>
-      </Unit21>
-      <Unit22>
+      </Unit22>
+      <Unit23>
         <Filename Value="..\AvalancheProject\Common\avbase.pas"/>
         <UnitName Value="avBase"/>
-        <EditorIndex Value="2"/>
+        <EditorIndex Value="4"/>
         <TopLine Value="150"/>
         <CursorPos X="24" Y="171"/>
         <UsageCount Value="10"/>
         <Loaded Value="True"/>
-      </Unit22>
+      </Unit23>
     </Units>
     <JumpHistory Count="30" HistoryIndex="29">
       <Position1>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="2803" Column="24" TopLine="2770"/>
+        <Caret Line="433" Column="15" TopLine="414"/>
       </Position1>
       <Position2>
         <Filename Value="untlevel.pas"/>
+        <Caret Line="686" Column="3" TopLine="683"/>
       </Position2>
       <Position3>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="421" Column="13" TopLine="391"/>
+        <Caret Line="432" Column="15" TopLine="415"/>
       </Position3>
       <Position4>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="423" Column="11" TopLine="393"/>
+        <Caret Line="673" Column="3" TopLine="671"/>
       </Position4>
       <Position5>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="657" Column="11" TopLine="627"/>
+        <Caret Line="493" Column="36" TopLine="486"/>
       </Position5>
       <Position6>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="659" Column="19" TopLine="629"/>
       </Position6>
       <Position7>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="665" Column="19" TopLine="635"/>
+        <Caret Line="432" Column="17" TopLine="406"/>
       </Position7>
       <Position8>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="671" Column="19" TopLine="641"/>
+        <Filename Value="untroomeditormain.pas"/>
+        <Caret Line="69" Column="15" TopLine="53"/>
       </Position8>
       <Position9>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="683" Column="19" TopLine="653"/>
+        <Caret Line="676" Column="21" TopLine="658"/>
       </Position9>
       <Position10>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="2802" Column="24" TopLine="2770"/>
+        <Caret Line="3097" Column="3" TopLine="3083"/>
       </Position10>
       <Position11>
         <Filename Value="untlevel.pas"/>
+        <Caret Line="657" Column="29" TopLine="645"/>
       </Position11>
       <Position12>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="429" Column="16" TopLine="403"/>
+        <Caret Line="2639" Column="10" TopLine="2636"/>
       </Position12>
       <Position13>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="661" Column="3" TopLine="659"/>
+        <Filename Value="untroomeditormain.pas"/>
+        <Caret Line="68" Column="23" TopLine="53"/>
       </Position13>
       <Position14>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="430" Column="15" TopLine="411"/>
+        <Filename Value="untroomeditormain.pas"/>
+        <Caret Line="352" Column="10" TopLine="317"/>
       </Position14>
       <Position15>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="667" Column="3" TopLine="665"/>
+        <Filename Value="untwaypoint.pas"/>
+        <Caret Line="35" Column="16" TopLine="16"/>
       </Position15>
       <Position16>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="432" Column="15" TopLine="412"/>
+        <Caret Line="2638" Column="36" TopLine="2619"/>
       </Position16>
       <Position17>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="673" Column="3" TopLine="671"/>
       </Position17>
       <Position18>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="430" Column="15" TopLine="414"/>
+        <Caret Line="14" Column="13"/>
       </Position18>
       <Position19>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="667" Column="3" TopLine="665"/>
+        <Caret Line="233" Column="18" TopLine="201"/>
       </Position19>
       <Position20>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="429" Column="15" TopLine="412"/>
+        <Caret Line="234" Column="18" TopLine="202"/>
       </Position20>
       <Position21>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="661" Column="3" TopLine="659"/>
+        <Caret Line="686" Column="15" TopLine="654"/>
       </Position21>
       <Position22>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="432" Column="15" TopLine="411"/>
+        <Caret Line="722" TopLine="714"/>
       </Position22>
       <Position23>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="673" Column="3" TopLine="671"/>
+        <Caret Line="723" TopLine="714"/>
       </Position23>
       <Position24>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="433" Column="15" TopLine="414"/>
+        <Caret Line="728" Column="64" TopLine="714"/>
       </Position24>
       <Position25>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="686" Column="3" TopLine="683"/>
+        <Filename Value="untwaypoint.pas"/>
+        <Caret Line="57" Column="41" TopLine="45"/>
       </Position25>
       <Position26>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="432" Column="15" TopLine="415"/>
+        <Filename Value="CTRoomEditor.lpr"/>
+        <Caret Line="11" Column="18"/>
       </Position26>
       <Position27>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="673" Column="3" TopLine="671"/>
+        <Filename Value="untroomeditormain.pas"/>
+        <Caret Line="10" Column="34"/>
       </Position27>
       <Position28>
-        <Filename Value="untlevel.pas"/>
-        <Caret Line="493" Column="36" TopLine="486"/>
+        <Filename Value="untwaypoint.pas"/>
+        <Caret Line="81" TopLine="45"/>
       </Position28>
       <Position29>
         <Filename Value="untlevel.pas"/>
+        <Caret Line="722" TopLine="714"/>
       </Position29>
       <Position30>
         <Filename Value="untlevel.pas"/>
-        <Caret Line="432" Column="17" TopLine="406"/>
+        <Caret Line="723" TopLine="714"/>
       </Position30>
     </JumpHistory>
     <RunParams>
@@ -325,4 +338,12 @@
       <Modes Count="0" ActiveMode="default"/>
     </RunParams>
   </ProjectSession>
+  <Debugging>
+    <Watches Count="1">
+      <Item1>
+        <Expression Value="Result"/>
+        <DisplayStyle Value="wdfPointer"/>
+      </Item1>
+    </Watches>
+  </Debugging>
 </CONFIG>

@@ -1,5 +1,7 @@
 unit untLevel;
 
+{$Define DEBUGBOTS}
+
 {$IfDef FPC}
   {$mode objfpc}{$H+}
   {$ModeSwitch advancedrecords}
@@ -1615,10 +1617,14 @@ end;
 
 function TRoomUnit.GetVisible(): Boolean;
 begin
+  {$IfDef DEBUGBOTS}
+    Result := True;
+  {$Else}
   if Room.CurrentPlayer = nil then
     Result := inherited GetVisible()
   else
     Result := Room.CurrentPlayer.CanSee(Self);
+  {$EndIf}
 end;
 
 procedure TRoomUnit.DealDamage(ADmg: Integer; AFromUnit: TRoomUnit);
@@ -2771,7 +2777,7 @@ procedure TBattleRoom.Draw();
       if (movedObj is TRoomUnit) and (movedObj <> FMap.CurrentPlayer) then
       begin
         unt := movedObj as TRoomUnit;
-        if FPlayer.CanSee(unt) then
+        if {$IfDef DEBUGBOTS}True{$Else}FPlayer.CanSee(unt){$EndIf} then
         begin
           bounds_min := unt.RoomPos - Floor(Vec(unt.ViewRange, unt.ViewRange));
           bounds_max := unt.RoomPos + Ceil(Vec(unt.ViewRange, unt.ViewRange));
@@ -2839,7 +2845,7 @@ var lantern: TLantern;
 begin
   PreloadModels;
   //FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
-  FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\creature1.avm')]);
+  FWorld.Renderer.PreloadModels([ExeRelativeFileName('units\units.avm')]);
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('bullets\bullets.avm')]);
 
   FFloor := TbGameObject.Create(FWorld);
@@ -2959,9 +2965,9 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string);
   var bot: TBot;
   begin
     //if Random(2) = 0 then
-      bot := TBotArcher1.Create(FMap);
+    //  bot := TBotArcher1.Create(FMap);
     //else
-    //  bot := TBotMutant1.Create(FMap);
+      bot := TBotMutant1.Create(FMap);
     bot.LoadModels();
     bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
     //bot.SetRoomPosDir(Vec(0,0), Random(6));
@@ -2973,8 +2979,7 @@ var
 begin
   PreloadModels;
   //FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
-  FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\creature1.avm')]);
-  FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\archer\archer.avm')]);
+  FWorld.Renderer.PreloadModels([ExeRelativeFileName('units\units.avm')]);
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('bullets\bullets.avm')]);
 
   LoadObstacles();
