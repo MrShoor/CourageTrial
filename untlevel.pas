@@ -99,6 +99,15 @@ type
 
   TRoomObjectClass = class of TRoomObject;
 
+  { TRoomFloor }
+
+  TRoomFloor = class(TbGameObject)
+  protected
+    procedure ValidateTransform; override;
+  public
+    procedure LoadModels(const AMap: TRoomMap);
+  end;
+
   { TRoomBullet }
 
   TRoomBullet = class (TbGameObject)
@@ -142,7 +151,7 @@ type
     function Animation(ASkillIndex: Integer): string;
     function ActionCost(ASkillIndex: Integer): Integer;
     function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
-    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): Boolean;
+    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean;
   end;
   IUnitItems10 = array [0..9] of IUnitItem;
   IUnitItemArr = {$IfDef FPC}specialize{$EndIf}IArray<IUnitItem>;
@@ -616,7 +625,7 @@ type
   private
     FWorld: TbWorld;
 
-    FFloor: TbGameObject;
+    FFloor: TRoomFloor;
     FObstacles: IObstacleArr;
     FLanterns: IbGameObjArr;
 
@@ -655,6 +664,7 @@ type
 
     procedure OnAfterWorldDraw(Sender: TObject);
 
+    procedure GenerateFloor;
     procedure PreloadModels;
     procedure CreateUI;
   public
@@ -725,6 +735,30 @@ function FindRoomClass(const AName: string): TRoomObjectClass;
 begin
   if gvRegRommClasses = nil then Exit(nil);
   if not gvRegRommClasses.TryGetValue(AName, Result) then Result := nil;
+end;
+
+{ TRoomFloor }
+
+procedure TRoomFloor.ValidateTransform;
+begin
+  //inherited ValidateTransform;
+end;
+
+procedure TRoomFloor.LoadModels(const AMap: TRoomMap);
+var idx: Integer;
+    i, j: Integer;
+begin
+  idx := 2;
+  for i := -AMap.Radius to AMap.Radius do
+    for j := -AMap.Radius to AMap.Radius do
+    begin
+      if not AMap.IsCellExists(Vec(i, j)) then Continue;
+      //idx := Random(5) + 1;
+      idx := WeightedRandom([5, 50, 2, 1, 1]) + 1;
+      AddModel('Hex'+IntToStr(idx), mtDefault);
+      FModels.Last.Mesh.Transform := MatTranslate(AMap.UI.TilePosToWorldPos(Vec(i,j)));
+    end;
+  FTransformValid := True;
 end;
 
 { TRoomMapGraph_CustomFilter }
@@ -1088,11 +1122,14 @@ end;
 { TBRA_UnitTurnAction }
 
 function TBRA_UnitTurnAction.ProcessAction: Boolean;
+var newDir: Integer;
 begin
   if RoomUnit.AP > 0 then
   begin
-    RoomUnit.RoomDir := RoomUnit.Room.Direction(RoomUnit.RoomPos, Target);
-    RoomUnit.AP := RoomUnit.AP - 1;
+    newDir := RoomUnit.Room.Direction(RoomUnit.RoomPos, Target);
+    if newDir <> RoomUnit.RoomDir then
+      RoomUnit.AP := RoomUnit.AP - 1;
+    RoomUnit.RoomDir := newDir;
   end;
   Result := False;
 end;
@@ -1794,7 +1831,7 @@ begin
   //FAffinePack.Row[1] := Vec(0,1);
   FAffinePackInv := Inv(FAffinePack);
 
-  FColors[TTileColorID.Normal] := Vec(0,0,0,1);
+  FColors[TTileColorID.Normal] := Vec(0,0,0,0);
   FColors[TTileColorID.HighlightedGreen] := Vec(0,0.5,0,1);
   FColors[TTileColorID.HighlightedRed] := Vec(0.5,0,0,1);
   FColors[TTileColorID.HighlightedYellow] := Vec(0.5,0.5,0,1);
@@ -2589,6 +2626,12 @@ begin
     Main.States.DepthWrite := oldDepthWrite;
 end;
 
+procedure TBattleRoom.GenerateFloor;
+begin
+  FFloor := TRoomFloor.Create(FMap);
+  FFloor.LoadModels(FMap);
+end;
+
 procedure TBattleRoom.PreloadModels;
 begin
   FLanterns := TbGameObjArr.Create();
@@ -2600,9 +2643,6 @@ begin
   //FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\creature1.avm')]);
 
   FWorld.Renderer.SetEnviromentCubemap(ExeRelativeFileName('waterfall.dds'));
-
-  FFloor := TbGameObject.Create(FWorld);
-  FFloor.AddModel('Floor', mtDefault);
 
 //  //FSun := FWorld.Renderer.CreatePointLight();
 //  FSun := FWorld.Renderer.CreateSpotLight();
@@ -2844,12 +2884,10 @@ var lantern: TLantern;
     obsDescIdx, i: Integer;
 begin
   PreloadModels;
+  GenerateFloor;
   //FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('units\units.avm')]);
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('bullets\bullets.avm')]);
-
-  FFloor := TbGameObject.Create(FWorld);
-  FFloor.AddModel('Floor', mtDefault);
 
   obsDescIdx := -1;
   for i := 0 to FObstacles.Count - 1 do
@@ -2964,10 +3002,14 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string);
   procedure SpawnBot();
   var bot: TBot;
   begin
-    //if Random(2) = 0 then
-    //  bot := TBotArcher1.Create(FMap);
-    //else
+    {$IfDef DEBUGBOTS}
+    bot := TBotMutant1.Create(FMap);
+    {$Else}
+    if Random(2) = 0 then
+      bot := TBotArcher1.Create(FMap);
+    else
       bot := TBotMutant1.Create(FMap);
+    {$EndIf}
     bot.LoadModels();
     bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
     //bot.SetRoomPosDir(Vec(0,0), Random(6));
@@ -2983,6 +3025,7 @@ begin
   FWorld.Renderer.PreloadModels([ExeRelativeFileName('bullets\bullets.avm')]);
 
   LoadObstacles();
+  GenerateFloor();
 
   FPlayer := TPlayer.Create(FMap);
   //FPlayer.SetRoomPosDir(Vec(5, 5), 0);
@@ -2990,7 +3033,7 @@ begin
   FPlayer.SetRoomPosDir(GetSpawnPlace(), Random(6));
   FUnits.Add(FPlayer);
 
-  for i := 0 to 6 do
+  for i := 0 to {$IfDef DEBUGBOTS}0{$Else}6{$EndIf} do
     SpawnBot();
 
   FActiveUnit := FUnits.Count - 1;
@@ -3005,6 +3048,7 @@ end;
 procedure TBattleRoom.GenerateEmpty();
 begin
   PreloadModels;
+  GenerateFloor;
 
   FEmptyLight := FWorld.Renderer.CreatePointLight();
   FEmptyLight.Pos := Vec(0, 10, 0);

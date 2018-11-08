@@ -25,7 +25,7 @@ type
     function Animation(ASkillIndex: Integer): string; virtual; abstract;
     function ActionCost(ASkillIndex: Integer): Integer; virtual; abstract;
     function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; virtual; abstract;
-    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): Boolean; virtual; abstract;
+    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; virtual; abstract;
   end;
 
   { TDefaultKick }
@@ -40,7 +40,7 @@ type
     function Animation(ASkillIndex: Integer): string; override;
     function ActionCost(ASkillIndex: Integer): Integer; override;
     function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; override;
-    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): Boolean; override;
+    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
   end;
 
   { TArcherBow }
@@ -55,7 +55,7 @@ type
     function Animation(ASkillIndex: Integer): string; override;
     function ActionCost(ASkillIndex: Integer): Integer; override;
     function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; override;
-    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): Boolean; override;
+    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
   end;
 
   { TAxe }
@@ -70,7 +70,7 @@ type
     function Animation(ASkillIndex: Integer): string; override;
     function ActionCost(ASkillIndex: Integer): Integer; override;
     function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; override;
-    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): Boolean; override;
+    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
   end;
 
 implementation
@@ -112,7 +112,8 @@ begin
   Result := nil;
 end;
 
-function TAxe.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): Boolean;
+function TAxe.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit;
+  AReservedPoints: Integer): Boolean;
 begin
   Result := False;
 end;
@@ -157,10 +158,11 @@ begin
   Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Animation(ASkillIndex), 1000, 300);
 end;
 
-function TDefaultKick.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): Boolean;
+function TDefaultKick.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit;
+  AReservedPoints: Integer): Boolean;
 begin
   Result := False;
-  if AOwner.AP < ActionCost(ASkillIndex) then Exit;
+  if AOwner.AP - AReservedPoints < ActionCost(ASkillIndex) then Exit;
   if AOwner.Room.Distance(AOwner.RoomPos, ATarget.RoomPos) > 1 then Exit;
   Result := True;
 end;
@@ -217,10 +219,11 @@ begin
   Result := TBRA_Shoot.Create(AOwner, [bullet], Animation(ASkillIndex), 1150, 1.37);
 end;
 
-function TArcherBow.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): Boolean;
+function TArcherBow.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit;
+  AReservedPoints: Integer): Boolean;
 begin
   Result := False;
-  if AOwner.AP < ActionCost(ASkillIndex) then Exit;
+  if AOwner.AP - AReservedPoints < ActionCost(ASkillIndex) then Exit;
   Result := True;
 end;
 
