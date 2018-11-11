@@ -8,7 +8,7 @@ unit ui_unit;
 interface
 
 uses
-  Classes, SysUtils, avMiniControls, avCanvas, untLevel, mutils;
+  Classes, SysUtils, avMiniControls, avCanvas, untLevel, mutils, intfUtils;
 
 type
 
@@ -19,6 +19,28 @@ type
   protected
     procedure DoValidate; override;
   public
+  end;
+
+  { TSkillInfo }
+
+  TSkillInfo = class
+  private
+    FItem    : IWeakRefIntf;//IUnitItem
+  public
+    Skillidx : Integer;
+    function Item(): IUnitItem;
+    procedure SetState(const AItem: IUnitItem; const ASkillIdx: Integer);
+  end;
+
+  { TavmSkillsPanel }
+
+  TavmSkillsPanel = class(TavmCustomControl)
+  private
+    FSkills: array [0..9] of TSkillInfo;
+  public
+    function Skill(AIndex: Integer): TSkillInfo;
+    procedure AfterConstruction; override;
+    destructor Destroy; override;
   end;
 
   { TavmUnitMenu }
@@ -45,6 +67,49 @@ type
   end;
 
 implementation
+
+{ TavmSkillsPanel }
+
+function TavmSkillsPanel.Skill(AIndex: Integer): TSkillInfo;
+begin
+  Result := FSkills[AIndex];
+end;
+
+procedure TavmSkillsPanel.AfterConstruction;
+var
+  i: Integer;
+begin
+  inherited AfterConstruction;
+  for i := Low(FSkills) to High(FSkills) do
+    FSkills[i] := TSkillInfo.Create;
+end;
+
+destructor TavmSkillsPanel.Destroy;
+var
+  i: Integer;
+begin
+  inherited Destroy;
+  for i := Low(FSkills) to High(FSkills) do
+    FreeAndNil(FSkills[i]);
+end;
+
+{ TSkillInfo }
+
+function TSkillInfo.Item(): IUnitItem;
+begin
+  if FItem = nil then Exit(nil);
+  Result := FItem.Intf as IUnitItem;
+  if Result = nil then FItem := nil;
+end;
+
+procedure TSkillInfo.SetState(const AItem: IUnitItem; const ASkillIdx: Integer);
+begin
+  if AItem = nil then
+    FItem := nil
+  else
+    FItem := (AItem as IWeakedInterface).WeakRef;
+  Skillidx := ASkillIdx;
+end;
 
 { TavmUnitBtn }
 

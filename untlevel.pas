@@ -140,9 +140,29 @@ type
 
   TRoomUnitEqSlot = (esNone, esLeftHand, esRightHand, esBothHands);
 
+  IUnitItem = interface;
+
+  IUnitSkill = interface
+    function Item: IUnitItem;
+    function Idx : Integer;
+    function WearedOnly: Boolean;
+
+    function Name: string;
+    function Desc: string;
+    function Ico : string;
+
+    function Cost : Integer;
+    function Range: Single;
+    function Animation: string;
+
+    function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
+    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean;
+  end;
+
   { IUnitItem }
 
   IUnitItem = interface
+  ['{E6D665A9-3E67-43A8-891E-32B835887FB8}']
     function Slot       : TRoomUnitEqSlot;
     function Model      : string;
     function Ico48      : string;

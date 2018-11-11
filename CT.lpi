@@ -115,7 +115,7 @@
         <PackageName Value="LCL"/>
       </Item4>
     </RequiredPackages>
-    <Units Count="11">
+    <Units Count="12">
       <Unit0>
         <Filename Value="CT.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -170,6 +170,11 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="untWayPoint"/>
       </Unit10>
+      <Unit11>
+        <Filename Value="untskills.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="untSkills"/>
+      </Unit11>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

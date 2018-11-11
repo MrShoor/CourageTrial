@@ -1,7 +1,7 @@
 object frmMain: TfrmMain
   Left = 449
   Height = 774
-  Top = 250
+  Top = 213
   Width = 1158
   Caption = 'frmMain'
   DoubleBuffered = False
@@ -11,7 +11,7 @@ object frmMain: TfrmMain
   OnMouseDown = FormMouseDown
   OnPaint = FormPaint
   ParentDoubleBuffered = False
-  LCLVersion = '2.0.0.1'
+  LCLVersion = '2.0.0.2'
   object ApplicationProperties1: TApplicationProperties
     OnIdle = ApplicationProperties1Idle
     left = 80

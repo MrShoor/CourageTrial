@@ -8,13 +8,13 @@ unit untItems;
 interface
 
 uses
-  Classes, SysUtils, untLevel;
+  Classes, SysUtils, untLevel, intfUtils;
 
 type
 
   { TUnitItem }
 
-  TUnitItem = class(TInterfacedObject, IUnitItem)
+  TUnitItem = class(TWeakedInterfacedObject, IUnitItem)
   private
   public
     function Slot  : TRoomUnitEqSlot; virtual; abstract;
