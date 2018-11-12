@@ -158,6 +158,8 @@ type
     function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
     function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean;
   end;
+  IUnitSkillArr = {$IfDef FPC}specialize{$EndIf}IArray<IUnitSkill>;
+  TUnitSkillArr = {$IfDef FPC}specialize{$EndIf}TArray<IUnitSkill>;
 
   { IUnitItem }
 
@@ -168,12 +170,8 @@ type
     function Ico48      : string;
 
     function SkillsCount: Integer;
-    function Animation(ASkillIndex: Integer): string;
-    function ActionCost(ASkillIndex: Integer): Integer;
-    function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
-    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean;
+    function Skill(ASkillIndex: Integer): IUnitSkill;
   end;
-  IUnitItems10 = array [0..9] of IUnitItem;
   IUnitItemArr = {$IfDef FPC}specialize{$EndIf}IArray<IUnitItem>;
   TUnitItemArr = {$IfDef FPC}specialize{$EndIf}TArray<IUnitItem>;
 
@@ -238,10 +236,11 @@ type
     procedure SetPreview96_128(const AValue: string);
   protected
     FAnimationPrefix: string;
+    FUnitSkills   : IUnitSkillArr;
     FEquippedItem : array [TRoomUnitEqSlot] of IUnitItem;
     FEquippedModel: array [TRoomUnitEqSlot] of IavModelInstance;
 
-    FSlots10: IUnitItems10;
+    FSlots10: IUnitSkillArr;
     procedure Unequip(const ASlot: TRoomUnitEqSlot);
     function  Equip(const AItem: IUnitItem): Boolean;
     procedure OnRegisterRoomObject(const ANewObject: TRoomObject); virtual;
@@ -256,7 +255,8 @@ type
 
     function PopFromInventory(const AIndex: Integer): IUnitItem; override;
 
-    function SkillSlots(): IUnitItems10;
+    property SkillSlots: IUnitSkillArr read FSlots10 write FSlots10;
+    function AllSkills(): IUnitSkillArr;
 
     procedure LoadModels(); virtual;
 
@@ -659,7 +659,8 @@ type
     FRootControl: TavmBaseControl;
     FUnitMenu: TavmCustomControl;
     FPlayerInventory: TavmCustomControl;
-    FOtherInventory: TavmCustomControl;
+    FPlayerSkills   : TavmCustomControl;
+    FOtherInventory : TavmCustomControl;
 
     FSun: IavSpotLight;
 
@@ -722,7 +723,7 @@ function  FindRoomClass(const AName: string): TRoomObjectClass;
 implementation
 
 uses
-  untEnemies, untGraphics, ui_unit, ui_inventory, ui_gamecamera, untItems;
+  untEnemies, untGraphics, ui_unit, ui_inventory, ui_skills, ui_gamecamera, untItems, untSkills;
 
 type
   IRoomClassesMap = {$IfDef FPC}specialize{$EndIf}IHashMap<string, TRoomObjectClass>;
@@ -1509,6 +1510,19 @@ begin
   Result := True;
 end;
 
+function TRoomUnit.AllSkills(): IUnitSkillArr;
+var i, j: Integer;
+begin
+  Result := TUnitSkillArr.Create();
+  Result.AddArray(FUnitSkills);
+  for i := 0 to FInventory.Count - 1 do
+  begin
+    if FInventory[i] = nil then Continue;
+    for j := 0 to FInventory[i].SkillsCount - 1 do
+      Result.Add(FInventory[i].Skill(j));
+  end;
+end;
+
 procedure TRoomUnit.OnRegisterRoomObject(const ANewObject: TRoomObject);
 begin
 
@@ -1525,6 +1539,9 @@ end;
 procedure TRoomUnit.AfterRegister;
 begin
   inherited AfterRegister;
+  FUnitSkills := TUnitSkillArr.Create();
+  FSlots10 := TUnitSkillArr.Create();
+  FSlots10.SetSize(10);
   FInventory := TUnitItemArr.Create();
 end;
 
@@ -1549,21 +1566,12 @@ var
 begin
   Result := inherited PopFromInventory(AIndex);
 
-  for i := 0 to 9 do
-    if FSlots10[i] = Result then
-      FSlots10[i] := nil;
-
   if Result <> nil then
     if FEquippedItem[Result.Slot] = Result then
     begin
       FEquippedItem[Result.Slot] := nil;
       FEquippedModel[Result.Slot] := nil;
     end;
-end;
-
-function TRoomUnit.SkillSlots(): IUnitItems10;
-begin
-  Result := FSlots10;
 end;
 
 procedure TRoomUnit.LoadModels();
@@ -2482,12 +2490,14 @@ begin
 
   FAnimationPrefix := 'Hero_';
 
-  FSlots10[0] := TDefaultKick.Create;
+  FUnitSkills.Add(TSkill_Kick.Create(nil, 0));
+
+  FSlots10[0] := FUnitSkills[0];
 
   bow := TArcherBow.Create;
   Equip(bow);
   PushToInventory(bow);
-  FSlots10[1] := bow;
+  FSlots10[1] := bow.Skill(0);
 
   axe := TAxe.Create;
   PushToInventory(axe);
@@ -2679,6 +2689,7 @@ procedure TBattleRoom.CreateUI;
 var
   menu: TavmUnitMenu;
   inv_ui: TavmInventory;
+  skills_ui: TavmSkills;
   lookAt: TVec3;
 begin
   FRootControl := TavmCameraControl.Create(Self);
@@ -2694,6 +2705,11 @@ begin
   inv_ui := TavmInventory.Create(FRootControl);
   inv_ui.Inventory := FPlayer.Inventory;
   FPlayerInventory := inv_ui;
+
+  skills_ui := TavmSkills.Create(FRootControl);
+  skills_ui.Pos := Vec(30, 10);
+  skills_ui.Skills := TAllSkillListAdapter.Create(FPlayer);
+  FPlayerSkills := skills_ui;
 
   inv_ui := TavmInventory.Create(FRootControl);
   inv_ui.Pos := Vec(inv_ui.Pos.x + 500, inv_ui.Pos.y);
@@ -2801,6 +2817,11 @@ end;
 
 procedure TBattleRoom.Draw();
 
+  procedure AlignControls;
+  begin
+    FPlayerSkills.Pos := Vec(Main.WindowSize.x - 10, 10);
+  end;
+
   procedure DrawTileMap;
   var
     i: Integer;
@@ -2857,6 +2878,7 @@ procedure TBattleRoom.Draw();
   end;
 
 begin
+  AlignControls;
   DrawTileMap;
 
   FWorld.Renderer.PrepareToDraw;

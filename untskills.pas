@@ -50,9 +50,94 @@ type
     function Cost : Integer; override;
     function Range: Single; override;
     function Animation: string; override;
+
+    function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; override;
+    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
+  end;
+
+  { TSkill_Shoot }
+
+  TSkill_Shoot = class(TUnitSkill)
+  protected
+    function WearedOnly: Boolean; override;
+
+    function Name: string; override;
+    function Desc: string; override;
+    function Ico : string; override;
+
+    function Cost : Integer; override;
+    function Range: Single; override;
+    function Animation: string; override;
+
+    function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; override;
+    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
   end;
 
 implementation
+
+{ TSkill_Shoot }
+
+function TSkill_Shoot.WearedOnly: Boolean;
+begin
+  Result := True;
+end;
+
+function TSkill_Shoot.Name: string;
+begin
+  Result := 'Простой выстрел';
+end;
+
+function TSkill_Shoot.Desc: string;
+begin
+  Result := 'Приченяет урон. Если попадешь';
+end;
+
+function TSkill_Shoot.Ico: string;
+begin
+  Result := 'bow_shoot.png';
+end;
+
+function TSkill_Shoot.Cost: Integer;
+begin
+  Result := 2;
+end;
+
+function TSkill_Shoot.Range: Single;
+begin
+  Result := 20;
+end;
+
+function TSkill_Shoot.Animation: string;
+begin
+  Result := 'Archer_Bow_Attack0';
+end;
+
+function TSkill_Shoot.DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
+var
+  bullet: TRoomBullet;
+begin
+  Result := nil;
+
+  if not CanUse(ASkillIndex, AOwner, ATarget) then Exit;
+  AOwner.AP := AOwner.AP - Cost;
+
+  bullet := TRoomBullet.Create(AOwner.Room);
+  bullet.LoadModels('Erika_Archer_Arrow_Mesh');
+  bullet.Owner := AOwner;
+  bullet.Velocity := 20;
+  bullet.Dmg := 10;
+  bullet.MaxRange := Range;
+  bullet.Target := ATarget.RoomPos;
+  bullet.StartPt := AOwner.RoomPos;
+  Result := TBRA_Shoot.Create(AOwner, [bullet], Animation, 1150, 1.37);
+end;
+
+function TSkill_Shoot.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
+begin
+  Result := False;
+  if AOwner.AP - AReservedPoints < Cost then Exit;
+  Result := True;
+end;
 
 { TUnitSkill }
 
@@ -70,7 +155,8 @@ end;
 
 constructor TUnitSkill.Create(const AItem: IUnitItem; const AIndex: Integer);
 begin
-  FItem := (AItem as IWeakedInterface).WeakRef;
+  if AItem <> nil then
+    FItem := (AItem as IWeakedInterface).WeakRef;
   FIndex := AIndex;
 end;
 
@@ -93,7 +179,7 @@ end;
 
 function TSkill_Kick.Ico: string;
 begin
-  Result := 'ui\skills\kick.png';
+  Result := 'kick.png';
 end;
 
 function TSkill_Kick.Cost: Integer;
@@ -109,6 +195,22 @@ end;
 function TSkill_Kick.Animation: string;
 begin
   Result := 'Kick0';
+end;
+
+function TSkill_Kick.DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
+begin
+  Result := nil;
+  if not CanUse(ASkillIndex, AOwner, ATarget) then Exit;
+  AOwner.AP := AOwner.AP - Cost;
+  Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Animation, 1000, 300);
+end;
+
+function TSkill_Kick.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
+begin
+  Result := False;
+  if AOwner.AP - AReservedPoints < Cost then Exit;
+  if AOwner.Room.Distance(AOwner.RoomPos, ATarget.RoomPos) > 1 then Exit;
+  Result := True;
 end;
 
 end.

@@ -8,7 +8,7 @@ unit ui_inventory;
 interface
 
 uses
-  Classes, SysUtils, avMiniControls, avCanvas, untLevel, mutils, avTypes;
+  Classes, SysUtils, avMiniControls, avCanvas, untLevel, mutils, avTypes, ui_scroll;
 
 const
   cCellSize   = 48;
@@ -16,20 +16,11 @@ const
   cScrollBarWidth = 24;
 
 type
-  { TavmInventoryScroll }
-
-  TavmInventoryScroll = class(TavmCustomScrollBar)
-  private
-  protected
-    procedure DoValidate; override;
-  public
-  end;
-
   { TavmInventory }
 
   TavmInventory = class(TavmCustomControl)
   private
-    FScroll: TavmInventoryScroll;
+    FScroll: TavmDefaultScroll;
 
     FGridHeight: Integer;
     FGridWidth: Integer;
@@ -76,21 +67,6 @@ type
   end;
 
 implementation
-
-{ TavmInventoryScroll }
-
-procedure TavmInventoryScroll.DoValidate;
-var barRct: TRectF;
-begin
-  Canvas.Clear;
-  barRct := BarRect();
-  Canvas.Brush.Color := Vec(0, 0.5, 0.5, 1.0);
-  Canvas.AddFill(barRct.min, barRct.max);
-
-  Canvas.Pen.Color := Vec(0,0,0,1);
-  Canvas.Pen.Width := 1;
-  Canvas.AddRectangle(Vec(0,0), Size);
-end;
 
 { TavmInventory }
 
@@ -175,6 +151,7 @@ procedure TavmInventory.Notify_DragMove(ABtn: Integer; const APt: TVec2; AShifts
 begin
   inherited Notify_DragMove(ABtn, APt, AShifts);
   if (ABtn <> 1) then Exit;
+  if (FDraggedItem < 0) then Exit;
   FDraggetItemCoord := APt;
 
   DropTarget := FindDropTarget(APt);
@@ -188,6 +165,7 @@ procedure TavmInventory.Notify_DragStop(ABtn: Integer; const APt: TVec2; AShifts
 begin
   inherited Notify_DragStop(ABtn, APt, AShifts);
   if (ABtn <> 1) then Exit;
+  if (FDraggedItem < 0) then Exit;
   if DropTarget <> nil then
     DropTarget.DropItem(Inventory, FDraggedItem);
   FDraggedItem := -1;
@@ -320,7 +298,7 @@ begin
   FDropPosition := -1;
   FDraggedItem := -1;
 
-  FScroll := TavmInventoryScroll.Create(Self);
+  FScroll := TavmDefaultScroll.Create(Self);
   FScroll.OnScroll := {$IfDef FPC}@{$EndIf}ScrollEvent;
 
   Origin := Vec(0,0);

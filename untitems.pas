@@ -15,32 +15,17 @@ type
   { TUnitItem }
 
   TUnitItem = class(TWeakedInterfacedObject, IUnitItem)
-  private
+  protected
+    FSkills: array of IUnitSkill;
   public
     function Slot  : TRoomUnitEqSlot; virtual; abstract;
     function Model : string;          virtual; abstract;
     function Ico48 : string;          virtual; abstract;
 
-    function SkillsCount: Integer; virtual; abstract;
-    function Animation(ASkillIndex: Integer): string; virtual; abstract;
-    function ActionCost(ASkillIndex: Integer): Integer; virtual; abstract;
-    function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; virtual; abstract;
-    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; virtual; abstract;
-  end;
+    function SkillsCount: Integer; virtual;
+    function Skill(ASkillIndex: Integer): IUnitSkill; virtual;
 
-  { TDefaultKick }
-
-  TDefaultKick = class(TUnitItem)
-  public
-    function Slot  : TRoomUnitEqSlot; override;
-    function Model : string;          override;
-    function Ico48 : string;          override;
-
-    function SkillsCount: Integer; override;
-    function Animation(ASkillIndex: Integer): string; override;
-    function ActionCost(ASkillIndex: Integer): Integer; override;
-    function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; override;
-    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
+    constructor Create; virtual;
   end;
 
   { TArcherBow }
@@ -50,12 +35,8 @@ type
     function Slot  : TRoomUnitEqSlot; override;
     function Model : string;          override;
     function Ico48 : string;          override;
-
-    function SkillsCount: Integer; override;
-    function Animation(ASkillIndex: Integer): string; override;
-    function ActionCost(ASkillIndex: Integer): Integer; override;
-    function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; override;
-    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
+  public
+    constructor Create; override;
   end;
 
   { TAxe }
@@ -65,21 +46,17 @@ type
     function Slot  : TRoomUnitEqSlot; override;
     function Model : string;          override;
     function Ico48 : string;          override;
-
-    function SkillsCount: Integer; override;
-    function Animation(ASkillIndex: Integer): string; override;
-    function ActionCost(ASkillIndex: Integer): Integer; override;
-    function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; override;
-    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
   end;
 
 implementation
+
+uses untSkills;
 
 { TAxe }
 
 function TAxe.Slot: TRoomUnitEqSlot;
 begin
-  Result := esNone;
+  Result := TRoomUnitEqSlot.esNone;
 end;
 
 function TAxe.Model: string;
@@ -92,79 +69,21 @@ begin
   Result := 'axe.png';
 end;
 
-function TAxe.SkillsCount: Integer;
+{ TUnitItem }
+
+function TUnitItem.SkillsCount: Integer;
 begin
-  Result := 0;
+  Result := Length(FSkills);
 end;
 
-function TAxe.Animation(ASkillIndex: Integer): string;
+function TUnitItem.Skill(ASkillIndex: Integer): IUnitSkill;
 begin
-  Result := '';
+  Result := FSkills[ASkillIndex];
 end;
 
-function TAxe.ActionCost(ASkillIndex: Integer): Integer;
+constructor TUnitItem.Create;
 begin
-  Result := 0;
-end;
 
-function TAxe.DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
-begin
-  Result := nil;
-end;
-
-function TAxe.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit;
-  AReservedPoints: Integer): Boolean;
-begin
-  Result := False;
-end;
-
-{ TDefaultKick }
-
-function TDefaultKick.Slot: TRoomUnitEqSlot;
-begin
-  Result := esNone;
-end;
-
-function TDefaultKick.Model: string;
-begin
-  Result := '';
-end;
-
-function TDefaultKick.Ico48: string;
-begin
-  Result := '';
-end;
-
-function TDefaultKick.SkillsCount: Integer;
-begin
-  Result := 1;
-end;
-
-function TDefaultKick.Animation(ASkillIndex: Integer): string;
-begin
-  Result := 'Kick0';
-end;
-
-function TDefaultKick.ActionCost(ASkillIndex: Integer): Integer;
-begin
-  Result := 3;
-end;
-
-function TDefaultKick.DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
-begin
-  Result := nil;
-  if not CanUse(ASkillIndex, AOwner, ATarget) then Exit;
-  AOwner.AP := AOwner.AP - ActionCost(ASkillIndex);
-  Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Animation(ASkillIndex), 1000, 300);
-end;
-
-function TDefaultKick.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit;
-  AReservedPoints: Integer): Boolean;
-begin
-  Result := False;
-  if AOwner.AP - AReservedPoints < ActionCost(ASkillIndex) then Exit;
-  if AOwner.Room.Distance(AOwner.RoomPos, ATarget.RoomPos) > 1 then Exit;
-  Result := True;
 end;
 
 { TArcherBow }
@@ -184,47 +103,11 @@ begin
   Result := 'bow.png';
 end;
 
-function TArcherBow.SkillsCount: Integer;
+constructor TArcherBow.Create;
 begin
-  Result := 1;
-end;
-
-function TArcherBow.Animation(ASkillIndex: Integer): string;
-begin
-  Result := 'Archer_Bow_Attack0';
-end;
-
-function TArcherBow.ActionCost(ASkillIndex: Integer): Integer;
-begin
-  Result := 3;
-end;
-
-function TArcherBow.DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
-var
-  bullet: TRoomBullet;
-begin
-  Result := nil;
-
-  if not CanUse(ASkillIndex, AOwner, ATarget) then Exit;
-  AOwner.AP := AOwner.AP - ActionCost(ASkillIndex);
-
-  bullet := TRoomBullet.Create(AOwner.Room);
-  bullet.LoadModels('Erika_Archer_Arrow_Mesh');
-  bullet.Owner := AOwner;
-  bullet.Velocity := 20;
-  bullet.Dmg := 10;
-  bullet.MaxRange := 20;
-  bullet.Target := ATarget.RoomPos;
-  bullet.StartPt := AOwner.RoomPos;
-  Result := TBRA_Shoot.Create(AOwner, [bullet], Animation(ASkillIndex), 1150, 1.37);
-end;
-
-function TArcherBow.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit;
-  AReservedPoints: Integer): Boolean;
-begin
-  Result := False;
-  if AOwner.AP - AReservedPoints < ActionCost(ASkillIndex) then Exit;
-  Result := True;
+  inherited Create;
+  SetLength(FSkills, 1);
+  FSkills[0] := TSkill_Shoot.Create(Self, 0);
 end;
 
 end.

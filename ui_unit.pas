@@ -8,7 +8,7 @@ unit ui_unit;
 interface
 
 uses
-  Classes, SysUtils, avMiniControls, avCanvas, untLevel, mutils, intfUtils;
+  Classes, SysUtils, avMiniControls, avCanvas, untLevel, mutils, intfUtils, ui_skills;
 
 type
 
@@ -21,28 +21,6 @@ type
   public
   end;
 
-  { TSkillInfo }
-
-  TSkillInfo = class
-  private
-    FItem    : IWeakRefIntf;//IUnitItem
-  public
-    Skillidx : Integer;
-    function Item(): IUnitItem;
-    procedure SetState(const AItem: IUnitItem; const ASkillIdx: Integer);
-  end;
-
-  { TavmSkillsPanel }
-
-  TavmSkillsPanel = class(TavmCustomControl)
-  private
-    FSkills: array [0..9] of TSkillInfo;
-  public
-    function Skill(AIndex: Integer): TSkillInfo;
-    procedure AfterConstruction; override;
-    destructor Destroy; override;
-  end;
-
   { TavmUnitMenu }
 
   TavmUnitMenu = class(TavmCustomControl)
@@ -53,6 +31,8 @@ type
     FLastAP: Integer;
 
     FEndTurnBtn: TavmUnitBtn;
+
+    FSkillSlots: TavmSkills;
 
     function GetOnEndTurnClick: TNotifyEvent;
     procedure SetOnEndTurnClick(const AValue: TNotifyEvent);
@@ -67,49 +47,6 @@ type
   end;
 
 implementation
-
-{ TavmSkillsPanel }
-
-function TavmSkillsPanel.Skill(AIndex: Integer): TSkillInfo;
-begin
-  Result := FSkills[AIndex];
-end;
-
-procedure TavmSkillsPanel.AfterConstruction;
-var
-  i: Integer;
-begin
-  inherited AfterConstruction;
-  for i := Low(FSkills) to High(FSkills) do
-    FSkills[i] := TSkillInfo.Create;
-end;
-
-destructor TavmSkillsPanel.Destroy;
-var
-  i: Integer;
-begin
-  inherited Destroy;
-  for i := Low(FSkills) to High(FSkills) do
-    FreeAndNil(FSkills[i]);
-end;
-
-{ TSkillInfo }
-
-function TSkillInfo.Item(): IUnitItem;
-begin
-  if FItem = nil then Exit(nil);
-  Result := FItem.Intf as IUnitItem;
-  if Result = nil then FItem := nil;
-end;
-
-procedure TSkillInfo.SetState(const AItem: IUnitItem; const ASkillIdx: Integer);
-begin
-  if AItem = nil then
-    FItem := nil
-  else
-    FItem := (AItem as IWeakedInterface).WeakRef;
-  Skillidx := ASkillIdx;
-end;
 
 { TavmUnitBtn }
 
@@ -160,6 +97,7 @@ procedure TavmUnitMenu.SetRoomUnit(const AValue: TRoomUnit);
 begin
   if FRoomUnit = AValue then Exit;
   FRoomUnit := AValue;
+  FSkillSlots.Skills := TSkillSlots10Adapter.Create(AValue);
   Invalidate;
 end;
 
@@ -252,6 +190,11 @@ begin
   FEndTurnBtn.Pos := Vec((Size.x + cHPBarWidth)*0.5 + 30, 20);
   FEndTurnBtn.Size := Vec(250, 40);
   FEndTurnBtn.Text := 'End turn';
+
+  FSkillSlots := TavmSkills.Create(Self);
+  FSkillSlots.GridWidth := 10;
+  FSkillSlots.GridHeight := 1;
+  FSkillSlots.Origin := Vec(0.5, 0);
 end;
 
 procedure TavmUnitMenu.DrawControl(const AMat: TMat3);
@@ -260,6 +203,7 @@ begin
   if FLastAP <> RoomUnit.AP then Invalidate;
 
   Pos := Vec(Main.WindowSize.x * 0.5, Main.WindowSize.y);
+  FSkillSlots.Pos := Vec(Size.x*0.5, 100);
   inherited DrawControl(AMat);
 end;
 

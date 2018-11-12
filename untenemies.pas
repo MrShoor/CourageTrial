@@ -157,8 +157,6 @@ type
   TBotMutant1 = class (TBot)
   private
     FAnim: IavAnimationController;
-
-    FKick: IUnitItem;
   protected
     function FindOptimalRouteForCheck(const ACheckPts: IVec2iArr): IRoomPath; override;
 
@@ -210,7 +208,7 @@ var gvDebugPoints: IVec2iArr;
 implementation
 
 uses
-  untItems;
+  untSkills, untItems;
 
 var gvBotID: Integer = 0;
 
@@ -663,12 +661,12 @@ begin
           end;
 
           availPts := AP - FBS_SeeEnemy.OptimalRoute.Count;
-          if (FEquippedItem[esBothHands] <> nil) and (availPts > FEquippedItem[esBothHands].ActionCost(0)) then
+          if (FEquippedItem[esBothHands] <> nil) and (availPts > FEquippedItem[esBothHands].Skill(0).Cost) then
           begin
             if (FBS_SeeEnemy.OptimalRoute.Count = 0) or
                (FRoom.Distance(RoomPos, FBS_SeeEnemy.Enemy.RoomPos) < FRoom.Distance(FBS_SeeEnemy.OptimalRoute.Last, FBS_SeeEnemy.Enemy.RoomPos)) then
             begin
-              Result := FEquippedItem[esBothHands].DoAction(0, Self, FBS_SeeEnemy.Enemy);
+              Result := FEquippedItem[esBothHands].Skill(0).DoAction(0, Self, FBS_SeeEnemy.Enemy);
               Exit;
             end
             else
@@ -1271,7 +1269,7 @@ begin
 
   Preview96_128 := 'ui\units\mutant1.png';
 
-  FKick := TDefaultKick.Create;
+  FUnitSkills.Add(TSkill_Kick.Create(nil, 0));
 end;
 
 function TBotMutant1.DoAction(): IBRA_Action;
@@ -1286,9 +1284,9 @@ begin
     bsSeeEnemy:
       begin
 
-        if FKick.CanUse(0, Self, FBS_SeeEnemy.Enemy) then
+        if FUnitSkills[0].CanUse(0, Self, FBS_SeeEnemy.Enemy) then
         begin
-          Result := FKick.DoAction(0, Self, FBS_SeeEnemy.Enemy);
+          Result := FUnitSkills[0].DoAction(0, Self, FBS_SeeEnemy.Enemy);
           Exit;
         end;
 
@@ -1326,9 +1324,9 @@ Exit;
     Exit(nil);
   end;
 
-  if FKick.CanUse(0, Self, player) then
+  if FUnitSkills[0].CanUse(0, Self, player) then
   begin
-    Result := FKick.DoAction(0, Self, player);
+    Result := FUnitSkills[0].DoAction(0, Self, player);
     Exit;
   end;
 
