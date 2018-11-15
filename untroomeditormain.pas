@@ -15,7 +15,7 @@ uses
   avRes, avTypes, avCameraController,
   mutils,
   untWayPoint,
-  untLevel, untObstacles;
+  untLevel, untObstacles, untInteractiveObjects;
 
 const
   cPreviewSize = 96;
@@ -200,6 +200,12 @@ begin
         FState_AddObject.CancelState();
       end;
     end;
+  end;
+
+  if Key = VK_SPACE then
+  begin
+    FRoom.KeyPress(Key);
+    FMain.InvalidateWindow;
   end;
 end;
 

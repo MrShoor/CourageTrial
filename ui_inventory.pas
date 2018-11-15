@@ -329,12 +329,12 @@ procedure TavmInventory.DropItem(const AFrom: IInventory; const AIndex: Integer)
 var item: IUnitItem;
 begin
   if FDropPosition < 0 then Exit;
-  item := AFrom.PopFromInventory(AIndex);
+  item := AFrom.Pop(AIndex);
 
   if (AFrom = FInventory) and (FDropPosition > AIndex) then
     Dec(FDropPosition);
 
-  FInventory.PushToInventory(item, FDropPosition);
+  FInventory.Push(item, FDropPosition);
 end;
 
 procedure TavmInventory.SetDropPoint(const APt: TVec2);

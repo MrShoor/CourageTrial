@@ -115,7 +115,7 @@
         <PackageName Value="LCL"/>
       </Item4>
     </RequiredPackages>
-    <Units Count="14">
+    <Units Count="15">
       <Unit0>
         <Filename Value="CT.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -183,6 +183,11 @@
         <Filename Value="ui_scroll.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit13>
+      <Unit14>
+        <Filename Value="untinteractiveobjects.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="untInteractiveObjects"/>
+      </Unit14>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

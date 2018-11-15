@@ -78,3 +78,6 @@ O 0 0 0
 N WayPoint
 C TRoomWaypoint
 O 0 0 0
+N Chest
+C TRoomChest
+O 0 0 0
