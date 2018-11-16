@@ -61,6 +61,7 @@ type
     function Item: IUnitItem;
     function Idx : Integer;
     function WearedOnly: Boolean;
+    function UseReady: Boolean;
 
     function Name: string;
     function Desc: string;
@@ -80,12 +81,17 @@ type
 
   IUnitItem = interface
   ['{E6D665A9-3E67-43A8-891E-32B835887FB8}']
+    function  GetEquipped: Boolean;
+    procedure SetEquipped(const AValue: Boolean);
+
     function Slot       : TRoomUnitEqSlot;
     function Model      : string;
     function Ico48      : string;
 
     function SkillsCount: Integer;
     function Skill(ASkillIndex: Integer): IUnitSkill;
+
+    property Equipped: Boolean read GetEquipped write SetEquipped;
   end;
   IUnitItemArr = {$IfDef FPC}specialize{$EndIf}IArray<IUnitItem>;
   TUnitItemArr = {$IfDef FPC}specialize{$EndIf}TArray<IUnitItem>;
@@ -96,6 +102,7 @@ type
     function Items  : IUnitItemArr;
     function Pop(const AIndex: Integer): IUnitItem;
     function Push(const AItem: IUnitItem; const AIndex: Integer): Integer;
+    procedure BumpStateID;
   end;
 
   { TTileUtils }
@@ -199,6 +206,7 @@ type
     function Items  : IUnitItemArr; virtual;
     function Pop(const AIndex: Integer): IUnitItem; virtual;
     function Push(const AItem: IUnitItem; const AIndex: Integer): Integer; virtual;
+    procedure BumpStateID;
   public
     constructor Create(const AOwner: TRoomObject);
   end;
@@ -235,9 +243,10 @@ type
     FEquippedModel: array [TRoomUnitEqSlot] of IavModelInstance;
     FInventory: IInventory;
 
+    FAllSkillsCacheInventoryLastStateID: Integer;
+    FAllSkillsCache: IUnitSkillArr;
+
     FSlots10: IUnitSkillArr;
-    procedure Unequip(const ASlot: TRoomUnitEqSlot);
-    function  Equip(const AItem: IUnitItem): Boolean;
     procedure OnRegisterRoomObject(const ANewObject: TRoomObject); virtual;
 
     function AddAnimationPrefix(const ANameSequence: array of string): TStringArray;
@@ -252,6 +261,8 @@ type
     function AllSkills(): IUnitSkillArr;
 
     function Inventory(): IInventory; override;
+    procedure Unequip(const ASlot: TRoomUnitEqSlot);
+    function  Equip(const AItem: IUnitItem): Boolean;
 
     procedure LoadModels(); virtual;
 
@@ -682,7 +693,7 @@ type
 
     FEmptyLight: IavPointLight;
 
-    FPlayerSkillSlot: Integer;
+    FPlayerActiveSkill: IUnitSkill;
 
     function IsPlayerTurn: Boolean;
     function IsBotTurn: Boolean;
@@ -699,6 +710,7 @@ type
   public
     procedure SetEditMode();
     procedure UI_SetOtherInventory(const AInventory: IInventory);
+    procedure UI_SetPlayerActiveSkill(const ASkill: IUnitSkill);
 
     property MovedTile: TVec2i read FMovedTile;
     property Player: TPlayer read FPlayer;
@@ -770,14 +782,24 @@ end;
 { TRoomUnit.TUnitInventory }
 
 function TRoomUnit.TUnitInventory.Pop(const AIndex: Integer): IUnitItem;
+var i: Integer;
+    newskills: IUnitSkillArr;
+    slots: IUnitSkillArr;
 begin
   Result := inherited Pop(AIndex);
   if Result <> nil then
-    if TRoomUnit(FOwner).FEquippedItem[Result.Slot] = Result then
+  begin
+    if Result.Equipped then
+      TRoomUnit(FOwner).Unequip(Result.Slot);
+
+    newskills := TRoomUnit(FOwner).AllSkills();
+    slots := TRoomUnit(FOwner).SkillSlots;
+    for i := 0 to slots.Count - 1 do
     begin
-      TRoomUnit(FOwner).FEquippedItem[Result.Slot] := nil;
-      TRoomUnit(FOwner).FEquippedModel[Result.Slot] := nil;
+      if newskills.IndexOf(slots[i]) < 0 then
+        slots[i] := nil;
     end;
+  end;
 end;
 
 { TInventory }
@@ -814,6 +836,11 @@ begin
     FInventory.Insert(AIndex, AItem);
     Result := AIndex;
   end;
+  Inc(FStateID);
+end;
+
+procedure TInventory.BumpStateID;
+begin
   Inc(FStateID);
 end;
 
@@ -855,17 +882,32 @@ end;
 procedure TRoomFloor.LoadModels(const AMap: TRoomMap);
 var idx: Integer;
     i, j: Integer;
+    hex: array [0..4] of IVec2iArr;
+    meshInst: IavMeshInstance;
 begin
+  for i := 0 to Length(hex) - 1 do
+    hex[i] := TVec2iArr.Create();
+
   idx := 2;
   for i := -AMap.Radius to AMap.Radius do
     for j := -AMap.Radius to AMap.Radius do
     begin
       if not AMap.IsCellExists(Vec(i, j)) then Continue;
       //idx := Random(5) + 1;
-      idx := WeightedRandom([5, 50, 2, 1, 1]) + 1;
-      AddModel('Hex'+IntToStr(idx), mtDefault);
-      FModels.Last.Mesh.Transform := MatTranslate(AMap.UI.TilePosToWorldPos(Vec(i,j)));
+      idx := WeightedRandom([5, 50, 2, 1, 1]);
+      hex[idx].Add(Vec(i,j));
+
+      //AddModel('Hex'+IntToStr(idx), mtDefault);
+      //FModels.Last.Mesh.Transform := MatTranslate(AMap.UI.TilePosToWorldPos(Vec(i,j)));
     end;
+
+  for j := 0 to Length(hex) - 1 do
+  begin
+    meshInst := World.Renderer.FindPrefabInstances('Hex'+IntToStr(j+1));
+    FModels.Add(World.Renderer.ModelsCollection.AddFromMesh(meshInst.Mesh, hex[j].Count));
+    for i := 0 to hex[j].Count - 1 do
+      FModels[j].MultiMesh[i].Transform := MatTranslate(AMap.UI.TilePosToWorldPos(hex[j][i]));
+  end;
   FTransformValid := True;
 end;
 
@@ -1476,6 +1518,12 @@ end;
 
 procedure TRoomUnit.Unequip(const ASlot: TRoomUnitEqSlot);
 begin
+  if FEquippedItem[ASlot] <> nil then
+  begin
+    FEquippedItem[ASlot].Equipped := False;
+    FInventory.BumpStateID;
+  end;
+
   FEquippedModel[ASlot] := nil;
   FEquippedItem[ASlot] := nil;
 end;
@@ -1485,6 +1533,8 @@ var
   m: TMat4;
   inst: IavModelInstanceArr;
 begin
+  if AItem.Slot = esNone then Exit(False);
+
   Unequip(AItem.Slot);
 
   m := FModels[0].Mesh.BindPoseTransform;
@@ -1495,7 +1545,9 @@ begin
 
   FEquippedModel[AItem.Slot] := inst[0];
   FEquippedItem[AItem.Slot] := AItem;
+  AItem.Equipped := True;
 
+  FInventory.BumpStateID;
   Result := True;
 end;
 
@@ -1503,15 +1555,26 @@ function TRoomUnit.AllSkills(): IUnitSkillArr;
 var i, j: Integer;
     items: IUnitItemArr;
 begin
-  Result := TUnitSkillArr.Create();
-  Result.AddArray(FUnitSkills);
-  items := Inventory().Items;
-  for i := 0 to items.Count - 1 do
+  if FAllSkillsCacheInventoryLastStateID <> FInventory.StateID then
   begin
-    if items[i] = nil then Continue;
-    for j := 0 to items[i].SkillsCount - 1 do
-      Result.Add(items[i].Skill(j));
+    FAllSkillsCache := nil;
+    FAllSkillsCacheInventoryLastStateID := FInventory.StateID;
   end;
+
+  if FAllSkillsCache = nil then
+  begin
+    FAllSkillsCache := TUnitSkillArr.Create();
+    FAllSkillsCache.AddArray(FUnitSkills);
+    items := Inventory().Items;
+    for i := 0 to items.Count - 1 do
+    begin
+      if items[i] = nil then Continue;
+      for j := 0 to items[i].SkillsCount - 1 do
+        FAllSkillsCache.Add(items[i].Skill(j));
+    end;
+  end;
+
+  Result := FAllSkillsCache;
 end;
 
 function TRoomUnit.Inventory(): IInventory;
@@ -2583,6 +2646,18 @@ begin
   FWorld.UpdateStep();
   if FUnits.Count = 0 then Exit;
 
+  //update active skill information
+  if FPlayerActiveSkill <> nil then
+    if not FPlayerActiveSkill.UseReady then
+      UI_SetPlayerActiveSkill(nil);
+  if FPlayerSkills <> nil then
+    TavmSkills(FPlayerSkills).ActiveSkill := FPlayerActiveSkill;
+  if FUnitMenu <> nil then
+    if TavmUnitMenu(FUnitMenu).SkillSlots <> nil then
+      if IsPlayerTurn then
+        TavmUnitMenu(FUnitMenu).SkillSlots.ActiveSkill := FPlayerActiveSkill;
+
+  //moved tile update
   if IsPlayerTurn then
   begin
     FMovedTile := FMap.UI.GetTileAtCoords(Main.Cursor.Ray);
@@ -2718,8 +2793,31 @@ begin
   FOtherInventory.Visible := (FOtherInventory as TavmInventory).Inventory <> nil;
 end;
 
+procedure TBattleRoom.UI_SetPlayerActiveSkill(const ASkill: IUnitSkill);
+  procedure SetActiveSkillInternal(const ASkill: IUnitSkill);
+  begin
+    FPlayerActiveSkill := ASkill;
+
+  end;
+
+var skills: IUnitSkillArr;
+begin
+  if FPlayer = nil then Exit;
+  if ASkill = nil then
+  begin
+    SetActiveSkillInternal(ASkill);
+    Exit;
+  end;
+
+  skills := FPlayer.AllSkills();
+  if skills.IndexOf(ASkill) < 0 then Exit;
+  if not ASkill.UseReady then Exit;
+  SetActiveSkillInternal(ASkill);
+end;
+
 procedure TBattleRoom.KeyPress(KeyCode: Integer);
 var inv_objs: IRoomObjectArr;
+    n: Integer;
 begin
   if KeyCode = Ord(' ') then
     FWorld.Renderer.InvalidateShaders;
@@ -2728,9 +2826,20 @@ begin
   if (KeyCode = Ord('E')) then
     EndTurn();
   case KeyCode of
-    Ord('1') : FPlayerSkillSlot := 0;
-    Ord('2') : FPlayerSkillSlot := 1;
-    Ord('G') : begin
+    Ord('0')..Ord('9') :
+    begin
+      n := KeyCode - Ord('0');
+      if (n >= 0) and (n <= 9) then
+      begin
+        if (n = 0) then
+          n := 9
+        else
+          n := n - 1;
+        UI_SetPlayerActiveSkill(FPlayer.SkillSlots[n]);
+      end;
+    end;
+    Ord('G') :
+    begin
       if FPlayer <> nil then
       begin
         if FOtherInventory.Visible then
@@ -2778,9 +2887,9 @@ begin
       new_action := TBRA_UnitMovementAction.Create(FPlayer, FMovePath);
     end;
 
-    if (obj is TRoomUnit) and (FPlayer <> obj) then
+    if (obj is TRoomUnit) and (FPlayer <> obj) and (FPlayerActiveSkill <> nil) then
     begin
-      new_action := FPlayer.SkillSlots[FPlayerSkillSlot].DoAction(0, FPlayer, obj as TRoomUnit);
+      new_action := FPlayerActiveSkill.DoAction(0, FPlayer, obj as TRoomUnit);
     end;
 
     if (obj is TRoomInteractiveObject) then
@@ -2804,6 +2913,7 @@ begin
   unt.AP := unt.MaxAP;
 
   (FUnitMenu as TavmUnitMenu).RoomUnit := unt;
+  (FUnitMenu as TavmUnitMenu).SkillSlots.ActiveSkill := nil;
   if unt.HP <= 0 then
     EndTurn()
   else
@@ -3221,4 +3331,3 @@ initialization
   RegRoomClass(TBrazier);
 
 end.
-

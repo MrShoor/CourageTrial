@@ -22,6 +22,7 @@ type
     function Item: IUnitItem;
     function Idx : Integer;
     function WearedOnly: Boolean; virtual; abstract;
+    function UseReady: Boolean; virtual; abstract;
 
     function Name: string; virtual; abstract;
     function Desc: string; virtual; abstract;
@@ -42,6 +43,7 @@ type
   TSkill_Kick = class(TUnitSkill)
   protected
     function WearedOnly: Boolean; override;
+    function UseReady: Boolean; override;
 
     function Name: string; override;
     function Desc: string; override;
@@ -60,6 +62,7 @@ type
   TSkill_Shoot = class(TUnitSkill)
   protected
     function WearedOnly: Boolean; override;
+    function UseReady: Boolean; override;
 
     function Name: string; override;
     function Desc: string; override;
@@ -80,6 +83,13 @@ implementation
 function TSkill_Shoot.WearedOnly: Boolean;
 begin
   Result := True;
+end;
+
+function TSkill_Shoot.UseReady: Boolean;
+var itm: IUnitItem;
+begin
+  itm := Item;
+  Result := itm.Equipped;
 end;
 
 function TSkill_Shoot.Name: string;
@@ -165,6 +175,11 @@ end;
 function TSkill_Kick.WearedOnly: Boolean;
 begin
   Result := False;
+end;
+
+function TSkill_Kick.UseReady: Boolean;
+begin
+  Result := True;
 end;
 
 function TSkill_Kick.Name: string;

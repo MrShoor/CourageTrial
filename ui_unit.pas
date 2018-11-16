@@ -42,6 +42,7 @@ type
     procedure AfterRegister; override;
     procedure DrawControl(const AMat: TMat3); override;
   public
+    property SkillSlots: TavmSkills read FSkillSlots;
     property RoomUnit: TRoomUnit read FRoomUnit write SetRoomUnit;
     property OnEndTurnClick: TNotifyEvent read GetOnEndTurnClick write SetOnEndTurnClick;
   end;

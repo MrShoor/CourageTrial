@@ -16,8 +16,12 @@ type
 
   TUnitItem = class(TWeakedInterfacedObject, IUnitItem)
   protected
+    FEquipped: Boolean;
     FSkills: array of IUnitSkill;
   public
+    function  GetEquipped: Boolean;
+    procedure SetEquipped(const AValue: Boolean);
+
     function Slot  : TRoomUnitEqSlot; virtual; abstract;
     function Model : string;          virtual; abstract;
     function Ico48 : string;          virtual; abstract;
@@ -70,6 +74,17 @@ begin
 end;
 
 { TUnitItem }
+
+function TUnitItem.GetEquipped: Boolean;
+begin
+  Result := FEquipped;
+end;
+
+procedure TUnitItem.SetEquipped(const AValue: Boolean);
+begin
+  if Slot = esNone then Exit;
+  FEquipped := AValue;
+end;
 
 function TUnitItem.SkillsCount: Integer;
 begin

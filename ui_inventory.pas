@@ -45,6 +45,7 @@ type
     procedure Notify_DragStart(ABtn: Integer; const APt: TVec2; AShifts: TShifts); override;
     procedure Notify_DragMove (ABtn: Integer; const APt: TVec2; AShifts: TShifts); override;
     procedure Notify_DragStop (ABtn: Integer; const APt: TVec2; AShifts: TShifts); override;
+    procedure Notify_MouseDblClick(ABtn: Integer; const APt: TVec2; AShifts: TShifts); override;
   protected
     procedure DoValidate; override;
     procedure AfterRegister; override;
@@ -173,6 +174,24 @@ begin
   Invalidate;
 end;
 
+procedure TavmInventory.Notify_MouseDblClick(ABtn: Integer; const APt: TVec2; AShifts: TShifts);
+var itemIdx: Integer;
+    item: IUnitItem;
+begin
+  inherited Notify_MouseDblClick(ABtn, APt, AShifts);
+  if FInventory = nil then Exit;
+  if not (FInventory.Owner is TPlayer) then Exit;
+  itemIdx := HitToItems(APt);
+  if itemIdx < 0 then Exit;
+  if itemIdx >= FInventory.Items.Count then Exit;
+  item := FInventory.Items[itemIdx];
+  if item.Equipped then
+    TPlayer(FInventory.Owner).Unequip(item.Slot)
+  else
+    TPlayer(FInventory.Owner).Equip(item);
+  Invalidate;
+end;
+
 procedure TavmInventory.SetGridWidth(const AValue: Integer);
 begin
   if FGridWidth = AValue then Exit;
@@ -215,20 +234,26 @@ end;
 
 procedure TavmInventory.DoValidate;
 
-  function GetCellSpriteFile(AIndex: Integer): string;
+  function GetCellSpriteInfo(AIndex: Integer; out AEquipped: Boolean): string;
+  var item: IUnitItem;
   begin
+    AEquipped := False;
     if FInventory = nil then Exit('');
     if AIndex < 0 then Exit('');
     if AIndex >= FInventory.Items.Count then Exit('');
-    Result := ExeRelativeFileName('ui\items\48\'+FInventory.Items[AIndex].Ico48);
+    item := FInventory.Items[AIndex];
+    if item = nil then Exit('');
+
+    Result := ExeRelativeFileName('ui\items\48\'+item.Ico48);
+    AEquipped := item.Equipped;
   end;
 
-  function GetCellSpriteFile(x,y: Integer): string;
+  function GetCellSpriteInfo(x,y: Integer; out AEquipped: Boolean): string;
   begin
-    Result := GetCellSpriteFile(y * GridWidth + x);
+    Result := GetCellSpriteInfo(y * GridWidth + x, AEquipped);
   end;
 
-  procedure DrawItemSprite(const ACellPos: TVec2; const ASpriteFile: string);
+  procedure DrawItemSprite(const ACellPos: TVec2; const ASpriteFile: string; AEquipped: Boolean);
   var
     cellRB: TVec2;
   begin
@@ -240,6 +265,9 @@ procedure TavmInventory.DoValidate;
       Canvas.AddFill(ACellPos, cellRB);
       Canvas.Brush.Color := Vec(1,1,1,1);
       Canvas.AddSprite(ACellPos, cellRB, ASpriteFile);
+
+      if AEquipped then
+        Canvas.AddSprite(cellRB - Vec(16,16), cellRB, ExeRelativeFileName('ui\items\equipped.png'));
     end;
 
     Canvas.AddRectangle(ACellPos, cellRB);
@@ -249,6 +277,7 @@ var
   i, j: Integer;
   cellPos: TVec2;
   itemSprite: string;
+  itemEquipped: Boolean;
 begin
   Canvas.Clear;
 
@@ -265,8 +294,8 @@ begin
     cellPos.x := cCellBorderSize;
     for i := 0 to FGridWidth - 1 do
     begin
-      itemSprite := GetCellSpriteFile(i, j);
-      DrawItemSprite(cellPos, itemSprite);
+      itemSprite := GetCellSpriteInfo(i, j, itemEquipped);
+      DrawItemSprite(cellPos, itemSprite, itemEquipped);
 
       cellPos.x := cellPos.x + cCellSize + cCellBorderSize;
     end;
@@ -275,9 +304,9 @@ begin
 
   if FDraggedItem <> -1 then
   begin
-    itemSprite := GetCellSpriteFile(FDraggedItem);
+    itemSprite := GetCellSpriteInfo(FDraggedItem, itemEquipped);
     cellPos := FDraggetItemCoord - Vec(cCellSize*0.5, cCellSize*0.5);
-    DrawItemSprite(cellPos, itemSprite);
+    DrawItemSprite(cellPos, itemSprite, itemEquipped);
   end;
 
   if FDropPosition >= 0 then
