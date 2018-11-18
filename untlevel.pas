@@ -67,9 +67,14 @@ type
     function Desc: string;
     function Ico : string;
 
-    function Cost : Integer;
-    function Range: Single;
+    function Cost    : Integer;
+    function Range   : Single;
+    function Damage  : TVec2i;
+    function Accuracy: TVec2;
+
     function Animation: string;
+    function SampleDamage(AOwner, ATarget: TRoomUnit): Integer;
+    function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean;
 
     function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
     function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean;
@@ -620,13 +625,14 @@ type
       TBulletInfoArr = {$IfDef FPC}specialize{$EndIf} TArray<TBulletInfo>;
   private
     FRoomUint: TRoomUnit;
-    FBullets: IBulletInfoArr;
+    FSkill   : IUnitSkill;
+    FBullets : IBulletInfoArr;
     FShootDelay: Integer;
   public
     function ProcessAction: Boolean; override;
     constructor Create(const AUnit: TRoomUnit;
                        const ABullets: array of TRoomBullet;
-                       const ASkillAnimation: string;
+                       const ASkill: IUnitSkill;
                        const AShootDelay: Integer;
                        const ABulletY: Single);
   end;
@@ -637,12 +643,13 @@ type
   private
     FRoomUnit   : TRoomUnit;
     FTarget     : TRoomUnit;
+    FSkill      : IUnitSkill;
     FActionTime : Integer;
     FDamageStartTime: Integer;
   public
     function ProcessAction: Boolean; override;
     constructor Create(const AUnit, ATarget: TRoomUnit;
-                       const ASkillAnimation: string;
+                       const ASkill: IUnitSkill;
                        const ADurationTime, ADamageStartTime: Integer);
   end;
 
@@ -1028,7 +1035,7 @@ function TBRA_Shoot.ProcessAction: Boolean;
   begin
     if ABltInfo^.hit <> nil then
     begin
-      ABltInfo^.hit.DealDamage(ABltInfo^.bullet.Dmg, ABltInfo^.bullet.Owner);
+      ABltInfo^.hit.DealDamage(FSkill.SampleDamage(FRoomUint, ABltInfo^.hit), ABltInfo^.bullet.Owner);
       if ABltInfo^.hit.HP <= 0 then
         ABltInfo^.hit.SetAnimation(['React0', 'Death0'], False)
       else
@@ -1067,7 +1074,7 @@ begin
 end;
 
 constructor TBRA_Shoot.Create(const AUnit: TRoomUnit;
-  const ABullets: array of TRoomBullet; const ASkillAnimation: string;
+  const ABullets: array of TRoomBullet; const ASkill: IUnitSkill;
   const AShootDelay: Integer; const ABulletY: Single);
 var
   i, j: Integer;
@@ -1079,10 +1086,12 @@ var
 begin
   Assert(AUnit <> nil);
   Assert(Length(ABullets) > 0);
+  Assert(ASkill <> nil);
 
-  AUnit.SetAnimation([ASkillAnimation, 'Idle0'], True);
+  AUnit.SetAnimation([ASkill.Animation, 'Idle0'], True);
 
   FRoomUint := AUnit;
+  FSkill := ASkill;
   FShootDelay := FRoomUint.World.GameTime + AShootDelay;
   FBullets := TBulletInfoArr.Create();
   FBullets.Capacity := Length(ABullets);
@@ -1098,7 +1107,7 @@ begin
 
       FRoomUint.RoomDir := FRoomUint.Room.Direction(FRoomUint.RoomPos, ABullets[i].Target);
 
-      path := FRoomUint.Room.RayCastDist(ABullets[i].StartPt, ABullets[i].Target, ABullets[i].MaxRange, False);
+      path := FRoomUint.Room.RayCastDist(ABullets[i].StartPt, ABullets[i].Target, ABullets[i].MaxRange+1, False);
       path.Insert(0, ABullets[i].StartPt);
 
       bInfo.stop := FRoomUint.Room.UI.TilePosToWorldPos(ABullets[i].Target);
@@ -1107,7 +1116,7 @@ begin
       if ABullets[i].Target = ABullets[i].StartPt then
       begin
         obj := FRoomUint.Room.ObjectAt(ABullets[i].Target);
-        if (obj <> nil) and (obj is TRoomUnit) and (Random < ABullets[i].Accuracy(0)) then
+        if (obj <> nil) and (obj is TRoomUnit) and FSkill.SampleHitChance(FRoomUint, TRoomUnit(obj)) then
           bInfo.hit := TRoomUnit(obj);
         FBullets.Add(bInfo);
         Continue;
@@ -1127,7 +1136,7 @@ begin
           pt := FRoomUint.Room.UI.TilePosToWorldPos(path[j]);
           pt.y := ABulletY;
           pt := Projection(pt, Line(bInfo.start, bInfo.stop - bInfo.start));
-          if Random < ABullets[i].Accuracy(Len(pt - bInfo.start)) then
+          if FSkill.SampleHitChance(FRoomUint, TRoomUnit(obj)) then
           begin
             bInfo.stop := pt;
             bInfo.hit := TRoomUnit(obj);
@@ -1333,24 +1342,27 @@ begin
   if FRoomUnit.World.GameTime > FDamageStartTime then
   begin
     FDamageStartTime := HUGE;
-    FTarget.Room.AddAction(TBRA_MakeDamage.Create(FTarget, FRoomUnit, 50));
+    if FSkill.SampleHitChance(FRoomUnit, FTarget) then
+      FTarget.Room.AddAction(TBRA_MakeDamage.Create(FTarget, FRoomUnit, FSkill.SampleDamage(FRoomUnit, FTarget) ));
   end;
 
   Result := FRoomUnit.World.GameTime < FActionTime;
 end;
 
 constructor TBRA_UnitDefaultAttack.Create(const AUnit, ATarget: TRoomUnit;
-  const ASkillAnimation: string; const ADurationTime, ADamageStartTime: Integer);
+  const ASkill: IUnitSkill; const ADurationTime, ADamageStartTime: Integer);
 begin
   Assert(AUnit <> nil);
   Assert(ATarget <> nil);
+  Assert(ASkill <> nil);
+  FSkill := ASkill;
 
   FRoomUnit := AUnit;
   FTarget := ATarget;
   FActionTime := FRoomUnit.World.GameTime + ADurationTime;
   FDamageStartTime := FRoomUnit.World.GameTime + ADamageStartTime;
 
-  FRoomUnit.SetAnimation([ASkillAnimation, 'Idle0'], True);
+  FRoomUnit.SetAnimation([FSkill.Animation, 'Idle0'], True);
   FRoomUnit.RoomDir := FRoomUnit.Room.Direction(FRoomUnit.RoomPos, FTarget.RoomPos);
 end;
 

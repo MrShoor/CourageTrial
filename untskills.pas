@@ -8,7 +8,7 @@ unit untSkills;
 interface
 
 uses
-  Classes, SysUtils, untLevel, intfUtils;
+  Classes, SysUtils, untLevel, intfUtils, mutils;
 
 type
 
@@ -30,7 +30,12 @@ type
 
     function Cost : Integer; virtual; abstract;
     function Range: Single; virtual; abstract;
+    function Damage: TVec2i; virtual; abstract;
+    function Accuracy: TVec2; virtual; abstract;
+
     function Animation: string; virtual; abstract;
+    function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; virtual; abstract;
+    function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean; virtual; abstract;
 
     function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; virtual; abstract;
     function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; virtual; abstract;
@@ -49,9 +54,14 @@ type
     function Desc: string; override;
     function Ico : string; override;
 
-    function Cost : Integer; override;
-    function Range: Single; override;
+    function Cost    : Integer; override;
+    function Range   : Single; override;
+    function Damage  : TVec2i; override;
+    function Accuracy: TVec2; override;
+
     function Animation: string; override;
+    function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; override;
+    function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean; override;
 
     function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; override;
     function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
@@ -60,6 +70,8 @@ type
   { TSkill_Shoot }
 
   TSkill_Shoot = class(TUnitSkill)
+  private
+    function RangeT(AOwner, ATarget: TRoomUnit): Single;
   protected
     function WearedOnly: Boolean; override;
     function UseReady: Boolean; override;
@@ -68,9 +80,14 @@ type
     function Desc: string; override;
     function Ico : string; override;
 
-    function Cost : Integer; override;
-    function Range: Single; override;
+    function Cost    : Integer; override;
+    function Range   : Single; override;
+    function Damage  : TVec2i; override;
+    function Accuracy: TVec2; override;
+
     function Animation: string; override;
+    function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; override;
+    function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean; override;
 
     function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; override;
     function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
@@ -78,7 +95,21 @@ type
 
 implementation
 
+uses
+  Math;
+
 { TSkill_Shoot }
+
+function TSkill_Shoot.RangeT(AOwner, ATarget: TRoomUnit): Single;
+var fromPt, toPt: TVec3;
+    dist: Single;
+begin
+  //fromPt := AOwner.Room.UI.TilePosToWorldPos(AOwner.RoomPos);
+  //toPt := AOwner.Room.UI.TilePosToWorldPos(ATarget.RoomPos);
+  //dist := Len(fromPt - toPt);
+  dist := AOwner.Room.Distance(AOwner.RoomPos, ATarget.RoomPos);
+  Result := clamp( max(0, (dist - 2)) / (Range - 2), 0.0, 1.0 );
+end;
 
 function TSkill_Shoot.WearedOnly: Boolean;
 begin
@@ -117,9 +148,31 @@ begin
   Result := 20;
 end;
 
+function TSkill_Shoot.Damage: TVec2i;
+begin
+  Result := Vec(10, 30);
+end;
+
+function TSkill_Shoot.Accuracy: TVec2;
+begin
+  Result := Vec(0.9, 0.3);
+end;
+
 function TSkill_Shoot.Animation: string;
 begin
   Result := 'Archer_Bow_Attack0';
+end;
+
+function TSkill_Shoot.SampleDamage(AOwner, ATarget: TRoomUnit): Integer;
+var t: Single;
+begin
+  t := RangeT(AOwner, ATarget);
+  Result := Round( Lerp(Damage.y, Damage.x, sqrt(t)) );
+end;
+
+function TSkill_Shoot.SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean;
+begin
+  Result := Random < Lerp(Accuracy.x, Accuracy.y, RangeT(AOwner, ATarget));
 end;
 
 function TSkill_Shoot.DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
@@ -139,7 +192,7 @@ begin
   bullet.MaxRange := Range;
   bullet.Target := ATarget.RoomPos;
   bullet.StartPt := AOwner.RoomPos;
-  Result := TBRA_Shoot.Create(AOwner, [bullet], Animation, 1150, 1.37);
+  Result := TBRA_Shoot.Create(AOwner, [bullet], Self, 1150, 1.37);
 end;
 
 function TSkill_Shoot.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
@@ -207,9 +260,29 @@ begin
   Result := 1;
 end;
 
+function TSkill_Kick.Damage: TVec2i;
+begin
+  Result := Vec(25, 25);
+end;
+
+function TSkill_Kick.Accuracy: TVec2;
+begin
+  Result := Vec(1, 1);
+end;
+
 function TSkill_Kick.Animation: string;
 begin
   Result := 'Kick0';
+end;
+
+function TSkill_Kick.SampleDamage(AOwner, ATarget: TRoomUnit): Integer;
+begin
+  Result := RandomRange(Damage.x, Damage.y+1);
+end;
+
+function TSkill_Kick.SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean;
+begin
+  Result := True;
 end;
 
 function TSkill_Kick.DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
@@ -217,7 +290,7 @@ begin
   Result := nil;
   if not CanUse(ASkillIndex, AOwner, ATarget) then Exit;
   AOwner.AP := AOwner.AP - Cost;
-  Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Animation, 1000, 300);
+  Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Self, 1000, 300);
 end;
 
 function TSkill_Kick.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;

@@ -169,6 +169,28 @@ uses
 { TavmSkillHint }
 
 procedure TavmSkillHint.BuildTextLines;
+  function GetDamageStr: string;
+  var dmg: TVec2i;
+  begin
+    dmg := FSkill.Damage;
+    if dmg.x = dmg.y then
+      Result := IntToStr(dmg.x)
+    else
+      Result := IntToStr(dmg.x) + '-' + IntToStr(dmg.y);
+  end;
+
+  function GetAccuracyStr: string;
+  var acc: TVec2;
+  begin
+    acc := FSkill.Accuracy;
+    if acc.x > acc.y then
+      acc := acc.yx;
+    if acc.x = acc.y then
+      Result := IntToStr(Round(acc.x*100)) + '%'
+    else
+      Result := IntToStr(Round(acc.x*100)) + '-' + IntToStr(Round(acc.y*100)) + '%';
+  end;
+
 const cTextYSpace = 10;
       cTextXSpace = 30;
 var tb: ITextBuilder;
@@ -198,8 +220,10 @@ begin
 
   tb := Canvas.TextBuilder;
   tb.Align := laLeft;
+  tb.WriteLn('Урон: ' + GetDamageStr());
   tb.WriteLn('Стоимость: ' + IntToStr(FSkill.Cost));
   tb.WriteLn('Дистанция: ' + FormatFloat('0.0', FSkill.Range));
+  tb.WriteLn('Точность: ' + GetAccuracyStr());
   FStatsText := tb.Finish();
   FStatsText.BoundsX := Vec(cTextXSpace, FStatsText.MaxLineWidth());
 
