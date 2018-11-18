@@ -2773,6 +2773,7 @@ begin
 
   skills_ui := TavmSkills.Create(FRootControl);
   skills_ui.Pos := Vec(30, 10);
+  skills_ui.HintDirection := Vec(-0.7, 0.7);
   skills_ui.Skills := TAllSkillListAdapter.Create(FPlayer);
   FPlayerSkills := skills_ui;
 

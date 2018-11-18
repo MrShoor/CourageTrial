@@ -196,6 +196,7 @@ begin
   FSkillSlots.GridWidth := 10;
   FSkillSlots.GridHeight := 1;
   FSkillSlots.Origin := Vec(0.5, 0);
+  FSkillSlots.HintDirection := Vec(0, -1.5);
 end;
 
 procedure TavmUnitMenu.DrawControl(const AMat: TMat3);

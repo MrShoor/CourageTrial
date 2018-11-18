@@ -58,6 +58,24 @@ type
     function GetSkill(AIndex: Integer): IUnitSkill;
   end;
 
+  { TavmSkillHint }
+
+  TavmSkillHint = class(TavmCustomControl)
+  private
+    FSkill: IUnitSkill;
+
+    FNameText  : ITextLines;
+    FStatsText : ITextLines;
+    procedure BuildTextLines;
+    procedure SetSkill(AValue: IUnitSkill);
+  protected
+    procedure AfterRegister; override;
+    procedure DoValidate; override;
+    procedure HitTestLocal(const ALocalPt: TVec2; var AControl: TavmBaseControl); override;
+  public
+    property Skill: IUnitSkill read FSkill write SetSkill;
+  end;
+
   { TavmSkillHighlighter }
 
   TavmSkillHighlighter = class(TavmCustomControl)
@@ -70,6 +88,7 @@ type
     procedure AfterRegister; override;
     procedure DoValidate; override;
     procedure OnUPS; override;
+    procedure HitTestLocal(const ALocalPt: TVec2; var AControl: TavmBaseControl); override;
   public
     property Rect: TRectF read FRect write SetRect;
   end;
@@ -79,6 +98,7 @@ type
   TavmSkills = class(TavmCustomControl)
   private
     FSkillHighlighter: TavmSkillHighlighter;
+    FSkillHint: TavmSkillHint;
 
     FDraggedItem: Integer;
 
@@ -89,6 +109,10 @@ type
     FScroll: TavmDefaultScroll;
     FSkills: ISkillsList;
     FLastStateID: Integer;
+
+    FLastMoveTime: Int64;
+    FHintDirection: TVec2;
+
     procedure SetGridHeight(AValue: Integer);
     procedure SetGridWidth(AValue: Integer);
     procedure SetSkills(const AValue: ISkillsList);
@@ -102,9 +126,13 @@ type
     function ItemRect(CellX, CellY: Integer): TRectF;
     function ItemRect(AIndex: Integer): TRectF;
     function HitToItems(const APt: TVec2): Integer;
+    function SkillAt(const APt: TVec2): IUnitSkill;
   protected
     function GetBattleRoom: TBattleRoom;
 
+    procedure Notify_MouseEnter; override;
+    procedure Notify_MouseLeave; override;
+    procedure Notify_MouseMove(const APt: TVec2; AShifts: TShifts); override;
     procedure Notify_DragStart(ABtn: Integer; const APt: TVec2; AShifts: TShifts); override;
     procedure Notify_DragMove (ABtn: Integer; const APt: TVec2; AShifts: TShifts); override;
     procedure Notify_DragStop (ABtn: Integer; const APt: TVec2; AShifts: TShifts); override;
@@ -113,6 +141,7 @@ type
     procedure DrawControl(const AMat: TMat3); override;
     procedure DoValidate; override;
     procedure AfterRegister; override;
+    procedure OnUPS; override;
   private
     FActiveSkill: IUnitSkill;
     FDropPosition: Integer;
@@ -128,9 +157,96 @@ type
     property Skills : ISkillsList read FSkills write SetSkills;
     property ActiveSkill: IUnitSkill read FActiveSkill write SetActiveSkill;
     property VScroll: Boolean read GetVScroll write SetVScroll;
+
+    property HintDirection: TVec2 read FHintDirection write FHintDirection; // in range [-1; 1]
   end;
 
 implementation
+
+uses
+  Math;
+
+{ TavmSkillHint }
+
+procedure TavmSkillHint.BuildTextLines;
+const cTextYSpace = 10;
+      cTextXSpace = 30;
+var tb: ITextBuilder;
+    s : TVec2;
+begin
+  if FSkill = nil then
+  begin
+    FNameText  := nil;
+    FStatsText := nil;
+    Exit;
+  end;
+
+  Canvas.Font.Color := Vec(1,1,1,1);
+  Canvas.Font.Size  := 32;
+  Canvas.Font.Style := [gsBold];
+  tb := Canvas.TextBuilder;
+  tb.Align := laCenter;
+  tb.WriteLn(FSkill.Name);
+
+  Canvas.Font.Size := 24;
+  Canvas.Font.Style := [];
+  tb.Align := laLeft;
+  tb.WriteLn(FSkill.Desc);
+
+  FNameText := tb.Finish();
+  FNameText.BoundsX := Vec(cTextXSpace, FNameText.MaxLineWidth());
+
+  tb := Canvas.TextBuilder;
+  tb.Align := laLeft;
+  tb.WriteLn('Стоимость: ' + IntToStr(FSkill.Cost));
+  tb.WriteLn('Дистанция: ' + FormatFloat('0.0', FSkill.Range));
+  FStatsText := tb.Finish();
+  FStatsText.BoundsX := Vec(cTextXSpace, FStatsText.MaxLineWidth());
+
+  s.y := cTextYSpace;
+  s.y := s.y + FNameText.TotalHeight() + cTextYSpace;
+  FStatsText.BoundsY := Vec(s.y, s.y + FStatsText.TotalHeight());
+  s.y := s.y + FStatsText.TotalHeight() + cTextYSpace;
+
+  s.x := FNameText.MaxLineWidth();
+  s.x := Max(s.x, FStatsText.MaxLineWidth());
+  s.x := s.x + cTextXSpace*2;
+
+  Size := s;
+end;
+
+procedure TavmSkillHint.SetSkill(AValue: IUnitSkill);
+begin
+  if FSkill=AValue then Exit;
+  FSkill:=AValue;
+  BuildTextLines;
+end;
+
+procedure TavmSkillHint.AfterRegister;
+begin
+  inherited AfterRegister;
+  Size := Vec(200, 100);
+end;
+
+procedure TavmSkillHint.DoValidate;
+begin
+  inherited DoValidate;
+  Canvas.Clear;
+  Canvas.Brush.Color := Vec(0.125, 0.125, 0.125, 1);
+  Canvas.AddFill(Vec(0,0), Size);
+
+  Canvas.Pen.Color := Vec(0,0,0,1);
+  Canvas.Pen.Width := 1;
+  Canvas.AddRectangle(Vec(0,0), Size);
+
+  Canvas.AddText(FNameText);
+  Canvas.AddText(FStatsText);
+end;
+
+procedure TavmSkillHint.HitTestLocal(const ALocalPt: TVec2; var AControl: TavmBaseControl);
+begin
+  AControl := nil;
+end;
 
 { TavmSkillHighlighter }
 
@@ -246,6 +362,11 @@ procedure TavmSkillHighlighter.OnUPS;
 begin
   inherited OnUPS;
   Invalidate;
+end;
+
+procedure TavmSkillHighlighter.HitTestLocal(const ALocalPt: TVec2; var AControl: TavmBaseControl);
+begin
+  AControl := nil;
 end;
 
 { TRoomUnitArapter }
@@ -464,6 +585,17 @@ begin
   end;
 end;
 
+function TavmSkills.SkillAt(const APt: TVec2): IUnitSkill;
+var idx: Integer;
+begin
+  Result := nil;
+  if FSkills = nil then Exit;
+  idx := HitToItems(APt);
+  if idx < 0 then Exit;
+  if idx >= FSkills.Count then Exit;
+  Result := FSkills.GetSkill(idx);
+end;
+
 function TavmSkills.GetBattleRoom: TBattleRoom;
 var obj: TavObject;
 begin
@@ -473,6 +605,33 @@ begin
     if obj is TBattleRoom then Exit(TBattleRoom(obj));
   until obj = nil;
   Result := nil;
+end;
+
+procedure TavmSkills.Notify_MouseEnter;
+begin
+  inherited Notify_MouseEnter;
+  UPSSubscribe;
+end;
+
+procedure TavmSkills.Notify_MouseLeave;
+begin
+  inherited Notify_MouseLeave;
+  UPSUnSubscribe;
+  FSkillHint.Visible := False;
+end;
+
+procedure TavmSkills.Notify_MouseMove(const APt: TVec2; AShifts: TShifts);
+var rct: TRectF;
+begin
+  inherited Notify_MouseMove(APt, AShifts);
+  FLastMoveTime := Main.Time64;
+  FSkillHint.Skill := SkillAt(APt);
+  if FSkillHint.Skill <> nil then
+  begin
+    FSkillHint.Origin := Sign(FHintDirection) * Vec(-0.5, -0.5) + Vec(0.5, 0.5);
+    rct := ItemRect(HitToItems(APt));
+    FSkillHint.Pos := Lerp(rct.min, rct.max, FHintDirection * Vec(0.5, 0.5) + Vec(0.5, 0.5));
+  end;
 end;
 
 procedure TavmSkills.Notify_DragStart(ABtn: Integer; const APt: TVec2; AShifts: TShifts);
@@ -651,6 +810,19 @@ begin
   FSkillHighlighter.Pos := Vec(0,0);
   FSkillHighlighter.Size := Vec(0,0);
   FSkillHighlighter.Visible := False;
+
+  FSkillHint := TavmSkillHint.Create(Self);
+  FSkillHint.Pos := Vec(0,0);
+  FSkillHint.Origin := Vec(1, 0);
+  FSkillHint.Visible := False;
+end;
+
+procedure TavmSkills.OnUPS;
+begin
+  inherited OnUPS;
+  FSkillHint.Visible := (Main.Time64 - FLastMoveTime > 100) and
+                        (not FDragStarted[0]) and
+                        (FSkillHint.Skill <> nil);
 end;
 
 procedure TavmSkills.SetDropPosition(const AValue: Integer);
