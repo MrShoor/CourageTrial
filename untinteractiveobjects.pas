@@ -34,6 +34,18 @@ type
     function Interactive_Try(AUnit: TRoomUnit): IBRA_Action; override;
   end;
 
+  { TRoomAltar }
+
+  TRoomAltar = class(TRoomInteractiveObject)
+  private
+  public
+    function Interactive_CellsCount: Integer; override;
+    function Interactive_GetCell(AIndex: Integer): TVec2i; override;
+
+    function Interactive_Cost(AIndex: Integer): Integer; override;
+    function Interactive_Try(AUnit: TRoomUnit): IBRA_Action; override;
+  end;
+
 implementation
 
 type
@@ -54,6 +66,31 @@ type
     function ProcessAction: Boolean; override;
     constructor Create(AChest: TRoomChest; AUnit: TRoomUnit);
   end;
+
+{ TRoomAltar }
+
+function TRoomAltar.Interactive_CellsCount: Integer;
+begin
+  Result := 2;
+end;
+
+function TRoomAltar.Interactive_GetCell(AIndex: Integer): TVec2i;
+begin
+  if AIndex = 0 then
+    Result := Vec(0, 1)
+  else
+    Result := Vec(1, -1);
+end;
+
+function TRoomAltar.Interactive_Cost(AIndex: Integer): Integer;
+begin
+  Result := 2;
+end;
+
+function TRoomAltar.Interactive_Try(AUnit: TRoomUnit): IBRA_Action;
+begin
+  Result := nil; //todo pick item
+end;
 
 { TBRA_LootChestAction }
 
@@ -178,6 +215,7 @@ end;
 
 initialization
 RegRoomClass(TRoomChest);
+RegRoomClass(TRoomAltar);
 
 finalization
 

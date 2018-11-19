@@ -141,5 +141,6 @@ end;
 initialization
   RegRoomClass(TRoomWaypoint);
 
-end.
+finalization
 
+end.

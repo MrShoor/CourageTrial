@@ -44,8 +44,8 @@ type
     property RotateSens: Single read FRotateSens write FRotateSens;
     property WheelSens : Single read FWheelSens  write FWheelSens;
 
-    procedure LookAt(const APt: TVec3);
-    procedure LookAt(const APt, AViewDir: TVec3);
+    procedure LookAt(const APt: TVec3); overload;
+    procedure LookAt(const APt, AViewDir: TVec3); overload;
   end;
 
 implementation

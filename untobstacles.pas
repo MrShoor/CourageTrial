@@ -31,8 +31,17 @@ function LoadObstacles(const AFileName: string): IObstacleArr;
 
 implementation
 
+{$IfDef FPC}
 const
   cEmptyObstacle: TObstacleDesc = (name: ''; clsname: 'TObstacle'; cells: nil);
+{$Else}
+function cEmptyObstacle: TObstacleDesc;
+begin
+  Result.name := '';
+  Result.clsname := 'TObstacle';
+  Result.cells := nil;
+end;
+{$EndIf}
 
 function LoadObstacles(const AFileName: string): IObstacleArr;
 
@@ -99,8 +108,8 @@ end;
 procedure TObstacleDesc.WriteStream(const AStream: TStream);
 var n: Integer;
 begin
-  StreamWriteString(AStream, name);
-  StreamWriteString(AStream, clsname);
+  StreamWriteString(AStream, AnsiString(name));
+  StreamWriteString(AStream, AnsiString(clsname));
   n := cells.Count;
   AStream.WriteBuffer(n, SizeOf(n));
   if n > 0 then
@@ -109,10 +118,14 @@ end;
 
 procedure TObstacleDesc.ReadStream(const AStream: TStream);
 var n: Integer;
+    astr_name: AnsiString;
+    astr_clsname: AnsiString;
 begin
   n := 0;
-  StreamReadString(AStream, name);
-  StreamReadString(AStream, clsname);
+  StreamReadString(AStream, astr_name);
+  StreamReadString(AStream, astr_clsname);
+  name := string(astr_name);
+  clsname := string(astr_clsname);
   AStream.ReadBuffer(n, SizeOf(n));
   cells := TObstacleCellsArr.Create();
   if n > 0 then

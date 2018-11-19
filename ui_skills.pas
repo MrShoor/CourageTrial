@@ -1,4 +1,4 @@
-unit ui_skills;
+﻿unit ui_skills;
 
 {$IfDef FPC}
   {$mode objfpc}{$H+}
@@ -123,8 +123,8 @@ type
     procedure UpdateScroll;
     procedure ScrollEvent(ASender: TObject);
   private
-    function ItemRect(CellX, CellY: Integer): TRectF;
-    function ItemRect(AIndex: Integer): TRectF;
+    function ItemRect(CellX, CellY: Integer): TRectF; overload;
+    function ItemRect(AIndex: Integer): TRectF; overload;
     function HitToItems(const APt: TVec2): Integer;
     function SkillAt(const APt: TVec2): IUnitSkill;
   protected
@@ -730,7 +730,7 @@ end;
 
 procedure TavmSkills.DoValidate;
 
-  function GetCellSpriteInfo(AIndex: Integer; out AUseReady: Boolean): string;
+  function GetCellSpriteInfo(AIndex: Integer; out AUseReady: Boolean): string; overload;
   var skill: IUnitSkill;
   begin
     AUseReady := True;
@@ -743,7 +743,7 @@ procedure TavmSkills.DoValidate;
     Result := ExeRelativeFileName('ui\skills\'+skill.Ico);
   end;
 
-  function GetCellSpriteInfo(x,y: Integer; out AUseReady: Boolean): string;
+  function GetCellSpriteInfo(x,y: Integer; out AUseReady: Boolean): string; overload;
   begin
     Result := GetCellSpriteInfo(y * GridWidth + x, AUseReady);
   end;

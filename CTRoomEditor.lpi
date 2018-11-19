@@ -140,6 +140,7 @@
       <Unit7>
         <Filename Value="untinteractiveobjects.pas"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="untInteractiveObjects"/>
       </Unit7>
     </Units>
   </ProjectOptions>
@@ -160,6 +161,11 @@
         </Win32>
       </Options>
     </Linking>
+    <Other>
+      <CompilerMessages>
+        <IgnoredMessages idx5024="True"/>
+      </CompilerMessages>
+    </Other>
   </CompilerOptions>
   <Debugging>
     <Exceptions Count="3">

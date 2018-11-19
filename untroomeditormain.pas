@@ -3,14 +3,19 @@ unit untRoomEditorMain;
 {$IfDef FPC}
   {$mode objfpc}{$H+}
   {$ModeSwitch advancedrecords}
+{$Else}
+  {$Define DCC}
 {$EndIf}
 
 interface
 
 uses
   Windows,
+  {$IfDef FPC}
   LCLType,
-  Classes, SysUtils, FileUtil, Forms, Controls, Graphics, Dialogs, ExtCtrls,
+  FileUtil,
+  {$EndIf}
+  Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls,
   Menus, StdCtrls,
   avRes, avTypes, avCameraController,
   mutils,
@@ -35,6 +40,17 @@ type
     procedure ClearState();
     procedure CancelState();
   end;
+
+  {$IFnDef FPC}
+  TPanel = class(ExtCtrls.TPanel)
+  private
+    FOnPaint: TNotifyEvent;
+  protected
+    procedure Paint; override;
+  public
+    property OnPaint: TNotifyEvent read FOnPaint write FOnPaint;
+  end;
+  {$EndIf}
 
   { TfmrMain }
 
@@ -89,7 +105,11 @@ var
 
 implementation
 
-{$R *.lfm}
+{$IfnDef DCC}
+  {$R *.lfm}
+{$Else}
+  {$R *.dfm}
+{$EndIf}
 
 { TAddObjectState }
 
@@ -158,6 +178,8 @@ end;
 
 procedure TfmrMain.FormCreate(Sender: TObject);
 begin
+  RenderPanel.OnPaint := {$IfDef FPC}@{$EndIf}RenderPanelPaint;
+
   lbObjects.ItemHeight := cPreviewSize + 16;
 
   FMain := TavMainRender.Create(nil);
@@ -232,7 +254,8 @@ begin
   cnv.FillRect(ARect);
 
   cnv.Pen.Color := clBlack;
-  cnv.Line(ARect.Left, ARect.Bottom - 1, ARect.Right, ARect.Bottom - 1);
+  cnv.MoveTo(ARect.Left, ARect.Bottom - 1);
+  cnv.LineTo(ARect.Right, ARect.Bottom - 1);
 
   if odFocused in State then
     cnv.DrawFocusRect(ARect);
@@ -294,7 +317,7 @@ begin
       if obj is TObstacle then
       begin
         FState := easAddObject;
-        if ssShift in GetKeyShiftState then
+        if ssShift in {$IfDef FPC}GetKeyShiftState{$Else}KeyboardStateToShiftState{$EndIf} then
         begin
           FState_AddObject.SetStateNew(FRoom, TObstacle(obj).Obstacle);
           FState_AddObject.obstacle.RoomPos := obj.RoomPos;
@@ -394,6 +417,18 @@ begin
   for i := 0 to Length(FObstaclePreviews) - 1 do
     FreeAndNil(FObstaclePreviews[i]);
 end;
+
+{$IFnDef FPC}
+{ TPanel }
+
+procedure TPanel.Paint;
+begin
+  if Assigned(FOnPaint) then
+    FOnPaint(Self)
+  else
+    inherited;
+end;
+{$EndIf}
 
 end.
 

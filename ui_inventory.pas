@@ -38,8 +38,8 @@ type
     procedure UpdateScroll;
     procedure ScrollEvent(ASender: TObject);
   private
-    function ItemRect(CellX, CellY: Integer): TRectF;
-    function ItemRect(AIndex: Integer): TRectF;
+    function ItemRect(CellX, CellY: Integer): TRectF; overload;
+    function ItemRect(AIndex: Integer): TRectF; overload;
     function HitToItems(const APt: TVec2): Integer;
   protected
     procedure Notify_DragStart(ABtn: Integer; const APt: TVec2; AShifts: TShifts); override;
@@ -234,7 +234,7 @@ end;
 
 procedure TavmInventory.DoValidate;
 
-  function GetCellSpriteInfo(AIndex: Integer; out AEquipped: Boolean): string;
+  function GetCellSpriteInfo(AIndex: Integer; out AEquipped: Boolean): string; overload;
   var item: IUnitItem;
   begin
     AEquipped := False;
@@ -248,7 +248,7 @@ procedure TavmInventory.DoValidate;
     AEquipped := item.Equipped;
   end;
 
-  function GetCellSpriteInfo(x,y: Integer; out AEquipped: Boolean): string;
+  function GetCellSpriteInfo(x,y: Integer; out AEquipped: Boolean): string; overload;
   begin
     Result := GetCellSpriteInfo(y * GridWidth + x, AEquipped);
   end;

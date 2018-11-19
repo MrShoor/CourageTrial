@@ -1,4 +1,4 @@
-unit untLevel;
+﻿unit untLevel;
 
 {$Define DEBUGBOTS}
 
@@ -17,6 +17,10 @@ uses
   untObstacles;
 
 type
+  {$IfnDef FPC}
+  TStringArray = array of string;
+  {$EndIf}
+
   IRoomMapGraph = {$IfDef FPC}specialize{$EndIf} IMap<TVec2i>;
   IRoomMapNonWeightedGraph = {$IfDef FPC}specialize{$EndIf}INonWeightedGraph<TVec2i>;
   IRoomMapPF  = {$IfDef FPC}specialize{$EndIf} IAStar<TVec2i>;
@@ -296,8 +300,8 @@ type
     procedure SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean); virtual;
     function  GetUnitMoveSpeed: Single; virtual;
 
-    function FindPath(const ATarget: TVec2i): IRoomPath;
-    function FindPath(const ATarget: TVec2i; ATargetUnit: TRoomUnit): IRoomPath;
+    function FindPath(const ATarget: TVec2i): IRoomPath; overload;
+    function FindPath(const ATarget: TVec2i; ATargetUnit: TRoomUnit): IRoomPath; overload;
 
     function IsDead(): Boolean;
 
@@ -311,8 +315,8 @@ type
     property ViewRange: Single read FViewRange write FViewRange;
     property ViewWholeRange: Single read FViewWholeRange write FViewWholeRange;
     function InViewField(const APt: TVec2i): Boolean;
-    function CanSee(const APos: TVec2i): Boolean;
-    function CanSee(const AOtherUnit: TRoomUnit): Boolean;
+    function CanSee(const APos: TVec2i): Boolean; overload;
+    function CanSee(const AOtherUnit: TRoomUnit): Boolean; overload;
     function GetShootPoints(): IVec2iArr;
     function GetMovePointsWeighted(AMaxDepth: Integer): IVec2iWeightedSet;
     function GetMovePoints(AMaxDepth: Integer): IVec2iSet;
@@ -495,8 +499,8 @@ type
     function NeighbourTile(const ACurrent: TVec2i; const AIndex: Integer): TVec2i;
     function Distance(const APt1, APt2: TVec2i): Integer;
     function Direction(const APt1, APt2: TVec2i): Integer;
-    function RayCast(const APt1, APt2: TVec2i; const AllowHitBlockers: Boolean): IRoomPath;
-    function RayCast(const APt1, APt2: TVec2i; const AFilter: IRoomCellFilter): IRoomPath;
+    function RayCast(const APt1, APt2: TVec2i; const AllowHitBlockers: Boolean): IRoomPath; overload;
+    function RayCast(const APt1, APt2: TVec2i; const AFilter: IRoomCellFilter): IRoomPath; overload;
     function RayCastDist(const APt1, APt2: TVec2i; ADist: Single; const AllowHitBlockers: Boolean): IRoomPath;
     function RayCastBoolean(const APt1, APt2: TVec2i): Boolean;
     function GetShootPointsSet(const ASourcePt: TVec2i; const AViewRange: Single; const AInFilter: IVec2iSet): IVec2iSet;
@@ -739,6 +743,7 @@ type
 
     procedure GenerateFloor;
     procedure PreloadModels;
+    procedure PreloadInGameModels;
     procedure CreateUI;
   public
     procedure SetEditMode();
@@ -2848,6 +2853,14 @@ begin
 //  FSun.CastShadows := st2048;
 end;
 
+procedure TBattleRoom.PreloadInGameModels;
+begin
+  //FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
+  FWorld.Renderer.PreloadModels([ExeRelativeFileName('units\units.avm')]);
+  FWorld.Renderer.PreloadModels([ExeRelativeFileName('bullets\bullets.avm')]);
+  FWorld.Renderer.PreloadModels([ExeRelativeFileName('weapons\weapons.avm')]);
+end;
+
 procedure TBattleRoom.CreateUI;
 var
   menu: TavmUnitMenu;
@@ -3158,9 +3171,7 @@ var lantern: TLantern;
 begin
   PreloadModels;
   GenerateFloor;
-  //FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
-  FWorld.Renderer.PreloadModels([ExeRelativeFileName('units\units.avm')]);
-  FWorld.Renderer.PreloadModels([ExeRelativeFileName('bullets\bullets.avm')]);
+  PreloadInGameModels;
 
   obsDescIdx := -1;
   for i := 0 to FObstacles.Count - 1 do
@@ -3293,9 +3304,7 @@ var
   i: Integer;
 begin
   PreloadModels;
-  //FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
-  FWorld.Renderer.PreloadModels([ExeRelativeFileName('units\units.avm')]);
-  FWorld.Renderer.PreloadModels([ExeRelativeFileName('bullets\bullets.avm')]);
+  PreloadInGameModels;
 
   LoadObstacles();
   GenerateFloor();
@@ -3331,6 +3340,9 @@ begin
   FEmptyLight.CastShadows := st1024;
 end;
 
+{$IfDef FPC}
+  {$WARN 5044 off : Symbol "$1" is not portable}
+{$EndIf}
 procedure TBattleRoom.DrawObstaclePreview(const AName: String; const bmp: TBitmap);
 var inst: IavModelInstanceArr;
     bbox: TAABB;
@@ -3382,7 +3394,6 @@ begin
     pSrc := PVec4b(mipdata.Data);
     for j := 0 to bmp.Height - 1 do
     begin
-      {$WARN 5044 off : Symbol "$1" is not portable}
       pDst := bmp.ScanLine[j];
       for i := 0 to bmp.Width - 1 do
       begin
@@ -3398,6 +3409,9 @@ begin
   Main.Camera.At := oldAt;
   Main.Camera.Eye := oldEye;
 end;
+{$IfDef FPC}
+  {$WARN 5044 on : Symbol "$1" is not portable}
+{$EndIf}
 
 procedure TBattleRoom.SaveRoomMap(const AStream: TStream);
 var obs: TObstacle;
@@ -3422,6 +3436,7 @@ procedure TBattleRoom.LoadRoomMap(const AStream: TStream);
 var obs: TObstacle;
     obsCount: Integer;
     i: Integer;
+    astr_clsName : AnsiString;
     clsName : string;
     roomCls : TRoomObjectClass;
 begin
@@ -3430,7 +3445,8 @@ begin
 
   for i := 0 to obsCount - 1 do
   begin
-    StreamReadString(AStream, clsName);
+    StreamReadString(AStream, astr_clsName);
+    clsName := string(astr_clsName);
     roomCls := FindRoomClass(clsName);
     Assert(roomCls <> nil);
     Assert(roomCls.InheritsFrom(TObstacle));

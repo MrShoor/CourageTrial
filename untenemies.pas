@@ -1,4 +1,4 @@
-unit untEnemies;
+﻿unit untEnemies;
 
 {$IfDef FPC}
   {$mode objfpc}{$H+}
@@ -106,8 +106,8 @@ type
 
     function GetPointsOnRange(const AStartPoint: TVec2i; const ARange: Integer): IVec2iArr;
 
-    function GetHiddenNeighbours(const AOriginPts: IVec2iArr): IVec2iArr;
-    function GetHiddenNeighbours(const AOriginPt: TVec2i): IVec2iArr;
+    function GetHiddenNeighbours(const AOriginPts: IVec2iArr): IVec2iArr; overload;
+    function GetHiddenNeighbours(const AOriginPt: TVec2i): IVec2iArr; overload;
 
     function Action_MoveWithRoute(const ARoute: IRoomPath): IBRA_Action;
   protected
@@ -222,7 +222,7 @@ function TBotArcher1.TComparer_OptimalRouteForCheck.Compare(const Left, Right): 
     Result := 10000;
     for i := 0 to FCheckPts.Count - 1 do
     begin
-      dist := Room.Distance(FCheckPts[i], APt);
+      dist := Self.FRoom.Distance(FCheckPts[i], APt);
       if dist < Result then
         Result := dist;
     end;
@@ -500,7 +500,7 @@ begin
     begin
       Assert(movePtsWeighted.Contains(pt));
 
-      if not checkPtsWeighted.TryGetPValue(pt, pWeight) then
+      if not checkPtsWeighted.TryGetPValue(pt, Pointer(pWeight)) then
         checkPtsWeighted.Add(pt, 0)
       else
         Inc(pWeight^);
@@ -1208,7 +1208,7 @@ begin
     begin
       Assert(movePtsWeighted.Contains(pt));
 
-      if not checkPtsWeighted.TryGetPValue(pt, pWeight) then
+      if not checkPtsWeighted.TryGetPValue(pt, Pointer(pWeight)) then
         checkPtsWeighted.Add(pt, 0)
       else
         Inc(pWeight^);
