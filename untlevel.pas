@@ -82,6 +82,24 @@ type
   IUnitSkillArr = {$IfDef FPC}specialize{$EndIf}IArray<IUnitSkill>;
   TUnitSkillArr = {$IfDef FPC}specialize{$EndIf}TArray<IUnitSkill>;
 
+  TUnitBuffKind = (bkPowerUp, bkStun, bkBleed, bkPoison, bkDebuff);
+  IUnitBuff = interface
+    function Name: string;
+    function Desc: string;
+    function Ico : string;
+
+    function Duration: Integer;
+    function Kind: TUnitBuffKind;
+
+    function Owner : TRoomUnit;
+    function AtUnit: TRoomUnit;
+
+    procedure SetUnit(const AUnit: TRoomUnit);
+    function DoStep: Boolean;
+  end;
+  IUnitBuffsArr = {$IfDef FPC}specialize{$EndIf}IArray<IUnitBuff>;
+  TUnitBuffsArr = {$IfDef FPC}specialize{$EndIf}TArray<IUnitBuff>;
+
   { IUnitItem }
 
   IUnitItem = interface
@@ -242,6 +260,8 @@ type
     procedure SetMaxHP(const AValue: Integer);
     procedure SetPreview96_128(const AValue: string);
   protected
+    FBuffs: IUnitBuffsArr;
+
     FAnimationPrefix: string;
     FUnitSkills   : IUnitSkillArr;
     FEquippedItem : array [TRoomUnitEqSlot] of IUnitItem;
@@ -264,6 +284,8 @@ type
 
     property SkillSlots: IUnitSkillArr read FSlots10 write FSlots10;
     function AllSkills(): IUnitSkillArr;
+    function AllBuffs(): IUnitBuffsArr;
+    procedure ProcessBuffs;
 
     function Inventory(): IInventory; override;
     procedure Unequip(const ASlot: TRoomUnitEqSlot);
@@ -296,6 +318,7 @@ type
     function GetMovePoints(AMaxDepth: Integer): IVec2iSet;
     function GetVisible(): Boolean; override;
 
+    procedure ApplyBuff(ABuff: IUnitBuff); virtual;
     procedure DealDamage(ADmg: Integer; AFromUnit: TRoomUnit); virtual;
   end;
   TRoomUnitArr = {$IfDef FPC}specialize{$EndIf} TArray<TRoomObject>;
@@ -755,7 +778,7 @@ function  FindRoomClass(const AName: string): TRoomObjectClass;
 implementation
 
 uses
-  untEnemies, untGraphics, ui_unit, ui_inventory, ui_skills, ui_gamecamera, untItems, untSkills;
+  untEnemies, untGraphics, ui_unit, ui_inventory, ui_skills, ui_gamecamera, untItems, untSkills, untBuffs;
 
 type
   IRoomClassesMap = {$IfDef FPC}specialize{$EndIf}IHashMap<string, TRoomObjectClass>;
@@ -1597,6 +1620,23 @@ begin
   Result := FAllSkillsCache;
 end;
 
+function TRoomUnit.AllBuffs(): IUnitBuffsArr;
+begin
+  Result := FBuffs;
+end;
+
+procedure TRoomUnit.ProcessBuffs;
+var i: Integer;
+begin
+  for i := 0 to FBuffs.Count - 1 do
+    if not FBuffs[i].DoStep then
+      FBuffs[i] := nil;
+
+  for i := FBuffs.Count - 1 downto 0 do
+    if FBuffs[i] = nil then
+      FBuffs.Delete(i);
+end;
+
 function TRoomUnit.Inventory(): IInventory;
 begin
   Result := FInventory;
@@ -1623,6 +1663,8 @@ begin
   FSlots10 := TUnitSkillArr.Create();
   FSlots10.SetSize(10);
   FInventory := TUnitInventory.Create(Self);
+
+  FBuffs := TUnitBuffsArr.Create();
 end;
 
 procedure TRoomUnit.WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType);
@@ -1756,6 +1798,15 @@ begin
   else
     Result := Room.CurrentPlayer.CanSee(Self);
   {$EndIf}
+end;
+
+procedure TRoomUnit.ApplyBuff(ABuff: IUnitBuff);
+begin
+  if ABuff <> nil then
+  begin
+    FBuffs.Add(ABuff);
+    ABuff.SetUnit(Self);
+  end;
 end;
 
 procedure TRoomUnit.DealDamage(ADmg: Integer; AFromUnit: TRoomUnit);
@@ -2975,9 +3026,15 @@ begin
     EndTurn()
   else
   begin
-    if (unt is TBot) then TBot(unt).NewTurn();
-    if (unt is TPlayer) then
-      FMessages.AddMessage('Ваш ход');
+    unt.ProcessBuffs;
+    //if (unt.AP <= 0) then
+    //  EndTurn()
+    //else
+    begin
+      if (unt is TBot) then TBot(unt).NewTurn();
+      if (unt is TPlayer) then
+        FMessages.AddMessage('Ваш ход');
+    end;
   end;
 end;
 
@@ -3247,6 +3304,7 @@ begin
   //FPlayer.SetRoomPosDir(Vec(5, 5), 0);
   FPlayer.LoadModels();
   FPlayer.SetRoomPosDir(GetSpawnPlace(), Random(6));
+  FPlayer.ApplyBuff(TBuff_Stun.Create(FPlayer, 3));
   FUnits.Add(FPlayer);
 
   for i := 0 to {$IfDef DEBUGBOTS}0{$Else}6{$EndIf} do

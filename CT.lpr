@@ -10,7 +10,7 @@ uses
   Interfaces, // this includes the LCL widgetset
   Forms, untMain, untLevel, untEnemies, untGraphics, ui_unit, untObstacles,
   untItems, ui_inventory, ui_gamecamera, untWayPoint, untSkills, ui_skills,
-  ui_scroll, untInteractiveObjects, ui_messages
+  ui_scroll, untInteractiveObjects, ui_messages, untbuffs
   { you can add units after this };
 
 {$R *.res}

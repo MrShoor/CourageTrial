@@ -49,6 +49,8 @@ type
 
 implementation
 
+uses Math;
+
 { TavmUnitBtn }
 
 procedure TavmUnitBtn.DoValidate;
@@ -104,6 +106,10 @@ end;
 
 procedure TavmUnitMenu.DoValidate;
 
+const
+  cBuffCellSize = 48;
+  cBuffSpacing = 5;
+
   procedure BuildHPText(const lt, rb: TVec2);
   var text: ITextLines;
   begin
@@ -124,6 +130,8 @@ var lt, rb, elsize: TVec2;
     cellname: string;
     border: Single;
     i: Integer;
+
+    buffs: IUnitBuffsArr;
 begin
   inherited DoValidate;
   Canvas.Clear;
@@ -171,6 +179,19 @@ begin
     Canvas.AddSprite(cellpos - Vec(13, 13), cellpos + Vec(13, 13), cellname);
   end;
   FLastAP := RoomUnit.AP;
+
+  //Buffs bar
+  buffs := RoomUnit.AllBuffs();
+  for i := 0 to buffs.Count - 1 do
+  begin
+    cellpos.y := -35 - cBuffCellSize div 2;
+    cellpos.x := (size.x - (buffs.Count * cBuffCellSize + (buffs.Count - 1) * cBuffSpacing)) * 0.5;
+    cellpos.x := cellpos.x + (i+0.5) * cBuffCellSize + Max(i - 1, 0) * cBuffSpacing;
+
+    cellpos.x := cellpos.x - cBuffCellSize div 2;
+    cellpos.y := cellpos.y - cBuffCellSize div 2;
+    Canvas.AddSprite(cellpos, cellpos + Vec(cBuffCellSize, cBuffCellSize), 'ui\buffs\' + buffs[i].Ico);
+  end;
 
   //
   lt := Vec(32, Size.y*0.5 - 64);
