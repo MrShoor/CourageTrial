@@ -11,7 +11,7 @@ interface
 
 uses
   Graphics,
-  Math, intfUtils,
+  Math,
   Classes, SysUtils, avBase, avRes, bWorld, mutils, bLights, avMesh, avTypes, avTess, avContnrs, avContnrsDefaults,
   avPathFinder, avMiniControls, avModel, avTexLoader, ui_messages,
   untObstacles;
@@ -714,7 +714,7 @@ type
     FOtherInventory : TavmCustomControl;
     FMessages: TavmMessages;
 
-    FSun: IavSpotLight;
+    //FSun: IavSpotLight;
 
     procedure OnEndTurnBtnClick(ASender: TObject);
   private
@@ -3061,7 +3061,7 @@ procedure TBattleRoom.Draw();
     bounds_max: TVec2i;
     x, y: Integer;
     movedObj: TRoomObject;
-    shootPts: IVec2iArr;
+    //shootPts: IVec2iArr;
   begin
     FMap.UI.ClearTileColors();
     if IsPlayerTurn then

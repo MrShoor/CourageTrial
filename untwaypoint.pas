@@ -8,11 +8,8 @@ unit untWayPoint;
 interface
 
 uses
-  Math,
-  intfUtils,
-  Classes, SysUtils, avBase, avRes, bWorld, mutils, bLights, avMesh, avTypes, avTess, avContnrs, avContnrsDefaults,
-  avModel,
-  avPathFinder, untLevel;
+  Classes, SysUtils, avBase, avRes, mutils, avTypes, avTess, avContnrsDefaults,
+  untLevel;
 
 type
 

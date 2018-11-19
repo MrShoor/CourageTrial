@@ -5,7 +5,6 @@ unit untMain;
 interface
 
 uses
-  Windows,
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, untLevel, avRes, avTypes, mutils;
 
 type

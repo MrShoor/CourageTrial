@@ -10,9 +10,9 @@ interface
 uses
   Math,
   intfUtils,
-  Classes, SysUtils, avBase, avRes, bWorld, mutils, bLights, avMesh, avTypes, avTess, avContnrs, avContnrsDefaults,
+  Classes, SysUtils, avBase, avRes, bWorld, mutils, avMesh, avTypes, avTess, avContnrs, avContnrsDefaults,
   avModel,
-  avPathFinder, untLevel,
+  untLevel,
   untWayPoint;
 
 type
@@ -1187,7 +1187,7 @@ var movePtsWeighted: IVec2iWeightMap;
     i: Integer;
 
     ptsList: IVec4iArr;
-    cmp: IComparer;
+    //cmp: IComparer;
 begin
   Result := nil;
   if AP < 4 then Exit;

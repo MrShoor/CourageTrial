@@ -8,7 +8,7 @@ unit ui_unit;
 interface
 
 uses
-  Classes, SysUtils, avMiniControls, avCanvas, untLevel, mutils, intfUtils, ui_skills;
+  Classes, SysUtils, avMiniControls, avCanvas, untLevel, mutils, ui_skills;
 
 type
 
@@ -128,7 +128,6 @@ const
 var lt, rb, elsize: TVec2;
     cellpos: TVec2;
     cellname: string;
-    border: Single;
     i: Integer;
 
     buffs: IUnitBuffsArr;

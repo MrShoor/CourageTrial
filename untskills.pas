@@ -101,7 +101,7 @@ uses
 { TSkill_Shoot }
 
 function TSkill_Shoot.RangeT(AOwner, ATarget: TRoomUnit): Single;
-var fromPt, toPt: TVec3;
+var //fromPt, toPt: TVec3;
     dist: Single;
 begin
   //fromPt := AOwner.Room.UI.TilePosToWorldPos(AOwner.RoomPos);

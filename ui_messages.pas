@@ -8,7 +8,7 @@ unit ui_messages;
 interface
 
 uses
-  Classes, SysUtils, avBase, avRes, avMiniControls, avCanvas, mutils, avTypes, ui_scroll, intfUtils, avContnrs;
+  Classes, SysUtils, avRes, avMiniControls, avCanvas, mutils, avTypes, avContnrs;
 
 type
   { TavmMessages }
