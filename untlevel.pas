@@ -13,7 +13,7 @@ uses
   Graphics,
   Math, intfUtils,
   Classes, SysUtils, avBase, avRes, bWorld, mutils, bLights, avMesh, avTypes, avTess, avContnrs, avContnrsDefaults,
-  avPathFinder, avMiniControls, avModel, avTexLoader,
+  avPathFinder, avMiniControls, avModel, avTexLoader, ui_messages,
   untObstacles;
 
 type
@@ -459,6 +459,7 @@ type
     function NextPointOnRay(const APt: TVec2i; const ADir, ADirStep: TVec2i): TVec2i;
   protected
     procedure AfterRegister; override;
+    function GetBattleRoom: TBattleRoom;
   public
     property InEditMode: Boolean read FInEditMode write FInEditMode;
     property UI: TRoomUI read FRoomUI;
@@ -466,6 +467,7 @@ type
     property Radius: Integer read FRadius write SetRadius;
 
     procedure Draw();
+    procedure AddMessage(const AStr: string);
 
     function NeighbourTile(const ACurrent: TVec2i; const AIndex: Integer): TVec2i;
     function Distance(const APt1, APt2: TVec2i): Integer;
@@ -687,6 +689,7 @@ type
     FPlayerInventory: TavmCustomControl;
     FPlayerSkills   : TavmCustomControl;
     FOtherInventory : TavmCustomControl;
+    FMessages: TavmMessages;
 
     FSun: IavSpotLight;
 
@@ -718,6 +721,7 @@ type
     procedure SetEditMode();
     procedure UI_SetOtherInventory(const AInventory: IInventory);
     procedure UI_SetPlayerActiveSkill(const ASkill: IUnitSkill);
+    procedure UI_AddMessage(const AMsg: string);
 
     property MovedTile: TVec2i read FMovedTile;
     property Player: TPlayer read FPlayer;
@@ -1155,6 +1159,10 @@ begin
 
       FBullets.Add(bInfo);
     end;
+
+  if FBullets.Count = 1 then
+    if FBullets[0].hit = nil then
+      FRoomUint.Room.AddMessage('Промах!');
 end;
 
 { TRoomBullet }
@@ -1610,6 +1618,7 @@ end;
 procedure TRoomUnit.AfterRegister;
 begin
   inherited AfterRegister;
+  Name := 'Игрок';
   FUnitSkills := TUnitSkillArr.Create();
   FSlots10 := TUnitSkillArr.Create();
   FSlots10.SetSize(10);
@@ -1751,11 +1760,18 @@ end;
 
 procedure TRoomUnit.DealDamage(ADmg: Integer; AFromUnit: TRoomUnit);
 var msg: TbFlyOutMessage;
+    s: string;
 begin
   HP := HP - ADmg;
 
   msg := TbFlyOutMessage.Create(World);
   msg.SetState(Pos+Vec(0,1.5,0), IntToStr(ADmg), Vec(1,0,0,1));
+
+  s := Name + ' получает ' + IntToStr(ADmg) + ' урона';
+  if IsDead() then
+    Room.AddMessage(s + ' и умирает')
+  else
+    Room.AddMessage(s);
 end;
 
 procedure TRoomUnit.SetAP(const AValue: Integer);
@@ -2215,9 +2231,28 @@ begin
   FInventoryObjects := TRoomObjectSet.Create;
 end;
 
+function TRoomMap.GetBattleRoom: TBattleRoom;
+var obj: TavObject;
+begin
+  obj := Self;
+  repeat
+    obj := obj.Parent;
+    if obj is TBattleRoom then Exit(TBattleRoom(obj));
+  until obj = nil;
+  Result := nil;
+end;
+
 procedure TRoomMap.Draw();
 begin
   FRoomUI.DrawUI();
+end;
+
+procedure TRoomMap.AddMessage(const AStr: string);
+var brom: TBattleRoom;
+begin
+  brom := GetBattleRoom;
+  if brom = nil then Exit;
+  brom.UI_AddMessage(AStr);
 end;
 
 function TRoomMap.Distance(const APt1, APt2: TVec2i): Integer;
@@ -2775,6 +2810,9 @@ begin
   lookAt := FMap.UI.TilePosToWorldPos(FPlayer.RoomPos);
   TavmCameraControl(FRootControl).LookAt(lookAt, -lookAt);
 
+  FMessages := TavmMessages.Create(FRootControl);
+  FMessages.Origin := Vec(0, 1);
+
   menu := TavmUnitMenu.Create(FRootControl);
   menu.OnEndTurnClick := {$IfDef FPC}@{$EndIf}OnEndTurnBtnClick;
   FUnitMenu := menu;
@@ -2826,6 +2864,12 @@ begin
   if skills.IndexOf(ASkill) < 0 then Exit;
   if not ASkill.UseReady then Exit;
   SetActiveSkillInternal(ASkill);
+end;
+
+procedure TBattleRoom.UI_AddMessage(const AMsg: string);
+begin
+  if FMessages = nil then Exit;
+  FMessages.AddMessage(AMsg);
 end;
 
 procedure TBattleRoom.KeyPress(KeyCode: Integer);
@@ -2932,6 +2976,8 @@ begin
   else
   begin
     if (unt is TBot) then TBot(unt).NewTurn();
+    if (unt is TPlayer) then
+      FMessages.AddMessage('Ваш ход');
   end;
 end;
 
@@ -2944,8 +2990,10 @@ procedure TBattleRoom.Draw();
 
   procedure AlignControls;
   begin
-    if FPlayerSkills = nil then Exit;
-    FPlayerSkills.Pos := Vec(Main.WindowSize.x - 10, 10);
+    if FPlayerSkills <> nil then
+      FPlayerSkills.Pos := Vec(Main.WindowSize.x - 10, 10);
+    if FMessages <> nil then
+      FMessages.Pos := Vec(10, Main.WindowSize.y - 200);
   end;
 
   procedure DrawTileMap;

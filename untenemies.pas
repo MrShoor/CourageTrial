@@ -553,6 +553,7 @@ var
   i: Integer;
   bow: IUnitItem;
 begin
+  Name := 'Лучница';
   ViewRange := 16;
   ViewAngle := Pi/3+EPS;
   ViewWholeRange := 2.5;
@@ -1253,6 +1254,7 @@ end;
 
 procedure TBotMutant1.LoadModels();
 begin
+  Name := 'Мутант';
   ViewRange := 10;
   ViewAngle := Pi/3+EPS;
   ViewWholeRange := 2.5;

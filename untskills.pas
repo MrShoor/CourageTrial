@@ -184,6 +184,8 @@ begin
   if not CanUse(ASkillIndex, AOwner, ATarget) then Exit;
   AOwner.AP := AOwner.AP - Cost;
 
+  AOwner.Room.AddMessage(AOwner.Name + ' стреляет');
+
   bullet := TRoomBullet.Create(AOwner.Room);
   bullet.LoadModels('Erika_Archer_Arrow_Mesh');
   bullet.Owner := AOwner;
@@ -290,6 +292,7 @@ begin
   Result := nil;
   if not CanUse(ASkillIndex, AOwner, ATarget) then Exit;
   AOwner.AP := AOwner.AP - Cost;
+  AOwner.Room.AddMessage(AOwner.Name + ' наносит удар');
   Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Self, 1000, 300);
 end;
 
