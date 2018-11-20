@@ -60,12 +60,12 @@ uses untSkills;
 
 function TAxe.Slot: TRoomUnitEqSlot;
 begin
-  Result := TRoomUnitEqSlot.esNone;
+  Result := TRoomUnitEqSlot.esRightHand;
 end;
 
 function TAxe.Model: string;
 begin
-  Result := '';
+  Result := 'Axe0';
 end;
 
 function TAxe.Ico48: string;

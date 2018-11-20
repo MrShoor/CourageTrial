@@ -8,7 +8,7 @@ unit untInteractiveObjects;
 interface
 
 uses
-  Classes, SysUtils, avBase, untLevel, untObstacles, avModel, avMesh, mutils, untItems;
+  Classes, SysUtils, bWorld, avBase, untLevel, untObstacles, avModel, avMesh, mutils, untItems;
 
 type
 
@@ -38,7 +38,18 @@ type
 
   TRoomAltar = class(TRoomInteractiveObject)
   private
+    FItem: IUnitItem;
+    FItemInstance: IavModelInstance;
+    FAnim: IavAnimationController;
+    procedure Equip(const AItem: IUnitItem);
+  protected
+    procedure UpdateStep; override;
+    procedure AfterRegister; override;
   public
+    procedure WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType); override;
+  public
+    procedure LoadModels(const AObstacle: TObstacleDesc); override;
+
     function Interactive_CellsCount: Integer; override;
     function Interactive_GetCell(AIndex: Integer): TVec2i; override;
 
@@ -68,6 +79,54 @@ type
   end;
 
 { TRoomAltar }
+
+procedure TRoomAltar.Equip(const AItem: IUnitItem);
+var
+  m: TMat4;
+  inst: IavModelInstanceArr;
+begin
+  FItem := AItem;
+
+  m := FModels[0].Mesh.BindPoseTransform;
+  inst := World.Renderer.CreateModelInstances([AItem.Model]);
+  inst[0].Mesh.Transform := m;
+  inst[0].Mesh.Pose := FModels[0].Mesh.Pose;
+  inst[0].Mesh.Transform := Transform();
+  FItemInstance := inst[0];
+end;
+
+procedure TRoomAltar.UpdateStep;
+begin
+  inherited UpdateStep;
+  if FAnim <> nil then
+  begin
+    FAnim.SetTime(World.GameTime);
+    FItemInstance.Mesh.Transform := Transform();
+  end;
+end;
+
+procedure TRoomAltar.AfterRegister;
+begin
+  inherited AfterRegister;
+  SubscribeForUpdateStep;
+end;
+
+procedure TRoomAltar.WriteModels(const ACollection: IavModelInstanceArr;
+  AType: TModelType);
+begin
+  inherited WriteModels(ACollection, AType);
+  if AType = mtDefault then
+    ACollection.Add(FItemInstance);
+end;
+
+procedure TRoomAltar.LoadModels(const AObstacle: TObstacleDesc);
+begin
+  inherited LoadModels(AObstacle);
+  FAnim := Create_IavAnimationController(FModels[0].Mesh.Pose, World.GameTime);
+  FAnim.AnimationSequence_StartAndStopOther(['Altar_Idle0'], True);
+
+  Equip(TArcherBow.Create);
+end;
 
 function TRoomAltar.Interactive_CellsCount: Integer;
 begin

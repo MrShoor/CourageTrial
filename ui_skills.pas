@@ -220,10 +220,10 @@ begin
 
   tb := Canvas.TextBuilder;
   tb.Align := laLeft;
-  tb.WriteLn('Урон: ' + GetDamageStr());
-  tb.WriteLn('Стоимость: ' + IntToStr(FSkill.Cost));
-  tb.WriteLn('Дистанция: ' + FormatFloat('0.0', FSkill.Range));
-  tb.WriteLn('Точность: ' + GetAccuracyStr());
+  tb.WriteLn(string('Урон: ') + GetDamageStr());
+  tb.WriteLn(string('Стоимость: ') + IntToStr(FSkill.Cost));
+  tb.WriteLn(string('Дистанция: ') + FormatFloat('0.0', FSkill.Range));
+  tb.WriteLn(string('Точность: ') + GetAccuracyStr());
   FStatsText := tb.Finish();
   FStatsText.BoundsX := Vec(cTextXSpace, FStatsText.MaxLineWidth());
 

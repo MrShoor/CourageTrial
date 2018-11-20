@@ -2648,7 +2648,6 @@ begin
   FSlots10[0] := FUnitSkills[0];
 
   bow := TArcherBow.Create;
-  Equip(bow);
   Inventory().Push(bow, 0);
   FSlots10[1] := bow.Skill(0);
 
@@ -2657,6 +2656,7 @@ begin
 
   axe := TAxe.Create;
   Inventory().Push(axe, 0);
+  Equip(axe);
   axe := TAxe.Create;
   Inventory().Push(axe, 0);
 
