@@ -38,6 +38,8 @@ type
 
   IVec2iArr = {$IfDef FPC}specialize{$EndIf}IArray<TVec2i>;
   TVec2iArr = {$IfDef FPC}specialize{$EndIf}TArray<TVec2i>;
+  IVec3iArr = {$IfDef FPC}specialize{$EndIf}IArray<TVec3i>;
+  TVec3iArr = {$IfDef FPC}specialize{$EndIf}TArray<TVec3i>;
   IVec2iSet = {$IfDef FPC}specialize{$EndIf}IHashSet<TVec2i>;
   TVec2iSet = {$IfDef FPC}specialize{$EndIf}THashSet<TVec2i>;
 
@@ -58,23 +60,30 @@ type
   TRoomUnit = class;
 
   TRoomUnitEqSlot = (esNone, esLeftHand, esRightHand, esBothHands);
+  TUnitItemKind = (ikUnknown, ikConsumable, ikBow, ikAxe);
+const
+  cUnitItemKindNames : array [TUnitItemKind] of string = ('???', 'Съедобное', 'Лук', 'Топор');
 
+type
   IUnitItem = interface;
 
   IUnitSkill = interface
     function Item: IUnitItem;
     function Idx : Integer;
     function WearedOnly: Boolean;
-    function UseReady: Boolean;
+    function UseReady(AUnit: TRoomUnit): Boolean;
 
     function Name: string;
     function Desc: string;
     function Ico : string;
 
-    function Cost    : Integer;
-    function Range   : Single;
-    function Damage  : TVec2i;
-    function Accuracy: TVec2;
+    function Cost       : Integer;
+    function Range      : Single;
+    function Damage     : TVec2i;
+    function DamageScale: Single;
+    function Accuracy   : TVec2;
+
+    function Req_WeaponType: TUnitItemKind;
 
     function Animation: string;
     function SampleDamage(AOwner, ATarget: TRoomUnit): Integer;
@@ -104,16 +113,17 @@ type
   IUnitBuffsArr = {$IfDef FPC}specialize{$EndIf}IArray<IUnitBuff>;
   TUnitBuffsArr = {$IfDef FPC}specialize{$EndIf}TArray<IUnitBuff>;
 
-  { IUnitItem }
-
   IUnitItem = interface
   ['{E6D665A9-3E67-43A8-891E-32B835887FB8}']
     function  GetEquipped: Boolean;
     procedure SetEquipped(const AValue: Boolean);
 
-    function Slot       : TRoomUnitEqSlot;
-    function Model      : string;
-    function Ico48      : string;
+    function Kind  : TUnitItemKind;
+    function Slot  : TRoomUnitEqSlot;
+    function Model : string;
+    function Ico48 : string;
+
+    function Weapon_Damage: TVec2i;
 
     function SkillsCount: Integer;
     function Skill(ASkillIndex: Integer): IUnitSkill;
@@ -184,8 +194,12 @@ type
   { TRoomFloor }
 
   TRoomFloor = class(TbGameObject)
+  private
+    FDoors: array[0..5] of IavModelInstance;
   protected
     procedure ValidateTransform; override;
+    procedure AddHexFloor(const AMap: TRoomMap);
+    procedure AddWalls(const AMap: TRoomMap; const ADoors: array of Boolean);
   public
     procedure LoadModels(const AMap: TRoomMap);
   end;
@@ -294,6 +308,7 @@ type
     function Inventory(): IInventory; override;
     procedure Unequip(const ASlot: TRoomUnitEqSlot);
     function  Equip(const AItem: IUnitItem): Boolean;
+    function  GetEquip(const ASlot: TRoomUnitEqSlot): IUnitItem;
 
     procedure LoadModels(); virtual;
 
@@ -385,6 +400,7 @@ type
     function GetTileAtCoords(const ACoord: TVec2): TVec2i; overload;
 
     function TilePosToWorldPos(const ATilePos: TVec2i): TVec3;
+    function TileToWorldTransform(const ATilePos: TVec2i; const ATileRot: Integer): TMat4;
 
     function AutoTileColor(const APos: TVec2i): TTileColorID;
 
@@ -553,37 +569,6 @@ type
 
     function Interactive_Cost(AIndex: Integer): Integer; virtual;
     function Interactive_Try(AUnit: TRoomUnit): IBRA_Action; virtual;
-  end;
-
-
-  { TLantern }
-
-  TLantern = class (TObstacle)
-  private const
-    cLightSrcPos: TVec3 = (x: 0.89635; y: 2.51368; z: 0.03713);
-  private
-    FLight: IavPointLight;
-  protected
-    procedure SetRoomDir(const AValue: Integer); override;
-    procedure SetRoomPos(const AValue: TVec2i); override;
-  public
-    procedure LoadModels(const AObstacle: TObstacleDesc); override;
-    procedure SetRoomPosDir(const APos: TVec2i; const ADir: Integer; const AAutoRegister: Boolean = True); override;
-  end;
-
-  { TBrazier }
-
-  TBrazier = class (TObstacle)
-  private const
-    cLightSrcPos: TVec3 = (x: 0.0; y: 1.0; z: 0.0);
-  private
-    FLight: IavPointLight;
-  protected
-    procedure SetRoomDir(const AValue: Integer); override;
-    procedure SetRoomPos(const AValue: TVec2i); override;
-  public
-    procedure LoadModels(const AObstacle: TObstacleDesc); override;
-    procedure SetRoomPosDir(const APos: TVec2i; const ADir: Integer; const AAutoRegister: Boolean = True); override;
   end;
 
   { TPlayer }
@@ -786,7 +771,7 @@ function  FindRoomClass(const AName: string): TRoomObjectClass;
 implementation
 
 uses
-  untEnemies, untGraphics, ui_unit, ui_inventory, ui_skills, ui_gamecamera, untItems, untSkills, untBuffs;
+  untEnemies, untGraphics, ui_unit, ui_inventory, ui_skills, ui_gamecamera, untItems, untSkills, untBuffs, untRoomObstacles;
 
 type
   IRoomClassesMap = {$IfDef FPC}specialize{$EndIf}IHashMap<string, TRoomObjectClass>;
@@ -935,9 +920,9 @@ begin
   //inherited ValidateTransform;
 end;
 
-procedure TRoomFloor.LoadModels(const AMap: TRoomMap);
+procedure TRoomFloor.AddHexFloor(const AMap: TRoomMap);
 var idx: Integer;
-    i, j: Integer;
+    i, j, n: Integer;
     hex: array [0..4] of IVec2iArr;
     meshInst: IavMeshInstance;
 begin
@@ -952,18 +937,86 @@ begin
       //idx := Random(5) + 1;
       idx := WeightedRandom([5, 50, 2, 1, 1]);
       hex[idx].Add(Vec(i,j));
-
-      //AddModel('Hex'+IntToStr(idx), mtDefault);
-      //FModels.Last.Mesh.Transform := MatTranslate(AMap.UI.TilePosToWorldPos(Vec(i,j)));
     end;
 
   for j := 0 to Length(hex) - 1 do
   begin
     meshInst := World.Renderer.FindPrefabInstances('Hex'+IntToStr(j+1));
-    FModels.Add(World.Renderer.ModelsCollection.AddFromMesh(meshInst.Mesh, hex[j].Count));
+    n := FModels.Add(World.Renderer.ModelsCollection.AddFromMesh(meshInst.Mesh, hex[j].Count));
     for i := 0 to hex[j].Count - 1 do
-      FModels[j].MultiMesh[i].Transform := MatTranslate(AMap.UI.TilePosToWorldPos(hex[j][i]));
+      FModels[n].MultiMesh[i].Transform := MatTranslate(AMap.UI.TilePosToWorldPos(hex[j][i]));
   end;
+end;
+
+procedure TRoomFloor.AddWalls(const AMap: TRoomMap; const ADoors: array of Boolean);
+var OWall: array[0..1] of IVec3iArr;
+    OWallConn: IVec3iArr;
+    v, vCenter: TVec2i;
+    i, j, n: Integer;
+    meshInst: IavMeshInstance;
+    tileDir: Integer;
+    tilePos: TVec2i;
+begin
+  Assert(Length(ADoors) = 6);
+  Assert(AMap.Radius mod 2 = 0, 'Odd map radius is not valid');
+
+  OWall[0] := TVec3iArr.Create();
+  OWall[1] := TVec3iArr.Create();
+  OWallConn := TVec3iArr.Create();
+
+  vCenter := Vec(-AMap.Radius div 2, AMap.Radius);
+  for j := 0 to 5 do
+  begin
+    if ADoors[j] then
+    begin
+      tileDir := j;
+      tilePos := TTileUtils.RotateTileCoord(vCenter, tileDir);
+
+      FDoors[j] := World.Renderer.CreateModelInstances(['Door'])[0];
+      FDoors[j].Mesh.Transform := AMap.UI.TileToWorldTransform(tilePos, tileDir);
+      FModels.Add(FDoors[j]);
+    end
+    else
+      OWall[Random(2)].Add(Vec(vCenter, j));
+
+    for i := 1 to (AMap.Radius div 3) div 2 do
+    begin
+      v := vCenter + Vec(i * 3, 0);
+      OWall[Random(2)].Add(Vec(v, j));
+      OWallConn.Add(Vec(v, j));
+
+      v := vCenter - Vec(i * 3, 0);
+      OWall[Random(2)].Add(Vec(v, j));
+      OWallConn.Add(Vec(v + Vec(3, 0), j));
+    end;
+  end;
+
+  for j := 0 to Length(OWall) - 1 do
+  begin
+    meshInst := World.Renderer.FindPrefabInstances('OWall'+IntToStr(j));
+    n := FModels.Add(World.Renderer.ModelsCollection.AddFromMesh(meshInst.Mesh, OWall[j].Count));
+    for i := 0 to OWall[j].Count - 1 do
+    begin
+      tileDir := OWall[j][i].z;
+      tilePos := TTileUtils.RotateTileCoord(OWall[j][i].xy, tileDir);
+      FModels[n].MultiMesh[i].Transform := AMap.UI.TileToWorldTransform(tilePos, tileDir);
+    end;
+  end;
+
+  meshInst := World.Renderer.FindPrefabInstances('OWall2');
+  n := FModels.Add(World.Renderer.ModelsCollection.AddFromMesh(meshInst.Mesh, OWallConn.Count));
+  for i := 0 to OWallConn.Count - 1 do
+  begin
+    tileDir := OWallConn[i].z;
+    tilePos := TTileUtils.RotateTileCoord(OWallConn[i].xy, tileDir);
+    FModels[n].MultiMesh[i].Transform := AMap.UI.TileToWorldTransform(tilePos, tileDir);
+  end;
+end;
+
+procedure TRoomFloor.LoadModels(const AMap: TRoomMap);
+begin
+  AddHexFloor(AMap);
+  AddWalls(AMap, [True, True, True, True, True, False]);
   FTransformValid := True;
 end;
 
@@ -1041,39 +1094,6 @@ end;
 constructor TRoomCellFilter_ExcludeUnits.Create(const ARoom: TRoomMap);
 begin
   FRoom := ARoom;
-end;
-
-{ TBrazier }
-
-procedure TBrazier.SetRoomDir(const AValue: Integer);
-begin
-  inherited SetRoomDir(AValue);
-  FLight.Pos := cLightSrcPos * Transform();
-end;
-
-procedure TBrazier.SetRoomPos(const AValue: TVec2i);
-begin
-  inherited SetRoomPos(AValue);
-  FLight.Pos := cLightSrcPos * Transform();
-end;
-
-procedure TBrazier.LoadModels(const AObstacle: TObstacleDesc);
-begin
-  inherited LoadModels(AObstacle);
-  FLight := World.Renderer.CreatePointLight();
-  FLight.Pos := cLightSrcPos;
-  FLight.Radius := 5;
-  FLight.Size := 0.1;
-  //FLight.Color := Vec(1,1,1.0)*4.41;
-  FLight.Color := Pow(Vec(1,0.655,0),1.0)*4.41*2*4;
-  FLight.CastShadows := st512;
-end;
-
-procedure TBrazier.SetRoomPosDir(const APos: TVec2i; const ADir: Integer;
-  const AAutoRegister: Boolean);
-begin
-  inherited SetRoomPosDir(APos, ADir, AAutoRegister);
-  FLight.Pos := cLightSrcPos * Transform();
 end;
 
 { TBRA_Shoot }
@@ -1616,6 +1636,11 @@ begin
   Result := True;
 end;
 
+function TRoomUnit.GetEquip(const ASlot: TRoomUnitEqSlot): IUnitItem;
+begin
+  Result := FEquippedItem[ASlot];
+end;
+
 function TRoomUnit.AllSkills(): IUnitSkillArr;
 var i, j: Integer;
     items: IUnitItemArr;
@@ -2081,6 +2106,11 @@ begin
   Result := Vec(v.x, 0, v.y);
 end;
 
+function TRoomUI.TileToWorldTransform(const ATilePos: TVec2i; const ATileRot: Integer): TMat4;
+begin
+  Result := Mat4(Quat(Vec(0, 1, 0), 2 * Pi * (ATileRot / 6)), TilePosToWorldPos(ATilePos));
+end;
+
 function TRoomUI.AutoTileColor(const APos: TVec2i): TTileColorID;
 var rm: TRoomMap;
     obj: TRoomObject;
@@ -2512,7 +2542,7 @@ end;
 
 function TRoomMap.IsCellExists(const APos: TVec2i): Boolean;
 begin
-  Result := Distance(Vec(0,0), APos) <= FRadius;
+  Result := Distance(Vec(0,0), APos) <= (FRadius - 1);
 end;
 
 function TRoomMap.IsCellBlocked(const APos: TVec2i): Boolean;
@@ -2661,12 +2691,13 @@ begin
   FAnimationPrefix := 'Hero_';
 
   FUnitSkills.Add(TSkill_Kick.Create(nil, 0));
+  FUnitSkills.Add(TSkill_Shoot.Create(nil, 0));
 
   FSlots10[0] := FUnitSkills[0];
+  FSlots10[1] := FUnitSkills[1];
 
   bow := TArcherBow.Create;
   Inventory().Push(bow, 0);
-  FSlots10[1] := bow.Skill(0);
 
   bow := TArcherBow.Create;
   Inventory().Push(bow, 0);
@@ -2695,38 +2726,6 @@ begin
   HP := MaxHP;
 
   Preview96_128 := 'ui\units\player.png';
-end;
-
-{ TLantern }
-
-procedure TLantern.SetRoomDir(const AValue: Integer);
-begin
-  inherited SetRoomDir(AValue);
-  FLight.Pos := cLightSrcPos * Transform();
-end;
-
-procedure TLantern.SetRoomPos(const AValue: TVec2i);
-begin
-  inherited SetRoomPos(AValue);
-  FLight.Pos := cLightSrcPos * Transform();
-end;
-
-procedure TLantern.LoadModels(const AObstacle: TObstacleDesc);
-begin
-  inherited LoadModels(AObstacle);
-  FLight := World.Renderer.CreatePointLight();
-  FLight.Pos := cLightSrcPos;
-  FLight.Radius := 10;
-  FLight.Size := 0.1;
-  //FLight.Color := Vec(1,1,1.0)*4.41;
-  FLight.Color := Pow(Vec(1,0.655,0),1.0)*4.41*4;
-  FLight.CastShadows := st512;
-end;
-
-procedure TLantern.SetRoomPosDir(const APos: TVec2i; const ADir: Integer; const AAutoRegister: Boolean);
-begin
-  inherited SetRoomPosDir(APos, ADir, AAutoRegister);
-  FLight.Pos := cLightSrcPos * Transform();
 end;
 
 { TBattleRoom }
@@ -2768,7 +2767,7 @@ begin
 
   //update active skill information
   if FPlayerActiveSkill <> nil then
-    if not FPlayerActiveSkill.UseReady then
+    if not FPlayerActiveSkill.UseReady(FPlayer) then
       UI_SetPlayerActiveSkill(nil);
   if FPlayerSkills <> nil then
     TavmSkills(FPlayerSkills).ActiveSkill := FPlayerActiveSkill;
@@ -2943,7 +2942,7 @@ begin
 
   skills := FPlayer.AllSkills();
   if skills.IndexOf(ASkill) < 0 then Exit;
-  if not ASkill.UseReady then Exit;
+  if not ASkill.UseReady(FPlayer) then Exit;
   SetActiveSkillInternal(ASkill);
 end;
 
@@ -3181,80 +3180,11 @@ procedure TBattleRoom.Generate();
     end;
   end;
 
-var lantern: TLantern;
-    bot: TBot;
-
-    obsDescIdx, i: Integer;
+var bot: TBot;
 begin
   PreloadModels;
   GenerateFloor;
   PreloadInGameModels;
-
-  obsDescIdx := -1;
-  for i := 0 to FObstacles.Count - 1 do
-    if FObstacles[i].name = 'Lantern' then
-    begin
-      obsDescIdx := i;
-      Break;
-    end;
-
-  if obsDescIdx > 0 then
-  begin
-    lantern := TLantern.Create(FMap);
-    lantern.LoadModels(FObstacles[obsDescIdx]);
-    lantern.SetRoomPosDir(Vec(0,0), 0);
-    FLanterns.Add(lantern);
-
-    //lantern := TLantern.Create(FMap);
-    //lantern.LoadModels();
-    //lantern.SetRoomPosDir(Vec(3,0), 1);
-    //FLanterns.Add(lantern);
-    //
-    //lantern := TLantern.Create(FMap);
-    //lantern.LoadModels();
-    //lantern.SetRoomPosDir(Vec(6,0), 2);
-    //FLanterns.Add(lantern);
-    //
-    //lantern := TLantern.Create(FMap);
-    //lantern.LoadModels();
-    //lantern.SetRoomPosDir(Vec(9,0), 3);
-    //FLanterns.Add(lantern);
-    //
-    //lantern := TLantern.Create(FMap);
-    //lantern.LoadModels();
-    //lantern.SetRoomPosDir(Vec(12,0), 4);
-    //FLanterns.Add(lantern);
-
-    lantern := TLantern.Create(FMap);
-    lantern.LoadModels(FObstacles[obsDescIdx]);
-    lantern.SetRoomPosDir(Vec(15,0), 5);
-    FLanterns.Add(lantern);
-
-    //lantern := TLantern.Create(FMap);
-    //lantern.LoadModels();
-    //lantern.SetRoomPosDir(Vec(0,3), 1);
-    //FLanterns.Add(lantern);
-    //
-    //lantern := TLantern.Create(FMap);
-    //lantern.LoadModels();
-    //lantern.SetRoomPosDir(Vec(0,6), 2);
-    //FLanterns.Add(lantern);
-    //
-    //lantern := TLantern.Create(FMap);
-    //lantern.LoadModels();
-    //lantern.SetRoomPosDir(Vec(0,9), 3);
-    //FLanterns.Add(lantern);
-    //
-    //lantern := TLantern.Create(FMap);
-    //lantern.LoadModels();
-    //lantern.SetRoomPosDir(Vec(0,12), 4);
-    //FLanterns.Add(lantern);
-    //
-    //lantern := TLantern.Create(FMap);
-    //lantern.LoadModels();
-    //lantern.SetRoomPosDir(Vec(0,15), 5);
-    //FLanterns.Add(lantern);
-  end;
 
   FPlayer := TPlayer.Create(FMap);
   //FPlayer.SetRoomPosDir(Vec(5, 5), 0);
@@ -3479,7 +3409,5 @@ end;
 
 initialization
   RegRoomClass(TObstacle);
-  RegRoomClass(TLantern);
-  RegRoomClass(TBrazier);
 
 end.

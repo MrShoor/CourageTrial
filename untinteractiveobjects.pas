@@ -135,7 +135,8 @@ begin
   if FAnim <> nil then
   begin
     FAnim.SetTime(World.GameTime);
-    FItemInstance.Mesh.Transform := Transform();
+    if FItemInstance <> nil then
+      FItemInstance.Mesh.Transform := Transform();
   end;
 end;
 
@@ -173,7 +174,8 @@ begin
   FAnim := Create_IavAnimationController(FModels[0].Mesh.Pose, World.GameTime);
   FAnim.AnimationSequence_StartAndStopOther(['Altar_Idle0'], True);
 
-  Equip(TArcherBow.Create);
+  if not Room.InEditMode then
+    Equip(TArcherBow.Create);
 end;
 
 function TRoomAltar.Interactive_CellsCount: Integer;

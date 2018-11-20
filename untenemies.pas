@@ -567,6 +567,8 @@ begin
   Equip(bow);
   Inventory().Push(bow, 0);
 
+  FUnitSkills.Add(TSkill_Shoot.Create(nil, 0));
+
   FAnimationPrefix := 'Archer_';
 
   SetLength(FAnim, FModels.Count);
@@ -662,12 +664,12 @@ begin
           end;
 
           availPts := AP - FBS_SeeEnemy.OptimalRoute.Count;
-          if (FEquippedItem[esBothHands] <> nil) and (availPts > FEquippedItem[esBothHands].Skill(0).Cost) then
+          if (FEquippedItem[esBothHands] <> nil) and (availPts > FUnitSkills[0].Cost) then
           begin
             if (FBS_SeeEnemy.OptimalRoute.Count = 0) or
                (FRoom.Distance(RoomPos, FBS_SeeEnemy.Enemy.RoomPos) < FRoom.Distance(FBS_SeeEnemy.OptimalRoute.Last, FBS_SeeEnemy.Enemy.RoomPos)) then
             begin
-              Result := FEquippedItem[esBothHands].Skill(0).DoAction(0, Self, FBS_SeeEnemy.Enemy);
+              Result := FUnitSkills[0].DoAction(0, Self, FBS_SeeEnemy.Enemy);
               Exit;
             end
             else

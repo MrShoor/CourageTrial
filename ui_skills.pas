@@ -17,6 +17,7 @@ const
 type
   ISkillsList = interface
     function StateID: Integer;
+    function RoomUnit: TRoomUnit;
     function  PopSkill(AIndex: Integer): IUnitSkill;
     procedure PushSkill(AIndex: Integer; const ASkill: IUnitSkill);
     function Count: Integer;
@@ -28,9 +29,8 @@ type
   TRoomUnitArapter = class(TInterfacedObject)
   private
     FUnit: IWeakRef;// TRoomUnit;
-  protected
-    function RoomUnit: TRoomUnit;
   public
+    function RoomUnit: TRoomUnit;
     constructor Create(AUnit: TRoomUnit);
   end;
 
@@ -66,6 +66,7 @@ type
 
     FNameText  : ITextLines;
     FStatsText : ITextLines;
+    FReqText   : ITextLines;
     procedure BuildTextLines;
     procedure SetSkill(AValue: IUnitSkill);
   protected
@@ -179,6 +180,14 @@ procedure TavmSkillHint.BuildTextLines;
       Result := IntToStr(dmg.x) + '-' + IntToStr(dmg.y);
   end;
 
+  function GetDamageScaleStr: string;
+  begin
+    if frac(FSkill.DamageScale) = 0 then
+      Result := FormatFloat('0', FSkill.DamageScale)+'x'
+    else
+      Result := FormatFloat('0.0', FSkill.DamageScale)+'x';
+  end;
+
   function GetAccuracyStr: string;
   var acc: TVec2;
   begin
@@ -221,19 +230,30 @@ begin
   tb := Canvas.TextBuilder;
   tb.Align := laLeft;
   tb.WriteLn(string('Урон: ') + GetDamageStr());
+  tb.WriteLn(string('Сила урона: ') + GetDamageScaleStr());
   tb.WriteLn(string('Стоимость: ') + IntToStr(FSkill.Cost));
   tb.WriteLn(string('Дистанция: ') + FormatFloat('0.0', FSkill.Range));
   tb.WriteLn(string('Точность: ') + GetAccuracyStr());
   FStatsText := tb.Finish();
   FStatsText.BoundsX := Vec(cTextXSpace, FStatsText.MaxLineWidth());
 
+  tb := Canvas.TextBuilder;
+  tb.Align := laLeft;
+  if FSkill.Req_WeaponType <> ikUnknown then
+    tb.WriteLn('Оружие: ' + cUnitItemKindNames[FSkill.Req_WeaponType]);
+  FReqText := tb.Finish();
+  FReqText.BoundsX := Vec(cTextXSpace, FReqText.MaxLineWidth());
+
   s.y := cTextYSpace;
   s.y := s.y + FNameText.TotalHeight() + cTextYSpace;
   FStatsText.BoundsY := Vec(s.y, s.y + FStatsText.TotalHeight());
   s.y := s.y + FStatsText.TotalHeight() + cTextYSpace;
+  FReqText.BoundsY := Vec(s.y, s.y + FReqText.TotalHeight());
+  s.y := s.y + FReqText.TotalHeight() + cTextYSpace;
 
   s.x := FNameText.MaxLineWidth();
   s.x := Max(s.x, FStatsText.MaxLineWidth());
+  s.x := Max(s.x, FReqText.MaxLineWidth());
   s.x := s.x + cTextXSpace*2;
 
   Size := s;
@@ -265,6 +285,7 @@ begin
 
   Canvas.AddText(FNameText);
   Canvas.AddText(FStatsText);
+  Canvas.AddText(FReqText);
 end;
 
 procedure TavmSkillHint.HitTestLocal(const ALocalPt: TVec2; var AControl: TavmBaseControl);
@@ -739,7 +760,7 @@ procedure TavmSkills.DoValidate;
     if AIndex >= FSkills.Count then Exit('');
     skill := FSkills.GetSkill(AIndex);
     if skill = nil then Exit('');
-    AUseReady := skill.UseReady;
+    AUseReady := skill.UseReady(FSkills.RoomUnit);
     Result := ExeRelativeFileName('ui\skills\'+skill.Ico);
   end;
 

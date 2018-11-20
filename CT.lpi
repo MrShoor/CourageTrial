@@ -115,7 +115,7 @@
         <PackageName Value="LCL"/>
       </Item4>
     </RequiredPackages>
-    <Units Count="16">
+    <Units Count="17">
       <Unit0>
         <Filename Value="CT.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -192,6 +192,11 @@
         <Filename Value="ui_messages.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit15>
+      <Unit16>
+        <Filename Value="untroomobstacles.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="untRoomObstacles"/>
+      </Unit16>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

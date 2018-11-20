@@ -8,10 +8,9 @@ unit untItems;
 interface
 
 uses
-  Classes, SysUtils, untLevel, intfUtils;
+  Classes, SysUtils, untLevel, intfUtils, mutils;
 
 type
-
   { TUnitItem }
 
   TUnitItem = class(TWeakedInterfacedObject, IUnitItem)
@@ -22,9 +21,12 @@ type
     function  GetEquipped: Boolean;
     procedure SetEquipped(const AValue: Boolean);
 
+    function Kind  : TUnitItemKind;   virtual; abstract;
     function Slot  : TRoomUnitEqSlot; virtual; abstract;
     function Model : string;          virtual; abstract;
     function Ico48 : string;          virtual; abstract;
+
+    function Weapon_Damage: TVec2i; virtual;
 
     function SkillsCount: Integer; virtual;
     function Skill(ASkillIndex: Integer): IUnitSkill; virtual;
@@ -36,27 +38,34 @@ type
 
   TArcherBow = class(TUnitItem)
   public
+    function Kind  : TUnitItemKind;   override;
     function Slot  : TRoomUnitEqSlot; override;
     function Model : string;          override;
     function Ico48 : string;          override;
-  public
-    constructor Create; override;
+
+    function Weapon_Damage: TVec2i; override;
   end;
 
   { TAxe }
 
   TAxe = class(TUnitItem)
   public
+    function Kind  : TUnitItemKind;   override;
     function Slot  : TRoomUnitEqSlot; override;
     function Model : string;          override;
     function Ico48 : string;          override;
+
+    function Weapon_Damage: TVec2i; override;
   end;
 
 implementation
 
-uses untSkills;
-
 { TAxe }
+
+function TAxe.Kind: TUnitItemKind;
+begin
+  Result := ikAxe;
+end;
 
 function TAxe.Slot: TRoomUnitEqSlot;
 begin
@@ -73,6 +82,11 @@ begin
   Result := 'axe.png';
 end;
 
+function TAxe.Weapon_Damage: TVec2i;
+begin
+  Result := Vec(30, 40);
+end;
+
 { TUnitItem }
 
 function TUnitItem.GetEquipped: Boolean;
@@ -84,6 +98,11 @@ procedure TUnitItem.SetEquipped(const AValue: Boolean);
 begin
   if Slot = esNone then Exit;
   FEquipped := AValue;
+end;
+
+function TUnitItem.Weapon_Damage: TVec2i;
+begin
+  Result := Vec(0,0);
 end;
 
 function TUnitItem.SkillsCount: Integer;
@@ -103,6 +122,11 @@ end;
 
 { TArcherBow }
 
+function TArcherBow.Kind: TUnitItemKind;
+begin
+  Result := ikBow;
+end;
+
 function TArcherBow.Slot: TRoomUnitEqSlot;
 begin
   Result := esBothHands;
@@ -118,11 +142,9 @@ begin
   Result := 'bow.png';
 end;
 
-constructor TArcherBow.Create;
+function TArcherBow.Weapon_Damage: TVec2i;
 begin
-  inherited Create;
-  SetLength(FSkills, 1);
-  FSkills[0] := TSkill_Shoot.Create(Self, 0);
+  Result := Vec(10, 30);
 end;
 
 end.

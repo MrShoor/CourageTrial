@@ -85,3 +85,12 @@ N Altar
 C TRoomAltar
 O 0 0 0
 O 1 0 0
+N TorchStand
+C TTorchStand
+O 0 0 0
+N Door
+O 0 0 1
+O 1 0 1
+O -1 0 1
+N Coll2
+O 0 0 1

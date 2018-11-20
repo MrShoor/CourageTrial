@@ -22,7 +22,7 @@ type
     function Item: IUnitItem;
     function Idx : Integer;
     function WearedOnly: Boolean; virtual; abstract;
-    function UseReady: Boolean; virtual; abstract;
+    function UseReady(AUnit: TRoomUnit): Boolean; virtual; abstract;
 
     function Name: string; virtual; abstract;
     function Desc: string; virtual; abstract;
@@ -31,14 +31,17 @@ type
     function Cost : Integer; virtual; abstract;
     function Range: Single; virtual; abstract;
     function Damage: TVec2i; virtual; abstract;
+    function DamageScale: Single; virtual; abstract;
     function Accuracy: TVec2; virtual; abstract;
+
+    function Req_WeaponType: TUnitItemKind; virtual;
 
     function Animation: string; virtual; abstract;
     function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; virtual; abstract;
     function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean; virtual; abstract;
 
     function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; virtual; abstract;
-    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; virtual; abstract;
+    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; virtual;
   public
     constructor Create(const AItem: IUnitItem; const AIndex: Integer);
   end;
@@ -48,16 +51,17 @@ type
   TSkill_Kick = class(TUnitSkill)
   protected
     function WearedOnly: Boolean; override;
-    function UseReady: Boolean; override;
+    function UseReady(AUnit: TRoomUnit): Boolean; override;
 
     function Name: string; override;
     function Desc: string; override;
     function Ico : string; override;
 
-    function Cost    : Integer; override;
-    function Range   : Single; override;
-    function Damage  : TVec2i; override;
-    function Accuracy: TVec2; override;
+    function Cost        : Integer; override;
+    function Range       : Single; override;
+    function Damage      : TVec2i; override;
+    function DamageScale : Single; override;
+    function Accuracy    : TVec2; override;
 
     function Animation: string; override;
     function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; override;
@@ -74,16 +78,19 @@ type
     function RangeT(AOwner, ATarget: TRoomUnit): Single;
   protected
     function WearedOnly: Boolean; override;
-    function UseReady: Boolean; override;
+    function UseReady(AUnit: TRoomUnit): Boolean; override;
 
     function Name: string; override;
     function Desc: string; override;
     function Ico : string; override;
 
-    function Cost    : Integer; override;
-    function Range   : Single; override;
-    function Damage  : TVec2i; override;
-    function Accuracy: TVec2; override;
+    function Cost        : Integer; override;
+    function Range       : Single; override;
+    function Damage      : TVec2i; override;
+    function DamageScale : Single; override;
+    function Accuracy    : TVec2; override;
+
+    function Req_WeaponType: TUnitItemKind; override;
 
     function Animation: string; override;
     function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; override;
@@ -116,11 +123,14 @@ begin
   Result := True;
 end;
 
-function TSkill_Shoot.UseReady: Boolean;
+function TSkill_Shoot.UseReady(AUnit: TRoomUnit): Boolean;
 var itm: IUnitItem;
 begin
-  itm := Item;
-  Result := itm.Equipped;
+  if AUnit = nil then Exit(False);
+  itm := AUnit.GetEquip(esBothHands);
+  if itm = nil then Exit(False);
+  if itm.Kind <> ikBow then Exit(False);
+  Result := True;
 end;
 
 function TSkill_Shoot.Name: string;
@@ -150,12 +160,22 @@ end;
 
 function TSkill_Shoot.Damage: TVec2i;
 begin
-  Result := Vec(10, 30);
+  Result := Vec(0, 0);
+end;
+
+function TSkill_Shoot.DamageScale: Single;
+begin
+  Result := 1;
 end;
 
 function TSkill_Shoot.Accuracy: TVec2;
 begin
   Result := Vec(0.9, 0.3);
+end;
+
+function TSkill_Shoot.Req_WeaponType: TUnitItemKind;
+begin
+  Result := ikBow;
 end;
 
 function TSkill_Shoot.Animation: string;
@@ -165,9 +185,16 @@ end;
 
 function TSkill_Shoot.SampleDamage(AOwner, ATarget: TRoomUnit): Integer;
 var t: Single;
+    itm: IUnitItem;
+    dmg: TVec2i;
 begin
+  itm := AOwner.GetEquip(esBothHands);
+  if itm = nil then Exit(0);
   t := RangeT(AOwner, ATarget);
-  Result := Round( Lerp(Damage.y, Damage.x, sqrt(t)) );
+  dmg := itm.Weapon_Damage + Damage;
+  dmg.x := Round(dmg.x * DamageScale);
+  dmg.y := Round(dmg.y * DamageScale);
+  Result := Round( Lerp(dmg.y, dmg.x, sqrt(t)) );
 end;
 
 function TSkill_Shoot.SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean;
@@ -199,6 +226,9 @@ end;
 
 function TSkill_Shoot.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
 begin
+  Result := inherited CanUse(ASkillIndex, AOwner, ATarget, AReservedPoints);
+  if not Result then Exit;
+
   Result := False;
   if AOwner.AP - AReservedPoints < Cost then Exit;
   Result := True;
@@ -218,6 +248,16 @@ begin
   Result := FIndex;
 end;
 
+function TUnitSkill.Req_WeaponType: TUnitItemKind;
+begin
+  Result := ikUnknown;
+end;
+
+function TUnitSkill.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
+begin
+  Result := UseReady(AOwner);
+end;
+
 constructor TUnitSkill.Create(const AItem: IUnitItem; const AIndex: Integer);
 begin
   if AItem <> nil then
@@ -232,7 +272,7 @@ begin
   Result := False;
 end;
 
-function TSkill_Kick.UseReady: Boolean;
+function TSkill_Kick.UseReady(AUnit: TRoomUnit): Boolean;
 begin
   Result := True;
 end;
@@ -267,6 +307,11 @@ begin
   Result := Vec(25, 25);
 end;
 
+function TSkill_Kick.DamageScale: Single;
+begin
+  Result := 1;
+end;
+
 function TSkill_Kick.Accuracy: TVec2;
 begin
   Result := Vec(1, 1);
@@ -298,6 +343,9 @@ end;
 
 function TSkill_Kick.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
 begin
+  Result := inherited CanUse(ASkillIndex, AOwner, ATarget, AReservedPoints);
+  if not Result then Exit;
+
   Result := False;
   if AOwner.AP - AReservedPoints < Cost then Exit;
   if AOwner.Room.Distance(AOwner.RoomPos, ATarget.RoomPos) > 1 then Exit;
