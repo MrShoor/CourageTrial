@@ -48,6 +48,9 @@ type
   public
     procedure WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType); override;
   public
+    function PickItem: IUnitItem;
+
+    procedure SetAnimation(const AName: string);
     procedure LoadModels(const AObstacle: TObstacleDesc); override;
 
     function Interactive_CellsCount: Integer; override;
@@ -77,6 +80,37 @@ type
     function ProcessAction: Boolean; override;
     constructor Create(AChest: TRoomChest; AUnit: TRoomUnit);
   end;
+
+  { TBRA_AltarPick }
+
+  TBRA_AltarPick = class(TBRA_Action)
+  private
+    FAltar: TRoomAltar;
+    FUnit : TRoomUnit;
+    FActionTime: Int64;
+  public
+    function ProcessAction: Boolean; override;
+    constructor Create(AAltar: TRoomAltar; AUnit: TRoomUnit);
+  end;
+
+{ TBRA_AltarPick }
+
+function TBRA_AltarPick.ProcessAction: Boolean;
+begin
+  Result := True;
+  if FUnit.World.GameTime >= FActionTime then
+  begin
+    Result := False;
+    FUnit.Inventory().Push(FAltar.PickItem, 0);
+  end;
+end;
+
+constructor TBRA_AltarPick.Create(AAltar: TRoomAltar; AUnit: TRoomUnit);
+begin
+  FAltar := AAltar;
+  FUnit := AUnit;
+  FActionTime := AUnit.World.GameTime + 800;
+end;
 
 { TRoomAltar }
 
@@ -115,8 +149,22 @@ procedure TRoomAltar.WriteModels(const ACollection: IavModelInstanceArr;
   AType: TModelType);
 begin
   inherited WriteModels(ACollection, AType);
-  if AType = mtDefault then
+  if (AType = mtDefault) and (FItemInstance <> nil) then
     ACollection.Add(FItemInstance);
+end;
+
+function TRoomAltar.PickItem: IUnitItem;
+begin
+  Result := FItem;
+  FItem := nil;
+  FItemInstance := nil;
+  FAnim := nil;
+  UnSubscribeFromUpdateStep;
+end;
+
+procedure TRoomAltar.SetAnimation(const AName: string);
+begin
+  FAnim.AnimationSequence_StartAndStopOther([AName, 'Altar_Idle0'], True);
 end;
 
 procedure TRoomAltar.LoadModels(const AObstacle: TObstacleDesc);
@@ -130,15 +178,18 @@ end;
 
 function TRoomAltar.Interactive_CellsCount: Integer;
 begin
-  Result := 2;
+  if FItem = nil then
+    Result := 0
+  else
+    Result := 2;
 end;
 
 function TRoomAltar.Interactive_GetCell(AIndex: Integer): TVec2i;
 begin
   if AIndex = 0 then
-    Result := Vec(0, 1)
+    Result := Vec(1, -1)
   else
-    Result := Vec(1, -1);
+    Result := Vec(0, 1);
 end;
 
 function TRoomAltar.Interactive_Cost(AIndex: Integer): Integer;
@@ -147,8 +198,16 @@ begin
 end;
 
 function TRoomAltar.Interactive_Try(AUnit: TRoomUnit): IBRA_Action;
+var
+  idx: Integer;
 begin
-  Result := nil; //todo pick item
+  Result := nil;
+  idx := GetInteractiveIdx(AUnit);
+  if idx < 0 then Exit;
+  if AUnit.AP < Interactive_Cost(idx) then Exit;
+  AUnit.AP := AUnit.AP - Interactive_Cost(idx);
+  SetAnimation('Altar_Action' + IntToStr(idx));
+  Result := TBRA_AltarPick.Create(Self, AUnit);
 end;
 
 { TBRA_LootChestAction }

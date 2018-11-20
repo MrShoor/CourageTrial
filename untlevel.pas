@@ -544,9 +544,12 @@ type
 
   TRoomInteractiveObject = class (TObstacle)
   private
+  protected
+    function GetInteractiveIdx(AUnit: TRoomUnit): Integer;
   public
     function Interactive_CellsCount: Integer; virtual;
     function Interactive_GetCell(AIndex: Integer): TVec2i; virtual;
+    function Interactive_GetAbsoluteCell(AIndex: Integer): TVec2i;
 
     function Interactive_Cost(AIndex: Integer): Integer; virtual;
     function Interactive_Try(AUnit: TRoomUnit): IBRA_Action; virtual;
@@ -891,6 +894,15 @@ end;
 
 { TRoomInteractiveObject }
 
+function TRoomInteractiveObject.GetInteractiveIdx(AUnit: TRoomUnit): Integer;
+var i: Integer;
+begin
+  for i := 0 to Interactive_CellsCount - 1 do
+    if AUnit.RoomPos = Interactive_GetAbsoluteCell(i) then
+      Exit(i);
+  Result := -1;
+end;
+
 function TRoomInteractiveObject.Interactive_CellsCount: Integer;
 begin
   Result := 0;
@@ -899,6 +911,11 @@ end;
 function TRoomInteractiveObject.Interactive_GetCell(AIndex: Integer): TVec2i;
 begin
   Result := Vec(0,0);
+end;
+
+function TRoomInteractiveObject.Interactive_GetAbsoluteCell(AIndex: Integer): TVec2i;
+begin
+  Result := TTileUtils.RotateTileCoord(Interactive_GetCell(AIndex), RoomDir) + RoomPos;
 end;
 
 function TRoomInteractiveObject.Interactive_Cost(AIndex: Integer): Integer;
