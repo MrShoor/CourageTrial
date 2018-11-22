@@ -191,17 +191,43 @@ type
 
   TRoomObjectClass = class of TRoomObject;
 
+  { TRoomDoor }
+
+  TRoomDoor = class (TRoomObject)
+  private
+    FOpened: Boolean;
+    FAnim  : IavAnimationController;
+    procedure SetOpened(AValue: Boolean);
+    procedure KillBlockingUnits;
+  protected
+    procedure UpdateStep; override;
+  public
+    procedure LoadModels;
+    function BlockedCellsCount: Integer; override;
+    function GetBlockedCell(AIndex: Integer): TVec2i; override;
+    function BlockedViewCell(AIndex: Integer): Boolean; override;
+
+    property Opened: Boolean read FOpened write SetOpened;
+  end;
+
   { TRoomFloor }
 
-  TRoomFloor = class(TbGameObject)
+  TRoomFloor = class(TRoomObject)
   private
-    FDoors: array[0..5] of IavModelInstance;
+    FDoors: array[0..5] of TRoomDoor;
+    FDoorsOpened: Boolean;
+    procedure SetDoorsOpened(AValue: Boolean);
   protected
+    procedure AfterRegister; override;
     procedure ValidateTransform; override;
-    procedure AddHexFloor(const AMap: TRoomMap);
-    procedure AddWalls(const AMap: TRoomMap; const ADoors: array of Boolean);
+    procedure AddHexFloor();
+    procedure AddWalls(const ADoors: array of Boolean);
   public
-    procedure LoadModels(const AMap: TRoomMap);
+    procedure WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType); override;
+
+    property DoorsOpened: Boolean read FDoorsOpened write SetDoorsOpened;
+    function DoorCellIndex(const ATileCoord: TVec2i): Integer;
+    procedure LoadModels();
   end;
 
   { TRoomBullet }
@@ -339,6 +365,7 @@ type
 
     procedure ApplyBuff(ABuff: IUnitBuff); virtual;
     procedure DealDamage(ADmg: Integer; AFromUnit: TRoomUnit); virtual;
+    procedure InstantKill(const AMessage: string); virtual;
   end;
   TRoomUnitArr = {$IfDef FPC}specialize{$EndIf} TArray<TRoomObject>;
   IRoomUnitArr = {$IfDef FPC}specialize{$EndIf} IArray<TRoomObject>;
@@ -486,6 +513,7 @@ type
       constructor Create(const ARoom: TRoomMap; const AStartPt: TVec2i); overload;
     end;
   private
+    FRoomFloor: TRoomFloor;
     FCurrentPlayer: TRoomUnit;
     FInEditMode: Boolean;
 
@@ -537,6 +565,7 @@ type
     procedure AddAction(AAction: IBRA_Action);
 
     property CurrentPlayer: TRoomUnit read FCurrentPlayer write FCurrentPlayer;
+    property RoomFloor: TRoomFloor read FRoomFloor;
   end;
 
   { TObstacle }
@@ -686,11 +715,7 @@ type
 
   TBattleRoom = class (TavMainRenderChild)
   private
-    FWorld: TbWorld;
-
-    FFloor: TRoomFloor;
     FObstacles: IObstacleArr;
-    FLanterns: IbGameObjArr;
 
     FPlayer: TPlayer;
 
@@ -724,15 +749,12 @@ type
     function IsBotTurn: Boolean;
     function IsMouseOnUI: Boolean;
   protected
-    procedure EMUps(var msg: TavMessage); message EM_UPS;
     procedure AfterRegister; override;
 
-    procedure OnAfterWorldDraw(Sender: TObject);
-
-    procedure GenerateFloor;
     procedure PreloadModels;
-    procedure PreloadInGameModels;
     procedure CreateUI;
+
+    function World: TbWorld;
   public
     procedure SetEditMode();
     procedure UI_SetOtherInventory(const AInventory: IInventory);
@@ -751,7 +773,10 @@ type
 
     procedure AddAction(AAction: IBRA_Action);
 
-    procedure Draw();
+    procedure UpdateStep();
+    procedure PrepareToDraw();
+    procedure Draw2DUI();
+    procedure Draw3DUI();
     procedure Generate();
     procedure GenerateWithLoad(const AFileName: string);
     procedure GenerateEmpty();
@@ -769,6 +794,8 @@ procedure RegRoomClass(const ARoomClass: TRoomObjectClass);
 function  FindRoomClass(const AName: string): TRoomObjectClass;
 
 implementation
+
+{$R 'shaders\CT_shaders.rc'}
 
 uses
   untEnemies, untGraphics, ui_unit, ui_inventory, ui_skills, ui_gamecamera, untItems, untSkills, untBuffs, untRoomObstacles;
@@ -804,6 +831,75 @@ function FindRoomClass(const AName: string): TRoomObjectClass;
 begin
   if gvRegRommClasses = nil then Exit(nil);
   if not gvRegRommClasses.TryGetValue(AName, Result) then Result := nil;
+end;
+
+{ TRoomDoor }
+
+procedure TRoomDoor.SetOpened(AValue: Boolean);
+begin
+  if FOpened = AValue then Exit;
+  if not AValue then
+    UnregisterAtRoom();
+  FOpened := AValue;
+  KillBlockingUnits;
+  if AValue then
+    RegisterAtRoom();
+
+  if FOpened then
+    FAnim.AnimationSequence_StartAndStopOther(['Door_Opening'], False)
+  else
+    FAnim.AnimationSequence_StartAndStopOther(['Door_Closing'], False);
+end;
+
+procedure TRoomDoor.KillBlockingUnits;
+var tile: TVec2i;
+    obj : TRoomObject;
+    i: Integer;
+begin
+  for i := 0 to BlockedCellsCount - 1 do
+  begin
+    tile := GetAbsoluteBlockedCell(i);
+    obj := FRoom.ObjectAt(tile);
+    if (obj <> nil) and (obj is TRoomUnit) then
+      TRoomUnit(obj).InstantKill(TRoomUnit(obj).Name + ' прихлопнут дверью');
+  end;
+end;
+
+procedure TRoomDoor.UpdateStep;
+begin
+  inherited UpdateStep;
+  if FAnim <> nil then
+    FAnim.SetTime(World.GameTime);
+end;
+
+procedure TRoomDoor.LoadModels;
+var model: IavModelInstance;
+begin
+  model := World.Renderer.CreateModelInstances(['Door'])[0];
+  FModels.Add(model);
+  FAnim := Create_IavAnimationController(model.Mesh.Pose, World.GameTime);
+  SubscribeForUpdateStep;
+end;
+
+function TRoomDoor.BlockedCellsCount: Integer;
+begin
+  if FOpened then
+    Result := 2
+  else
+    Result := 0;
+end;
+
+function TRoomDoor.GetBlockedCell(AIndex: Integer): TVec2i;
+begin
+  if AIndex = 0 then
+    Result := Vec(0, -1)
+  else
+    Result := Vec(-1, -1);
+end;
+
+function TRoomDoor.BlockedViewCell(AIndex: Integer): Boolean;
+begin
+  Result := True;
 end;
 
 { TRoomUnit.TUnitInventory }
@@ -915,12 +1011,29 @@ end;
 
 { TRoomFloor }
 
+procedure TRoomFloor.SetDoorsOpened(AValue: Boolean);
+var
+  i: Integer;
+begin
+  if FDoorsOpened = AValue then Exit;
+  FDoorsOpened := AValue;
+  for i := 0 to 5 do
+    if FDoors[i] <> nil then
+      FDoors[i].Opened := FDoorsOpened;
+end;
+
+procedure TRoomFloor.AfterRegister;
+begin
+  inherited AfterRegister;
+  FNonRegistrable := True;
+end;
+
 procedure TRoomFloor.ValidateTransform;
 begin
   //inherited ValidateTransform;
 end;
 
-procedure TRoomFloor.AddHexFloor(const AMap: TRoomMap);
+procedure TRoomFloor.AddHexFloor();
 var idx: Integer;
     i, j, n: Integer;
     hex: array [0..4] of IVec2iArr;
@@ -930,10 +1043,10 @@ begin
     hex[i] := TVec2iArr.Create();
 
   idx := 2;
-  for i := -AMap.Radius to AMap.Radius do
-    for j := -AMap.Radius to AMap.Radius do
+  for i := -Room.Radius to Room.Radius do
+    for j := -Room.Radius to Room.Radius do
     begin
-      if not AMap.IsCellExists(Vec(i, j)) then Continue;
+      if Room.Distance(Vec(0,0), Vec(i, j)) > Room.FRadius then Continue;
       //idx := Random(5) + 1;
       idx := WeightedRandom([5, 50, 2, 1, 1]);
       hex[idx].Add(Vec(i,j));
@@ -944,11 +1057,11 @@ begin
     meshInst := World.Renderer.FindPrefabInstances('Hex'+IntToStr(j+1));
     n := FModels.Add(World.Renderer.ModelsCollection.AddFromMesh(meshInst.Mesh, hex[j].Count));
     for i := 0 to hex[j].Count - 1 do
-      FModels[n].MultiMesh[i].Transform := MatTranslate(AMap.UI.TilePosToWorldPos(hex[j][i]));
+      FModels[n].MultiMesh[i].Transform := MatTranslate(Room.UI.TilePosToWorldPos(hex[j][i]));
   end;
 end;
 
-procedure TRoomFloor.AddWalls(const AMap: TRoomMap; const ADoors: array of Boolean);
+procedure TRoomFloor.AddWalls(const ADoors: array of Boolean);
 var OWall: array[0..1] of IVec3iArr;
     OWallConn: IVec3iArr;
     v, vCenter: TVec2i;
@@ -958,28 +1071,32 @@ var OWall: array[0..1] of IVec3iArr;
     tilePos: TVec2i;
 begin
   Assert(Length(ADoors) = 6);
-  Assert(AMap.Radius mod 2 = 0, 'Odd map radius is not valid');
+  Assert(Room.Radius mod 2 = 0, 'Odd map radius is not valid');
 
   OWall[0] := TVec3iArr.Create();
   OWall[1] := TVec3iArr.Create();
   OWallConn := TVec3iArr.Create();
 
-  vCenter := Vec(-AMap.Radius div 2, AMap.Radius);
+  vCenter := Vec(-Room.Radius div 2, Room.Radius);
   for j := 0 to 5 do
   begin
+    tileDir := j;
+    tilePos := TTileUtils.RotateTileCoord(vCenter, tileDir);
+
     if ADoors[j] then
     begin
-      tileDir := j;
-      tilePos := TTileUtils.RotateTileCoord(vCenter, tileDir);
-
-      FDoors[j] := World.Renderer.CreateModelInstances(['Door'])[0];
-      FDoors[j].Mesh.Transform := AMap.UI.TileToWorldTransform(tilePos, tileDir);
-      FModels.Add(FDoors[j]);
+      FDoors[j] := TRoomDoor.Create(Self);
+      FDoors[j].LoadModels;
+      FDoors[j].RoomPos := tilePos;
+      FDoors[j].RoomDir := tileDir;
     end
     else
+    begin
+      FDoors[j] := nil;
       OWall[Random(2)].Add(Vec(vCenter, j));
+    end;
 
-    for i := 1 to (AMap.Radius div 3) div 2 do
+    for i := 1 to (Room.Radius div 3) div 2 do
     begin
       v := vCenter + Vec(i * 3, 0);
       OWall[Random(2)].Add(Vec(v, j));
@@ -999,7 +1116,7 @@ begin
     begin
       tileDir := OWall[j][i].z;
       tilePos := TTileUtils.RotateTileCoord(OWall[j][i].xy, tileDir);
-      FModels[n].MultiMesh[i].Transform := AMap.UI.TileToWorldTransform(tilePos, tileDir);
+      FModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(tilePos, tileDir);
     end;
   end;
 
@@ -1009,14 +1126,30 @@ begin
   begin
     tileDir := OWallConn[i].z;
     tilePos := TTileUtils.RotateTileCoord(OWallConn[i].xy, tileDir);
-    FModels[n].MultiMesh[i].Transform := AMap.UI.TileToWorldTransform(tilePos, tileDir);
+    FModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(tilePos, tileDir);
   end;
 end;
 
-procedure TRoomFloor.LoadModels(const AMap: TRoomMap);
+procedure TRoomFloor.WriteModels(const ACollection: IavModelInstanceArr;
+  AType: TModelType);
 begin
-  AddHexFloor(AMap);
-  AddWalls(AMap, [True, True, True, True, True, False]);
+  inherited WriteModels(ACollection, AType);
+end;
+
+function TRoomFloor.DoorCellIndex(const ATileCoord: TVec2i): Integer;
+var i: Integer;
+begin
+  if not FDoorsOpened then Exit(-1);
+  for i := 0 to 5 do
+    if FDoors[i] <> nil then
+      if FDoors[i].RoomPos = ATileCoord then Exit(i);
+  Result := -1;
+end;
+
+procedure TRoomFloor.LoadModels();
+begin
+  AddHexFloor();
+  AddWalls([True, True, True, True, True, False]);
   FTransformValid := True;
 end;
 
@@ -1872,6 +2005,13 @@ begin
     Room.AddMessage(s);
 end;
 
+procedure TRoomUnit.InstantKill(const AMessage: string);
+begin
+  HP := 0;
+  Room.AddMessage(AMessage);
+  SetAnimation(['Death0'], False);
+end;
+
 procedure TRoomUnit.SetAP(const AValue: Integer);
 begin
   if FAP = AValue then Exit;
@@ -2021,7 +2161,7 @@ begin
   FTilesData.Add(epmty_tile);
 
   FTilesProg := TavProgram.Create(Self);
-  FTilesProg.Load('UI_DrawTiles', False, '..\shaders\!Out');
+  FTilesProg.Load('UI_DrawTiles', True, '..\shaders\!Out');
   FTilesVB   := TavVB.Create(Self);
   FTilesVB.Vertices := FTilesData as IVerticesData;
 
@@ -2255,6 +2395,13 @@ begin
   if FRadius = AValue then Exit;
   FRadius := AValue;
   FRoomUI.Radius := AValue;
+
+  FreeAndNil(FRoomFloor);
+  if FRadius > 0 then
+  begin
+    FRoomFloor := TRoomFloor.Create(Self);
+    FRoomFloor.LoadModels();
+  end;
 end;
 
 function TRoomMap.NextPointOnRay(const APt: TVec2i; const ADir, ADirStep: TVec2i): TVec2i;
@@ -2543,6 +2690,9 @@ end;
 function TRoomMap.IsCellExists(const APos: TVec2i): Boolean;
 begin
   Result := Distance(Vec(0,0), APos) <= (FRadius - 1);
+  if not Result then
+    if FRoomFloor <> nil then
+      Result := FRoomFloor.DoorCellIndex(APos) >= 0;
 end;
 
 function TRoomMap.IsCellBlocked(const APos: TVec2i): Boolean;
@@ -2757,124 +2907,23 @@ begin
   Result := (hit <> nil) and (hit <> FRootControl);
 end;
 
-procedure TBattleRoom.EMUps(var msg: TavMessage);
-var bot: TBot;
-    new_action: IBRA_Action;
-    i: LongInt;
-begin
-  FWorld.UpdateStep();
-  if FUnits.Count = 0 then Exit;
-
-  //update active skill information
-  if FPlayerActiveSkill <> nil then
-    if not FPlayerActiveSkill.UseReady(FPlayer) then
-      UI_SetPlayerActiveSkill(nil);
-  if FPlayerSkills <> nil then
-    TavmSkills(FPlayerSkills).ActiveSkill := FPlayerActiveSkill;
-  if FUnitMenu <> nil then
-    if TavmUnitMenu(FUnitMenu).SkillSlots <> nil then
-      if IsPlayerTurn then
-        TavmUnitMenu(FUnitMenu).SkillSlots.ActiveSkill := FPlayerActiveSkill;
-
-  //moved tile update
-  if IsPlayerTurn then
-  begin
-    FMovedTile := FMap.UI.GetTileAtCoords(Main.Cursor.Ray);
-    FMovePath := nil;
-    if (not IsMouseOnUI) and (FPlayer <> nil) then
-    begin
-      FMovePath := FPlayer.FindPath(FMovedTile);
-      if FMovePath <> nil then FMovePath.Add(FMovedTile);
-    end;
-
-    //FRayPath := FMap.RayCast(FPlayer.RoomPos, FMovedTile, True);
-  end;
-
-  if (FActions.Count = 0) and IsBotTurn() then
-  begin
-    bot := FUnits[FActiveUnit] as TBot;
-    new_action := bot.DoAction();
-    if new_action = nil then
-    begin
-      EndTurn();
-      bot.LogAction('EndTurn');
-    end
-    else
-    begin
-      FActions.Add(new_action);
-      bot.LogAction('Action: '+new_action.Name);
-    end;
-  end;
-
-  for i := FActions.Count - 1 downto 0 do
-  begin
-    if not FActions[i].ProcessAction() then
-      FActions.DeleteWithSwap(i);
-  end;
-end;
-
 procedure TBattleRoom.AfterRegister;
 begin
   inherited AfterRegister;
-  FWorld := TbWorld.Create(Self);
-  FWorld.Renderer.OnAfterDraw := {$IfDef FPC}@{$EndIf}OnAfterWorldDraw;
-
   Main.Camera.At := Vec(0,0,0);
   Main.Camera.Up := Vec(0,1,0);
   Main.Camera.Eye := Main.Camera.At + Vec(10, 10, 5);
 
-  FMap := TRoomMap.Create(FWorld);
+  FMap := TRoomMap.Create(Self);
   FMap.Radius := 20;
   FMap.FBattleRoom := Self;
 end;
 
-procedure TBattleRoom.OnAfterWorldDraw(Sender: TObject);
-var oldDepthWrite: Boolean;
-begin
-  //  Main.States.DepthTest := False;
-    oldDepthWrite := Main.States.DepthWrite;
-    Main.States.DepthWrite := False;
-    Main.States.Blending[0] := True;
-    Main.States.SetBlendFunctions(bfSrcAlpha, bfInvSrcAlpha);
-    FMap.Draw();
-    Main.States.DepthWrite := oldDepthWrite;
-end;
-
-procedure TBattleRoom.GenerateFloor;
-begin
-  FFloor := TRoomFloor.Create(FMap);
-  FFloor.LoadModels(FMap);
-end;
-
 procedure TBattleRoom.PreloadModels;
 begin
-  FLanterns := TbGameObjArr.Create();
   FUnits := TRoomUnitArr.Create();
   FActions := TBRA_ActionArr.Create();
   FObstacles := LoadObstacles(ExeRelativeFileName('models\scene1_obstacles.txt'));
-  FWorld.Renderer.PreloadModels([ExeRelativeFileName('models\scene1.avm')]);
-  //FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
-  //FWorld.Renderer.PreloadModels([ExeRelativeFileName('enemies\creature1.avm')]);
-
-  FWorld.Renderer.SetEnviromentCubemap(ExeRelativeFileName('waterfall.dds'));
-
-//  //FSun := FWorld.Renderer.CreatePointLight();
-//  FSun := FWorld.Renderer.CreateSpotLight();
-////  FSun.Size := 2;
-//  FSun.Pos := Vec(300, 300, 300);
-//  FSun.Radius := 1500;
-//  FSun.Dir := normalize(Vec(0,0,0) - FSun.Pos);
-//  FSun.Color := Vec(0.3,0.3,0.3);
-//  FSun.Angles := Vec(0.027*Pi, 0.027*Pi);
-//  FSun.CastShadows := st2048;
-end;
-
-procedure TBattleRoom.PreloadInGameModels;
-begin
-  //FWorld.Renderer.PreloadModels([ExeRelativeFileName('chars\gop.avm')]);
-  FWorld.Renderer.PreloadModels([ExeRelativeFileName('units\units.avm')]);
-  FWorld.Renderer.PreloadModels([ExeRelativeFileName('bullets\bullets.avm')]);
-  FWorld.Renderer.PreloadModels([ExeRelativeFileName('weapons\weapons.avm')]);
 end;
 
 procedure TBattleRoom.CreateUI;
@@ -2911,6 +2960,11 @@ begin
   inv_ui.Pos := Vec(inv_ui.Pos.x + 500, inv_ui.Pos.y);
   inv_ui.Visible := False;
   FOtherInventory := inv_ui;
+end;
+
+function TBattleRoom.World: TbWorld;
+begin
+  Result := Parent as TbWorld;
 end;
 
 procedure TBattleRoom.SetEditMode();
@@ -2956,8 +3010,8 @@ procedure TBattleRoom.KeyPress(KeyCode: Integer);
 var inv_objs: IRoomObjectArr;
     n: Integer;
 begin
-  if KeyCode = Ord(' ') then
-    FWorld.Renderer.InvalidateShaders;
+  if KeyCode = Ord('O') then
+    FMap.RoomFloor.DoorsOpened := not FMap.RoomFloor.DoorsOpened;
 
   if not IsPlayerTurn() then Exit;
   if (KeyCode = Ord('E')) then
@@ -3072,8 +3126,62 @@ begin
   FActions.Add(AAction);
 end;
 
-procedure TBattleRoom.Draw();
+procedure TBattleRoom.UpdateStep();
+var bot: TBot;
+    new_action: IBRA_Action;
+    i: LongInt;
+begin
+  if FUnits.Count = 0 then Exit;
 
+  //update active skill information
+  if FPlayerActiveSkill <> nil then
+    if not FPlayerActiveSkill.UseReady(FPlayer) then
+      UI_SetPlayerActiveSkill(nil);
+  if FPlayerSkills <> nil then
+    TavmSkills(FPlayerSkills).ActiveSkill := FPlayerActiveSkill;
+  if FUnitMenu <> nil then
+    if TavmUnitMenu(FUnitMenu).SkillSlots <> nil then
+      if IsPlayerTurn then
+        TavmUnitMenu(FUnitMenu).SkillSlots.ActiveSkill := FPlayerActiveSkill;
+
+  //moved tile update
+  if IsPlayerTurn then
+  begin
+    FMovedTile := FMap.UI.GetTileAtCoords(Main.Cursor.Ray);
+    FMovePath := nil;
+    if (not IsMouseOnUI) and (FPlayer <> nil) then
+    begin
+      FMovePath := FPlayer.FindPath(FMovedTile);
+      if FMovePath <> nil then FMovePath.Add(FMovedTile);
+    end;
+
+    //FRayPath := FMap.RayCast(FPlayer.RoomPos, FMovedTile, True);
+  end;
+
+  if (FActions.Count = 0) and IsBotTurn() then
+  begin
+    bot := FUnits[FActiveUnit] as TBot;
+    new_action := bot.DoAction();
+    if new_action = nil then
+    begin
+      EndTurn();
+      bot.LogAction('EndTurn');
+    end
+    else
+    begin
+      FActions.Add(new_action);
+      bot.LogAction('Action: '+new_action.Name);
+    end;
+  end;
+
+  for i := FActions.Count - 1 downto 0 do
+  begin
+    if not FActions[i].ProcessAction() then
+      FActions.DeleteWithSwap(i);
+  end;
+end;
+
+procedure TBattleRoom.PrepareToDraw();
   procedure AlignControls;
   begin
     if FPlayerSkills <> nil then
@@ -3136,19 +3244,27 @@ procedure TBattleRoom.Draw();
         end;
     end;
   end;
-
 begin
   AlignControls;
   DrawTileMap;
+end;
 
-  FWorld.Renderer.PrepareToDraw;
-  Main.Clear(Black, True, Main.Projection.DepthRange.y, True);
-  FWorld.Renderer.DrawWorld;
-
+procedure TBattleRoom.Draw2DUI();
+begin
   if FRootControl <> nil then
     FRootControl.Draw();
+end;
 
-  Main.ActiveFrameBuffer.BlitToWindow();
+procedure TBattleRoom.Draw3DUI();
+var
+  oldDepthWrite: Boolean;
+begin
+  oldDepthWrite := Main.States.DepthWrite;
+  Main.States.DepthWrite := False;
+  Main.States.Blending[0] := True;
+  Main.States.SetBlendFunctions(bfSrcAlpha, bfInvSrcAlpha);
+  FMap.Draw();
+  Main.States.DepthWrite := oldDepthWrite;
 end;
 
 procedure TBattleRoom.Generate();
@@ -3183,8 +3299,6 @@ procedure TBattleRoom.Generate();
 var bot: TBot;
 begin
   PreloadModels;
-  GenerateFloor;
-  PreloadInGameModels;
 
   FPlayer := TPlayer.Create(FMap);
   //FPlayer.SetRoomPosDir(Vec(5, 5), 0);
@@ -3237,7 +3351,7 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string);
     bot := TBotArcher1.Create(FMap);
     {$Else}
     if Random(2) = 0 then
-      bot := TBotArcher1.Create(FMap);
+      bot := TBotArcher1.Create(FMap)
     else
       bot := TBotMutant1.Create(FMap);
     {$EndIf}
@@ -3251,10 +3365,8 @@ var
   i: Integer;
 begin
   PreloadModels;
-  PreloadInGameModels;
 
   LoadObstacles();
-  GenerateFloor();
 
   FPlayer := TPlayer.Create(FMap);
   //FPlayer.SetRoomPosDir(Vec(5, 5), 0);
@@ -3278,9 +3390,8 @@ end;
 procedure TBattleRoom.GenerateEmpty();
 begin
   PreloadModels;
-  GenerateFloor;
 
-  FEmptyLight := FWorld.Renderer.CreatePointLight();
+  FEmptyLight := World.Renderer.CreatePointLight();
   FEmptyLight.Pos := Vec(0, 10, 0);
   FEmptyLight.Radius := 50;
   FEmptyLight.Color := Vec(1,1,1);
@@ -3307,7 +3418,7 @@ var inst: IavModelInstanceArr;
 begin
   Assert(bmp.Width * bmp.Height > 0);
 
-  inst := FWorld.Renderer.CreateModelInstances([AName]);
+  inst := World.Renderer.CreateModelInstances([AName]);
   inst[0].Mesh.Transform := IdentityMat4;
   bbox := inst[0].Mesh.Mesh.BBox;
 
@@ -3329,9 +3440,9 @@ begin
     tmpfbo.Clear(0, Vec(0,0,0,0));
     tmpfbo.ClearDS(Main.Projection.DepthRange.y);
 
-    FWorld.Renderer.ModelsProgram_NoLight.Select();
-    FWorld.Renderer.ModelsCollection.Select();
-    FWorld.Renderer.ModelsCollection.Draw(inst);
+    World.Renderer.ModelsProgram_NoLight.Select();
+    World.Renderer.ModelsCollection.Select();
+    World.Renderer.ModelsCollection.Draw(inst);
 
     texdata := EmptyTexData(bmp.Width, bmp.Height, TTextureFormat.RGBA, False, True);
     tmpfbo.GetColor(0).ReadBack(texdata, 0, 0);

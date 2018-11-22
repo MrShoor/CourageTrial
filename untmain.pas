@@ -5,9 +5,22 @@ unit untMain;
 interface
 
 uses
-  Classes, SysUtils, Forms, Controls, Graphics, Dialogs, untLevel, avRes, avTypes, mutils;
+  Classes, SysUtils, Forms, Controls, Graphics, Dialogs, untLevel, avBase, avRes, avTypes, mutils,
+  bWorld;
 
 type
+
+  { TUPSObject }
+
+  TUPSObject = class(TavObject)
+  private
+    FWorld: TbWorld;
+    FRoom : TBattleRoom;
+  protected
+    procedure EMUps(var msg: TavMessage); message EM_UPS;
+  public
+    procedure SetState(AWorld: TbWorld; ARoom: TBattleRoom);
+  end;
 
   { TfrmMain }
 
@@ -23,11 +36,16 @@ type
     FMain: TavMainRender;
     FDefFBO: TavFrameBuffer;
 
+    FUPSObj: TUPSObject;
+
+    FWorld: TbWorld;
     FRoom: TBattleRoom;
+
     procedure AutoInit;
     procedure RenderScene;
 
     procedure InitWorld;
+    procedure OnAfterWorldDraw(Sender: TObject);
   public
 
   end;
@@ -38,6 +56,20 @@ var
 implementation
 
 {$R *.lfm}
+
+{ TUPSObject }
+
+procedure TUPSObject.EMUps(var msg: TavMessage);
+begin
+  FWorld.UpdateStep();
+  FRoom.UpdateStep();
+end;
+
+procedure TUPSObject.SetState(AWorld: TbWorld; ARoom: TBattleRoom);
+begin
+  FWorld := AWorld;
+  FRoom := ARoom;
+end;
 
 { TfrmMain }
 
@@ -108,7 +140,14 @@ begin
     FDefFBO.FrameRect := RectI(0, 0, ClientWidth, ClientHeight);
     FDefFBO.Select();
 
-  	FRoom.Draw();
+    FRoom.PrepareToDraw();
+    FWorld.Renderer.PrepareToDraw;
+    FMain.Clear(Black, True, FMain.Projection.DepthRange.y, True);
+    FWorld.Renderer.DrawWorld;
+  	FRoom.Draw2DUI();
+
+    FMain.ActiveFrameBuffer.BlitToWindow();
+
     FMain.Present;
   finally
     FMain.Unbind;
@@ -116,9 +155,32 @@ begin
 end;
 
 procedure TfrmMain.InitWorld;
+  procedure PreloadModels;
+  begin
+    FWorld.Renderer.PreloadModels([ExeRelativeFileName('models\scene1.avm')]);
+    FWorld.Renderer.SetEnviromentCubemap(ExeRelativeFileName('waterfall.dds'));
+
+    FWorld.Renderer.PreloadModels([ExeRelativeFileName('units\units.avm')]);
+    FWorld.Renderer.PreloadModels([ExeRelativeFileName('bullets\bullets.avm')]);
+    FWorld.Renderer.PreloadModels([ExeRelativeFileName('weapons\weapons.avm')]);
+  end;
+
 begin
-  FRoom := TBattleRoom.Create(FMain);
+  FWorld := TbWorld.Create(FMain);
+  FWorld.Renderer.OnAfterDraw := {$IfDef FPC}@{$EndIf}OnAfterWorldDraw;
+  PreloadModels;
+
+  FRoom := TBattleRoom.Create(FWorld);
   FRoom.GenerateWithLoad('rooms\r1.room');
+
+  if FUPSObj = nil then
+    FUPSObj := TUPSObject.Create(FMain);
+  FUPSObj.SetState(FWorld, FRoom);
+end;
+
+procedure TfrmMain.OnAfterWorldDraw(Sender: TObject);
+begin
+  FRoom.Draw3DUI();
 end;
 
 end.

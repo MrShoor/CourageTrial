@@ -17,7 +17,7 @@ uses
   {$EndIf}
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls,
   Menus, StdCtrls,
-  avRes, avTypes, avCameraController,
+  avRes, avTypes, avCameraController, bWorld,
   mutils,
   untWayPoint,
   untLevel, untObstacles, untInteractiveObjects;
@@ -83,7 +83,8 @@ type
     FMain: TavMainRender;
     FDefFBO: TavFrameBuffer;
 
-    FRoom: TBattleRoom;
+    FWorld: TbWorld;
+    FRoom : TBattleRoom;
 
     FObstaclePreviews: array of TBitmap;
 
@@ -191,6 +192,13 @@ begin
   FMain.States.DepthFunc := cfGreater;
   FMain.States.ColorMask[0] := AllChanells;
   FMain.UpdateStatesInterval := 8;
+
+  FWorld := TbWorld.Create(FMain);
+  FWorld.Renderer.SetEnviromentCubemap(ExeRelativeFileName('waterfall.dds'));
+  FWorld.Renderer.PreloadModels([ExeRelativeFileName('models\scene1.avm')]);
+  //FWorld.Renderer.PreloadModels([ExeRelativeFileName('units\units.avm')]);
+  //FWorld.Renderer.PreloadModels([ExeRelativeFileName('bullets\bullets.avm')]);
+  FWorld.Renderer.PreloadModels([ExeRelativeFileName('weapons\weapons.avm')]);
 
   FDefFBO := Create_FrameBuffer(FMain, [TTextureFormat.RGBA, TTextureFormat.D32f], [true, false]);
 
@@ -358,7 +366,14 @@ begin
     if FRoom = nil then
       FMain.Clear(Vec(0,0,0,0))
     else
-      FRoom.Draw();
+    begin
+      FRoom.PrepareToDraw();
+      FWorld.Renderer.PrepareToDraw;
+      FMain.Clear(Black, True, FMain.Projection.DepthRange.y, True);
+      FWorld.Renderer.DrawWorld;
+    end;
+
+    FMain.ActiveFrameBuffer.BlitToWindow();
 
     FMain.Present;
   finally
@@ -378,7 +393,7 @@ begin
     FMain.InvalidateWindow;
     UpdateWindow(FMain.Window);
   end;
-  FRoom := TBattleRoom.Create(FMain);
+  FRoom := TBattleRoom.Create(FWorld);
   FRoom.SetEditMode();
   FRoom.GenerateEmpty();
 
