@@ -115,7 +115,7 @@
         <PackageName Value="LCL"/>
       </Item4>
     </RequiredPackages>
-    <Units Count="17">
+    <Units Count="18">
       <Unit0>
         <Filename Value="CT.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -197,6 +197,11 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="untRoomObstacles"/>
       </Unit16>
+      <Unit17>
+        <Filename Value="untfloor.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="untFloor"/>
+      </Unit17>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

@@ -6,6 +6,7 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, untLevel, avBase, avRes, avTypes, mutils,
+  untFloor,
   bWorld;
 
 type
@@ -14,12 +15,12 @@ type
 
   TUPSObject = class(TavObject)
   private
+    FFloor: TFloorMap;
     FWorld: TbWorld;
-    FRoom : TBattleRoom;
   protected
     procedure EMUps(var msg: TavMessage); message EM_UPS;
   public
-    procedure SetState(AWorld: TbWorld; ARoom: TBattleRoom);
+    procedure SetState(AWorld: TbWorld; AFloor: TFloorMap);
   end;
 
   { TfrmMain }
@@ -39,7 +40,7 @@ type
     FUPSObj: TUPSObject;
 
     FWorld: TbWorld;
-    FRoom: TBattleRoom;
+    FFloor: TFloorMap;
 
     procedure AutoInit;
     procedure RenderScene;
@@ -62,13 +63,13 @@ implementation
 procedure TUPSObject.EMUps(var msg: TavMessage);
 begin
   FWorld.UpdateStep();
-  FRoom.UpdateStep();
+  FFloor.CurrentRoom.UpdateStep();
 end;
 
-procedure TUPSObject.SetState(AWorld: TbWorld; ARoom: TBattleRoom);
+procedure TUPSObject.SetState(AWorld: TbWorld; AFloor: TFloorMap);
 begin
+  FFloor := AFloor;
   FWorld := AWorld;
-  FRoom := ARoom;
 end;
 
 { TfrmMain }
@@ -95,7 +96,7 @@ end;
 
 procedure TfrmMain.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
-  FRoom.KeyPress(Key);
+  FFloor.CurrentRoom.KeyPress(Key);
 end;
 
 procedure TfrmMain.FormMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
@@ -106,7 +107,7 @@ begin
     mbMiddle : btnIdx := 1;
     mbRight : btnIdx := 2;
   end;
-  FRoom.MouseClick(btnIdx, x, y);
+  FFloor.CurrentRoom.MouseClick(btnIdx, x, y);
 end;
 
 procedure TfrmMain.FormPaint(Sender: TObject);
@@ -132,19 +133,19 @@ end;
 
 procedure TfrmMain.RenderScene;
 begin
-  if FRoom <> nil then
-    Caption := IntToStr(FRoom.MovedTile.x) + ' ' + IntToStr(FRoom.MovedTile.y);
+  if FFloor.CurrentRoom <> nil then
+    Caption := IntToStr(FFloor.CurrentRoom.MovedTile.x) + ' ' + IntToStr(FFloor.CurrentRoom.MovedTile.y);
 
 	if FMain.Bind then
   try
     FDefFBO.FrameRect := RectI(0, 0, ClientWidth, ClientHeight);
     FDefFBO.Select();
 
-    FRoom.PrepareToDraw();
+    FFloor.CurrentRoom.PrepareToDraw();
     FWorld.Renderer.PrepareToDraw;
     FMain.Clear(Black, True, FMain.Projection.DepthRange.y, True);
     FWorld.Renderer.DrawWorld;
-  	FRoom.Draw2DUI();
+  	FFloor.Draw2DUI();
 
     FMain.ActiveFrameBuffer.BlitToWindow();
 
@@ -170,17 +171,17 @@ begin
   FWorld.Renderer.OnAfterDraw := {$IfDef FPC}@{$EndIf}OnAfterWorldDraw;
   PreloadModels;
 
-  FRoom := TBattleRoom.Create(FWorld);
-  FRoom.GenerateWithLoad('rooms\r1.room');
+  FFloor := TFloorMap.Create(FWorld);
+  FFloor.Create2Rooms;
 
   if FUPSObj = nil then
     FUPSObj := TUPSObject.Create(FMain);
-  FUPSObj.SetState(FWorld, FRoom);
+  FUPSObj.SetState(FWorld, FFloor);
 end;
 
 procedure TfrmMain.OnAfterWorldDraw(Sender: TObject);
 begin
-  FRoom.Draw3DUI();
+  FFloor.CurrentRoom.Draw3DUI();
 end;
 
 end.

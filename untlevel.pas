@@ -13,8 +13,11 @@ uses
   Graphics,
   Math,
   Classes, SysUtils, avBase, avRes, bWorld, mutils, bLights, avMesh, avTypes, avTess, avContnrs, avContnrsDefaults,
-  avPathFinder, avMiniControls, avModel, avTexLoader, ui_messages,
+  avPathFinder, avModel, avTexLoader,
   untObstacles;
+
+const
+  cRoomRadius = 20;
 
 type
   {$IfnDef FPC}
@@ -58,6 +61,8 @@ type
   TBattleRoom = class;
   TRoomObject = class;
   TRoomUnit = class;
+
+  TOnLeaveBattleRoom = procedure (const ABattleRoom: TBattleRoom; const ADoorIdx: Integer) of object;
 
   TRoomUnitEqSlot = (esNone, esLeftHand, esRightHand, esBothHands);
   TUnitItemKind = (ikUnknown, ikConsumable, ikBow, ikAxe);
@@ -142,6 +147,18 @@ type
     procedure BumpStateID;
   end;
 
+  IGameUI = interface
+    function IsMouseOnUI: Boolean;
+
+    procedure SetActiveUnit(const ARoomUnit: TRoomUnit);
+    procedure SetPlayerActiveSkill(const ASkill: IUnitSkill);
+    procedure SetOtherInventory(const AInventory: IInventory);
+
+    procedure AddMessage(const AMsg: string);
+
+    procedure UpdateStep(const AIsPlayerTurn: Boolean);
+  end;
+
   { TTileUtils }
 
   TTileUtils = class
@@ -162,6 +179,7 @@ type
     FNonRegistrable: Boolean;
     FRoom: TRoomMap;
     function CanRegister(target: TavObject): boolean; override;
+    procedure AfterValidateTransform; override;
     procedure SetRoomDir(const AValue: Integer); virtual;
     procedure SetRoomPos(const AValue: TVec2i); virtual;
   public
@@ -214,12 +232,13 @@ type
 
   TRoomFloor = class(TRoomObject)
   private
+    FInited: Boolean;
     FDoors: array[0..5] of TRoomDoor;
     FDoorsOpened: Boolean;
     procedure SetDoorsOpened(AValue: Boolean);
+    procedure InitModels;
   protected
     procedure AfterRegister; override;
-    procedure ValidateTransform; override;
     procedure AddHexFloor();
     procedure AddWalls(const ADoors: array of Boolean);
   public
@@ -227,7 +246,6 @@ type
 
     property DoorsOpened: Boolean read FDoorsOpened write SetDoorsOpened;
     function DoorCellIndex(const ATileCoord: TVec2i): Integer;
-    procedure LoadModels();
   end;
 
   { TRoomBullet }
@@ -433,7 +451,7 @@ type
 
     procedure InvalidateFogOfWar;
 
-    procedure DrawUI();
+    procedure DrawUI(const ATransform: TMat4);
   end;
 
   { TRoomMapGraph }
@@ -520,7 +538,6 @@ type
     FRadius: Integer;
 
     FRoomUI: TRoomUI;
-    FBattleRoom: TBattleRoom;
 
     FObjects: IObjectMap;
 
@@ -534,6 +551,7 @@ type
   public
     property InEditMode: Boolean read FInEditMode write FInEditMode;
     property UI: TRoomUI read FRoomUI;
+    property BattleRoom: TBattleRoom read GetBattleRoom;
 
     property Radius: Integer read FRadius write SetRadius;
 
@@ -715,6 +733,17 @@ type
 
   TBattleRoom = class (TavMainRenderChild)
   private
+    FAffinePack: TMat2;
+    FAffinePackInv: TMat2;
+
+    FRoomPos: TVec2i;
+    FRoomDir: Integer;
+    FRoomTransform: TMat4;
+    FRoomTransformInv: TMat4;
+    procedure UpdateRoomTransform;
+    procedure SetRoomPos(AValue: TVec2i);
+    procedure SetRoomDir(AValue: Integer);
+  private
     FObstacles: IObstacleArr;
 
     FPlayer: TPlayer;
@@ -723,17 +752,8 @@ type
     FActiveUnit: Integer;
 
     FMap: TRoomMap;
-
-    FRootControl: TavmBaseControl;
-    FUnitMenu: TavmCustomControl;
-    FPlayerInventory: TavmCustomControl;
-    FPlayerSkills   : TavmCustomControl;
-    FOtherInventory : TavmCustomControl;
-    FMessages: TavmMessages;
-
-    //FSun: IavSpotLight;
-
-    procedure OnEndTurnBtnClick(ASender: TObject);
+    FUI : IGameUI;
+    FOnLeaveBattleRoom: TOnLeaveBattleRoom;
   private
     FActions: IBRA_ActionArr;
   protected
@@ -745,42 +765,45 @@ type
 
     FPlayerActiveSkill: IUnitSkill;
 
-    function IsPlayerTurn: Boolean;
     function IsBotTurn: Boolean;
     function IsMouseOnUI: Boolean;
   protected
     procedure AfterRegister; override;
-
-    procedure PreloadModels;
-    procedure CreateUI;
-
     function World: TbWorld;
   public
     procedure SetEditMode();
-    procedure UI_SetOtherInventory(const AInventory: IInventory);
-    procedure UI_SetPlayerActiveSkill(const ASkill: IUnitSkill);
-    procedure UI_AddMessage(const AMsg: string);
+    procedure SetPlayerActiveSkill(const ASkill: IUnitSkill);
 
+    property RoomPos: TVec2i read FRoomPos write SetRoomPos;
+    property RoomDir: Integer read FRoomDir write SetRoomDir;
+    property RoomTransform: TMat4 read FRoomTransform;
+    property RoomTransformInv: TMat4 read FRoomTransformInv;
+
+    function IsPlayerTurn: Boolean;
     property MovedTile: TVec2i read FMovedTile;
     property Player: TPlayer read FPlayer;
     property Obstacles: IObstacleArr read FObstacles;
     property Map: TRoomMap read FMap;
+    property UI : IGameUI read FUI write FUI;
 
     procedure KeyPress(KeyCode: Integer);
     procedure MouseMove(xpos, ypos: Integer);
     procedure MouseClick(button: Integer; xpos, ypos: Integer);
     procedure EndTurn();
 
+    property OnLeaveBattleRoom: TOnLeaveBattleRoom read FOnLeaveBattleRoom write FOnLeaveBattleRoom;
+
     procedure AddAction(AAction: IBRA_Action);
 
     procedure UpdateStep();
     procedure PrepareToDraw();
-    procedure Draw2DUI();
     procedure Draw3DUI();
-    procedure Generate();
     procedure GenerateWithLoad(const AFileName: string);
     procedure GenerateEmpty();
     procedure DrawObstaclePreview(const AName: String; const bmp: TBitmap);
+
+    procedure DetachPlayer();
+    procedure AttachPlayer(const APlayer: TPlayer; const ARoomPos: TVec2i; ARoomDir: Integer);
 
     procedure SaveRoomMap(const AStream: TStream);
     procedure LoadRoomMap(const AStream: TStream);
@@ -798,7 +821,7 @@ implementation
 {$R 'shaders\CT_shaders.rc'}
 
 uses
-  untEnemies, untGraphics, ui_unit, ui_inventory, ui_skills, ui_gamecamera, untItems, untSkills, untBuffs, untRoomObstacles;
+  untEnemies, untGraphics, untItems, untSkills, untBuffs, untRoomObstacles;
 
 type
   IRoomClassesMap = {$IfDef FPC}specialize{$EndIf}IHashMap<string, TRoomObjectClass>;
@@ -1022,15 +1045,18 @@ begin
       FDoors[i].Opened := FDoorsOpened;
 end;
 
+procedure TRoomFloor.InitModels;
+begin
+  if FInited then Exit;
+  AddHexFloor();
+  AddWalls([True, True, True, True, True, False]);
+  FInited := True;
+end;
+
 procedure TRoomFloor.AfterRegister;
 begin
   inherited AfterRegister;
   FNonRegistrable := True;
-end;
-
-procedure TRoomFloor.ValidateTransform;
-begin
-  //inherited ValidateTransform;
 end;
 
 procedure TRoomFloor.AddHexFloor();
@@ -1057,7 +1083,7 @@ begin
     meshInst := World.Renderer.FindPrefabInstances('Hex'+IntToStr(j+1));
     n := FModels.Add(World.Renderer.ModelsCollection.AddFromMesh(meshInst.Mesh, hex[j].Count));
     for i := 0 to hex[j].Count - 1 do
-      FModels[n].MultiMesh[i].Transform := MatTranslate(Room.UI.TilePosToWorldPos(hex[j][i]));
+      FModels[n].MultiMesh[i].Transform := MatTranslate(Room.UI.TilePosToWorldPos(hex[j][i])) * Room.BattleRoom.RoomTransform;
   end;
 end;
 
@@ -1116,7 +1142,7 @@ begin
     begin
       tileDir := OWall[j][i].z;
       tilePos := TTileUtils.RotateTileCoord(OWall[j][i].xy, tileDir);
-      FModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(tilePos, tileDir);
+      FModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(tilePos, tileDir) * Room.BattleRoom.RoomTransform;
     end;
   end;
 
@@ -1126,13 +1152,13 @@ begin
   begin
     tileDir := OWallConn[i].z;
     tilePos := TTileUtils.RotateTileCoord(OWallConn[i].xy, tileDir);
-    FModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(tilePos, tileDir);
+    FModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(tilePos, tileDir) * Room.BattleRoom.RoomTransform;
   end;
 end;
 
-procedure TRoomFloor.WriteModels(const ACollection: IavModelInstanceArr;
-  AType: TModelType);
+procedure TRoomFloor.WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType);
 begin
+  InitModels;
   inherited WriteModels(ACollection, AType);
 end;
 
@@ -1144,13 +1170,6 @@ begin
     if FDoors[i] <> nil then
       if FDoors[i].RoomPos = ATileCoord then Exit(i);
   Result := -1;
-end;
-
-procedure TRoomFloor.LoadModels();
-begin
-  AddHexFloor();
-  AddWalls([True, True, True, True, True, False]);
-  FTransformValid := True;
 end;
 
 { TRoomMapGraph_CustomFilter }
@@ -2069,6 +2088,12 @@ begin
   Result := Assigned(FRoom);
 end;
 
+procedure TRoomObject.AfterValidateTransform;
+begin
+  FTransform := FTransform * Room.BattleRoom.RoomTransform;
+  FTransformInv := Inv(FTransform);
+end;
+
 function TRoomObject.BlockedCellsCount: Integer;
 begin
   Result := 1;
@@ -2205,8 +2230,11 @@ end;
 
 function TRoomUI.GetTileAtCoords(const ARay: TLine): TVec2i;
 var IntPt: TVec3;
+    ray: TLine;
 begin
-  if Intersect(Plane(0,1,0,FPlaneY), ARay, IntPt) then
+  ray := ARay * (Parent as TRoomMap).BattleRoom.RoomTransformInv;
+
+  if Intersect(Plane(0,1,0,FPlaneY), ray, IntPt) then
     Result := GetTileAtCoords(Vec(IntPt.x, IntPt.z))
   else
     Result := Vec(0,0);
@@ -2270,7 +2298,7 @@ begin
   FFogOfWarValid := False;
 end;
 
-procedure TRoomUI.DrawUI();
+procedure TRoomUI.DrawUI(const ATransform: TMat4);
 var tmpColors: TVec4Arr;
   i: Integer;
 begin
@@ -2285,6 +2313,7 @@ begin
   for i := 0 to Length(FColors) - 1 do
     tmpColors[i] := FColorsFogOfWar[TTileColorID(i)];
   FTilesProg.SetAttributes(nil, nil, FTilesVBFogOfWar);
+  FTilesProg.SetUniform('Transform', ATransform);
   FTilesProg.SetUniform('TileColors', tmpColors);
   FTilesProg.SetUniform('gradPow', 1.0);
   FTilesProg.SetUniform('minAlpha', 0.7);
@@ -2293,6 +2322,7 @@ begin
   for i := 0 to Length(FColors) - 1 do
     tmpColors[i] := FColors[TTileColorID(i)];
   FTilesProg.SetAttributes(nil, nil, FTilesVB);
+  FTilesProg.SetUniform('Transform', ATransform);
   FTilesProg.SetUniform('TileColors', tmpColors);
   FTilesProg.SetUniform('gradPow', 8.0);
   FTilesProg.SetUniform('minAlpha', 0.0);
@@ -2398,10 +2428,7 @@ begin
 
   FreeAndNil(FRoomFloor);
   if FRadius > 0 then
-  begin
     FRoomFloor := TRoomFloor.Create(Self);
-    FRoomFloor.LoadModels();
-  end;
 end;
 
 function TRoomMap.NextPointOnRay(const APt: TVec2i; const ADir, ADirStep: TVec2i): TVec2i;
@@ -2494,15 +2521,15 @@ end;
 
 procedure TRoomMap.Draw();
 begin
-  FRoomUI.DrawUI();
+  FRoomUI.DrawUI(BattleRoom.RoomTransform);
 end;
 
 procedure TRoomMap.AddMessage(const AStr: string);
-var brom: TBattleRoom;
+var broom: TBattleRoom;
 begin
-  brom := GetBattleRoom;
-  if brom = nil then Exit;
-  brom.UI_AddMessage(AStr);
+  broom := GetBattleRoom;
+  if broom = nil then Exit;
+  broom.UI.AddMessage(AStr);
 end;
 
 function TRoomMap.Distance(const APt1, APt2: TVec2i): Integer;
@@ -2792,7 +2819,7 @@ end;
 
 procedure TRoomMap.AddAction(AAction: IBRA_Action);
 begin
-  FBattleRoom.AddAction(AAction);
+  GetBattleRoom.AddAction(AAction);
 end;
 
 { TPlayer }
@@ -2880,10 +2907,27 @@ end;
 
 { TBattleRoom }
 
-procedure TBattleRoom.OnEndTurnBtnClick(ASender: TObject);
+procedure TBattleRoom.SetRoomDir(AValue: Integer);
 begin
-  if not IsPlayerTurn then Exit;
-  EndTurn();
+  if FRoomDir = AValue then Exit;
+  FRoomDir := AValue;
+  UpdateRoomTransform;
+end;
+
+procedure TBattleRoom.UpdateRoomTransform;
+var
+  WorldPos2d: TVec2;
+begin
+  WorldPos2d := (FRoomPos * FAffinePack) * ((cRoomRadius*2+2)*0.86602540378443864676372317075294);
+  FRoomTransform := Mat4(Quat(Vec(0, 1, 0), 2 * Pi * (FRoomDir / 6)), Vec(WorldPos2d.x, 0, WorldPos2d.y));
+  FRoomTransformInv := Inv(FRoomTransform);
+end;
+
+procedure TBattleRoom.SetRoomPos(AValue: TVec2i);
+begin
+  if FRoomPos = AValue then Exit;
+  FRoomPos := AValue;
+  UpdateRoomTransform;
 end;
 
 function TBattleRoom.IsPlayerTurn: Boolean;
@@ -2898,73 +2942,31 @@ begin
 end;
 
 function TBattleRoom.IsMouseOnUI: Boolean;
-var curpt: TVec2;
-    hit: TavmBaseControl;
 begin
-  curpt := (Main.Cursor.WindowCur*Vec(0.5, -0.5) + Vec(0.5, 0.5) )*Main.WindowSize;
-  if FRootControl.InputConnector.Captured <> nil then Exit(True);
-  hit := FRootControl.HitTest(curpt, True);
-  Result := (hit <> nil) and (hit <> FRootControl);
+  if FUI = nil then Exit(False);
+  Result := FUI.IsMouseOnUI;
 end;
 
 procedure TBattleRoom.AfterRegister;
 begin
   inherited AfterRegister;
+  FAffinePack.Row[0] := Vec(0.86602540378443864676372317075294, 0.5);
+  FAffinePack.Row[1] := Vec(0, 1);
+  FAffinePackInv := Inv(FAffinePack);
+  UpdateRoomTransform;
+
   Main.Camera.At := Vec(0,0,0);
   Main.Camera.Up := Vec(0,1,0);
   Main.Camera.Eye := Main.Camera.At + Vec(10, 10, 5);
 
-  FMap := TRoomMap.Create(Self);
-  FMap.Radius := 20;
-  FMap.FBattleRoom := Self;
-end;
-
-procedure TBattleRoom.PreloadModels;
-begin
   FUnits := TRoomUnitArr.Create();
   FActions := TBRA_ActionArr.Create();
   FObstacles := LoadObstacles(ExeRelativeFileName('models\scene1_obstacles.txt'));
 end;
 
-procedure TBattleRoom.CreateUI;
-var
-  menu: TavmUnitMenu;
-  inv_ui: TavmInventory;
-  skills_ui: TavmSkills;
-  lookAt: TVec3;
-begin
-  FRootControl := TavmCameraControl.Create(Self);
-  FRootControl.Size := Vec(10000, 10000);
-
-  lookAt := FMap.UI.TilePosToWorldPos(FPlayer.RoomPos);
-  TavmCameraControl(FRootControl).LookAt(lookAt, -lookAt);
-
-  FMessages := TavmMessages.Create(FRootControl);
-  FMessages.Origin := Vec(0, 1);
-
-  menu := TavmUnitMenu.Create(FRootControl);
-  menu.OnEndTurnClick := {$IfDef FPC}@{$EndIf}OnEndTurnBtnClick;
-  FUnitMenu := menu;
-
-  inv_ui := TavmInventory.Create(FRootControl);
-  inv_ui.Inventory := FPlayer.Inventory;
-  FPlayerInventory := inv_ui;
-
-  skills_ui := TavmSkills.Create(FRootControl);
-  skills_ui.Pos := Vec(30, 10);
-  skills_ui.HintDirection := Vec(-0.7, 0.7);
-  skills_ui.Skills := TAllSkillListAdapter.Create(FPlayer);
-  FPlayerSkills := skills_ui;
-
-  inv_ui := TavmInventory.Create(FRootControl);
-  inv_ui.Pos := Vec(inv_ui.Pos.x + 500, inv_ui.Pos.y);
-  inv_ui.Visible := False;
-  FOtherInventory := inv_ui;
-end;
-
 function TBattleRoom.World: TbWorld;
 begin
-  Result := Parent as TbWorld;
+  Result := FindAtParents(TbWorld) as TbWorld;
 end;
 
 procedure TBattleRoom.SetEditMode();
@@ -2972,13 +2974,7 @@ begin
   FMap.InEditMode := True;
 end;
 
-procedure TBattleRoom.UI_SetOtherInventory(const AInventory: IInventory);
-begin
-  (FOtherInventory as TavmInventory).Inventory := AInventory;
-  FOtherInventory.Visible := (FOtherInventory as TavmInventory).Inventory <> nil;
-end;
-
-procedure TBattleRoom.UI_SetPlayerActiveSkill(const ASkill: IUnitSkill);
+procedure TBattleRoom.SetPlayerActiveSkill(const ASkill: IUnitSkill);
   procedure SetActiveSkillInternal(const ASkill: IUnitSkill);
   begin
     FPlayerActiveSkill := ASkill;
@@ -2998,12 +2994,6 @@ begin
   if skills.IndexOf(ASkill) < 0 then Exit;
   if not ASkill.UseReady(FPlayer) then Exit;
   SetActiveSkillInternal(ASkill);
-end;
-
-procedure TBattleRoom.UI_AddMessage(const AMsg: string);
-begin
-  if FMessages = nil then Exit;
-  FMessages.AddMessage(AMsg);
 end;
 
 procedure TBattleRoom.KeyPress(KeyCode: Integer);
@@ -3026,28 +3016,20 @@ begin
           n := 9
         else
           n := n - 1;
-        UI_SetPlayerActiveSkill(FPlayer.SkillSlots[n]);
+        SetPlayerActiveSkill(FPlayer.SkillSlots[n]);
       end;
     end;
     Ord('G') :
     begin
       if FPlayer <> nil then
       begin
-        if FOtherInventory.Visible then
-        begin
-          FOtherInventory.Visible := False;
-        end
+        inv_objs := FMap.InventoryObjectsAt(FPlayer.RoomPos, True);
+        if inv_objs.Count > 0 then
+          UI.SetOtherInventory(inv_objs[0].Inventory)
         else
-        begin
-          inv_objs := FMap.InventoryObjectsAt(FPlayer.RoomPos, True);
-          if inv_objs.Count > 0 then
-            UI_SetOtherInventory(inv_objs[0].Inventory);
-        end;
+          UI.SetOtherInventory(nil);
       end;
     end;
-    //Ord('1') : FPlayerSkillSlot := 0;
-    //Ord('1') : FPlayerSkillSlot := 0;
-    //Ord('1') : FPlayerSkillSlot := 0;
   end;
 end;
 
@@ -3103,8 +3085,7 @@ begin
   unt := FUnits[FActiveUnit] as TRoomUnit;
   unt.AP := unt.MaxAP;
 
-  (FUnitMenu as TavmUnitMenu).RoomUnit := unt;
-  (FUnitMenu as TavmUnitMenu).SkillSlots.ActiveSkill := nil;
+  UI.SetActiveUnit(unt);
   if unt.HP <= 0 then
     EndTurn()
   else
@@ -3116,7 +3097,7 @@ begin
     begin
       if (unt is TBot) then TBot(unt).NewTurn();
       if (unt is TPlayer) then
-        FMessages.AddMessage('Ваш ход');
+        UI.AddMessage('Ваш ход');
     end;
   end;
 end;
@@ -3130,19 +3111,17 @@ procedure TBattleRoom.UpdateStep();
 var bot: TBot;
     new_action: IBRA_Action;
     i: LongInt;
+    n: Integer;
 begin
   if FUnits.Count = 0 then Exit;
 
   //update active skill information
   if FPlayerActiveSkill <> nil then
     if not FPlayerActiveSkill.UseReady(FPlayer) then
-      UI_SetPlayerActiveSkill(nil);
-  if FPlayerSkills <> nil then
-    TavmSkills(FPlayerSkills).ActiveSkill := FPlayerActiveSkill;
-  if FUnitMenu <> nil then
-    if TavmUnitMenu(FUnitMenu).SkillSlots <> nil then
-      if IsPlayerTurn then
-        TavmUnitMenu(FUnitMenu).SkillSlots.ActiveSkill := FPlayerActiveSkill;
+      SetPlayerActiveSkill(nil);
+
+  UI.SetPlayerActiveSkill(FPlayerActiveSkill);
+  UI.UpdateStep(IsPlayerTurn);
 
   //moved tile update
   if IsPlayerTurn then
@@ -3179,16 +3158,17 @@ begin
     if not FActions[i].ProcessAction() then
       FActions.DeleteWithSwap(i);
   end;
+
+  if Assigned(FOnLeaveBattleRoom) then
+    if FPlayer <> nil then
+    begin
+      n := FMap.RoomFloor.DoorCellIndex(FPlayer.RoomPos);
+      if n >= 0 then
+        FOnLeaveBattleRoom(Self, n);
+    end;
 end;
 
 procedure TBattleRoom.PrepareToDraw();
-  procedure AlignControls;
-  begin
-    if FPlayerSkills <> nil then
-      FPlayerSkills.Pos := Vec(Main.WindowSize.x - 10, 10);
-    if FMessages <> nil then
-      FMessages.Pos := Vec(10, Main.WindowSize.y - 200);
-  end;
 
   procedure DrawTileMap;
   var
@@ -3245,14 +3225,7 @@ procedure TBattleRoom.PrepareToDraw();
     end;
   end;
 begin
-  AlignControls;
   DrawTileMap;
-end;
-
-procedure TBattleRoom.Draw2DUI();
-begin
-  if FRootControl <> nil then
-    FRootControl.Draw();
 end;
 
 procedure TBattleRoom.Draw3DUI();
@@ -3265,60 +3238,6 @@ begin
   Main.States.SetBlendFunctions(bfSrcAlpha, bfInvSrcAlpha);
   FMap.Draw();
   Main.States.DepthWrite := oldDepthWrite;
-end;
-
-procedure TBattleRoom.Generate();
-
-  procedure CreateObstacles();
-  var obs: TObstacle;
-      i, j: Integer;
-      obsDesc: PObstacleDesc;
-      newPos: TVec2i;
-      newDir: Integer;
-  begin
-    if FObstacles = nil then Exit;
-    if FObstacles.Count = 0 then Exit;
-    for i := 0 to 40 do
-    begin
-      obsDesc := FObstacles.PItem[Random(FObstacles.Count)];
-      for j := 0 to 10 do
-      begin
-        newPos.x := Random(FMap.Radius * 2 + 1) - FMap.Radius;
-        newPos.y := Random(FMap.Radius * 2 + 1) - FMap.Radius;
-        newDir := Random(6);
-        if not FMap.IsCellExists(newPos) then Continue;
-        if not CanPlaceObstacle(FMap, obsDesc^, newPos, newDir) then Continue;
-        obs := TObstacle.Create(FMap);
-        obs.LoadModels(obsDesc^);
-        obs.SetRoomPosDir(newPos, newDir);
-        Break;
-      end;
-    end;
-  end;
-
-var bot: TBot;
-begin
-  PreloadModels;
-
-  FPlayer := TPlayer.Create(FMap);
-  //FPlayer.SetRoomPosDir(Vec(5, 5), 0);
-  FPlayer.LoadModels();
-  FPlayer.SetRoomPosDir(Vec(2, 1), 0);
-  FUnits.Add(FPlayer);
-
-  bot := TBotMutant1.Create(FMap);
-  bot.LoadModels();
-  bot.SetRoomPosDir(Vec(-4, 4), 0);
-  FUnits.Add(bot);
-
-  FActiveUnit := FUnits.Count - 1;
-
-  CreateObstacles();
-  CreateUI();
-
-  EndTurn();
-
-  FMap.CurrentPlayer := FPlayer;
 end;
 
 procedure TBattleRoom.GenerateWithLoad(const AFileName: string);
@@ -3364,32 +3283,21 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string);
 var
   i: Integer;
 begin
-  PreloadModels;
+  FreeAndNil(FMap);
+  FMap := TRoomMap.Create(Self);
+  FMap.Radius := cRoomRadius;
 
   LoadObstacles();
 
-  FPlayer := TPlayer.Create(FMap);
-  //FPlayer.SetRoomPosDir(Vec(5, 5), 0);
-  FPlayer.LoadModels();
-  FPlayer.SetRoomPosDir(GetSpawnPlace(), Random(6));
-  FPlayer.ApplyBuff(TBuff_Stun.Create(FPlayer, 3));
-  FUnits.Add(FPlayer);
-
   for i := 0 to {$IfDef DEBUGBOTS}0{$Else}6{$EndIf} do
     SpawnBot();
-
-  FActiveUnit := FUnits.Count - 1;
-
-  CreateUI();
-
-  EndTurn();
-
-  FMap.CurrentPlayer := FPlayer;
 end;
 
 procedure TBattleRoom.GenerateEmpty();
 begin
-  PreloadModels;
+  FreeAndNil(FMap);
+  FMap := TRoomMap.Create(Self);
+  FMap.Radius := cRoomRadius;
 
   FEmptyLight := World.Renderer.CreatePointLight();
   FEmptyLight.Pos := Vec(0, 10, 0);
@@ -3467,6 +3375,40 @@ begin
   Main.Camera.At := oldAt;
   Main.Camera.Eye := oldEye;
 end;
+
+procedure TBattleRoom.DetachPlayer();
+var n: Integer;
+begin
+  n := FUnits.IndexOf(FPlayer);
+  if n >= 0 then
+    FUnits.Delete(n);
+  FActiveUnit := 0;
+  FPlayerActiveSkill := nil;
+  FActions.Clear();
+  FMovePath.Clear();
+  FRayPath.Clear();
+  FMap.CurrentPlayer := nil;
+  FPlayer := nil;
+end;
+
+procedure TBattleRoom.AttachPlayer(const APlayer: TPlayer; const ARoomPos: TVec2i; ARoomDir: Integer);
+begin
+  if TRoomMap(APlayer.Parent).BattleRoom <> Self then
+  begin
+    TRoomMap(APlayer.Parent).BattleRoom.DetachPlayer();
+  end;
+
+  if FPlayer = nil then
+  begin
+    FPlayer := APlayer;
+    FPlayer.Parent := Map;
+    FUnits.Insert(0, FPlayer);
+    FActiveUnit := FUnits.Count - 1;
+    FMap.CurrentPlayer := FPlayer;
+    EndTurn();
+  end;
+end;
+
 {$IfDef FPC}
   {$WARN 5044 on : Symbol "$1" is not portable}
 {$EndIf}

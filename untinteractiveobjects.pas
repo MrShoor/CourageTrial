@@ -226,12 +226,12 @@ end;
 
 procedure TBRA_LootChestAction.ShowOtherInventory;
 begin
-  GetBattleRoom.UI_SetOtherInventory(FChest.Inventory());
+  GetBattleRoom.UI.SetOtherInventory(FChest.Inventory());
 end;
 
 procedure TBRA_LootChestAction.HideOtherInventory;
 begin
-  GetBattleRoom.UI_SetOtherInventory(nil);
+  GetBattleRoom.UI.SetOtherInventory(nil);
 end;
 
 procedure TBRA_LootChestAction.TryCancel;

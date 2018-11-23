@@ -731,7 +731,7 @@ begin
     if (itemIdx >= 0) and (itemIdx < FSkills.Count) then
       skill := FSkills.GetSkill(itemIdx);
 
-    bRoom.UI_SetPlayerActiveSkill(skill);
+    bRoom.SetPlayerActiveSkill(skill);
   end;
 
   inherited Notify_MouseUp(ABtn, APt, AShifts);
