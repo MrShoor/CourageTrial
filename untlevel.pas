@@ -182,7 +182,6 @@ type
     FNonRegistrable: Boolean;
     FRoom: TRoomMap;
     function CanRegister(target: TavObject): boolean; override;
-    procedure AfterValidateTransform; override;
     procedure SetRoomDir(const AValue: Integer); virtual;
     procedure SetRoomPos(const AValue: TVec2i); virtual;
   public
@@ -438,6 +437,7 @@ type
     procedure SetMapRadius(const ARadius: Integer);
   protected
     procedure AfterRegister; override;
+    function RoomMap: TRoomMap;
   public
     property Radius: Integer read FRadius write SetMapRadius;
     property Colors[ID: TTileColorID]: TVec4 read GetColors write SetColors;
@@ -790,6 +790,7 @@ type
 
     function IsBotTurn: Boolean;
     function IsMouseOnUI: Boolean;
+    procedure AutoOpenDoors;
     procedure AutoCloseDoors;
   protected
     procedure AfterRegister; override;
@@ -802,6 +803,8 @@ type
     property RoomDir: Integer read FRoomDir write SetRoomDir;
     property RoomTransform: TMat4 read FRoomTransform;
     property RoomTransformInv: TMat4 read FRoomTransformInv;
+    function WorldPos: TVec3;
+    function WorldRot: TQuat;
 
     function IsPlayerTurn: Boolean;
     property MovedTile: TVec2i read FMovedTile;
@@ -1172,7 +1175,7 @@ begin
     meshInst := World.Renderer.FindPrefabInstances('Hex'+IntToStr(j+1));
     n := FModels.Add(World.Renderer.ModelsCollection.AddFromMesh(meshInst.Mesh, hex[j].Count));
     for i := 0 to hex[j].Count - 1 do
-      FModels[n].MultiMesh[i].Transform := MatTranslate(Room.UI.TilePosToWorldPos(hex[j][i])) * Room.BattleRoom.RoomTransform;
+      FModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(hex[j][i], 0);
   end;
 end;
 
@@ -1230,7 +1233,7 @@ begin
     begin
       tileDir := OWall[j][i].z;
       tilePos := TTileUtils.RotateTileCoord(OWall[j][i].xy, tileDir);
-      FModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(tilePos, tileDir) * Room.BattleRoom.RoomTransform;
+      FModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(tilePos, tileDir);
     end;
   end;
 
@@ -1240,7 +1243,7 @@ begin
   begin
     tileDir := OWallConn[i].z;
     tilePos := TTileUtils.RotateTileCoord(OWallConn[i].xy, tileDir);
-    FModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(tilePos, tileDir) * Room.BattleRoom.RoomTransform;
+    FModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(tilePos, tileDir);
   end;
 end;
 
@@ -2181,6 +2184,12 @@ begin
 end;
 
 procedure TRoomObject.SetRoomDir(const AValue: Integer);
+
+  function DirToQuat(const ADir: Integer): TQuat;
+  begin
+    Result := Quat(Vec(0, 1, 0), 2 * Pi * (ADir / 6));
+  end;
+
 begin
   if FRoomDir = AValue then Exit;
   if not FNonRegistrable then
@@ -2188,7 +2197,7 @@ begin
   FRoomDir := AValue;
   if not FNonRegistrable then
     if FRegistered then FRoom.PutObject(Self);
-  Rot := Quat(Vec(0, 1, 0), 2 * Pi * (AValue / 6));
+  Rot := DirToQuat(AValue + FRoom.BattleRoom.RoomDir);
 end;
 
 function TRoomObject.CanRegister(target: TavObject): boolean;
@@ -2197,12 +2206,6 @@ begin
   if not Result then Exit;
   FRoom := TRoomMap(target.FindAtParents(TRoomMap));
   Result := Assigned(FRoom);
-end;
-
-procedure TRoomObject.AfterValidateTransform;
-begin
-  FTransform := FTransform * Room.BattleRoom.RoomTransform;
-  FTransformInv := Inv(FTransform);
 end;
 
 function TRoomObject.BlockedCellsCount: Integer;
@@ -2250,7 +2253,7 @@ begin
     if FRegistered then FRoom.PutObject(Self);
   if AAutoRegister then RegisterAtRoom();
   Pos := FRoom.UI.TilePosToWorldPos(APos);
-  Rot := Quat(Vec(0, 1, 0), 2 * Pi * (ADir / 6));
+  Rot := Quat(Vec(0, 1, 0), 2 * Pi * ((ADir + FRoom.BattleRoom.RoomDir) / 6));
 end;
 
 procedure TRoomObject.RegisterAtRoom();
@@ -2324,6 +2327,11 @@ begin
   FColorsFogOfWar[TTileColorID.Hovered] := Vec(1,1,1,1);
 end;
 
+function TRoomUI.RoomMap: TRoomMap;
+begin
+  Result := Parent as TRoomMap;
+end;
+
 procedure TRoomUI.ClearTileColors();
 var
   j, i: Integer;
@@ -2383,11 +2391,12 @@ var v: TVec2;
 begin
   v := ATilePos * FAffinePack;
   Result := Vec(v.x, 0, v.y);
+  Result := Result * RoomMap.BattleRoom.WorldRot + RoomMap.BattleRoom.WorldPos;
 end;
 
 function TRoomUI.TileToWorldTransform(const ATilePos: TVec2i; const ATileRot: Integer): TMat4;
 begin
-  Result := Mat4(Quat(Vec(0, 1, 0), 2 * Pi * (ATileRot / 6)), TilePosToWorldPos(ATilePos));
+  Result := Mat4(Quat(Vec(0, 1, 0), 2 * Pi * (ATileRot / 6)) * RoomMap.BattleRoom.WorldRot, TilePosToWorldPos(ATilePos));
 end;
 
 function TRoomUI.AutoTileColor(const APos: TVec2i): TTileColorID;
@@ -2638,8 +2647,9 @@ begin
   p2 := UI.TilePosToWorldPos(APt2);
   dir := Vec(p2.x, p2.z) - Vec(p1.x, p1.z);
   angle := -(arctan2(dir.y, dir.x)) / (2 * Pi) * 6;
-  if angle < 0 then angle := angle + 6;
-  Result := Round(angle);
+  Result := Round(angle - BattleRoom.RoomDir) mod 6;
+  if Result < 0 then
+    Result := Result + 6;
 end;
 
 function TRoomMap.RayCast(const APt1, APt2: TVec2i; const AllowHitBlockers: Boolean): IRoomPath;
@@ -3001,12 +3011,22 @@ begin
   UpdateRoomTransform;
 end;
 
-procedure TBattleRoom.UpdateRoomTransform;
+function TBattleRoom.WorldPos: TVec3;
 var
   WorldPos2d: TVec2;
 begin
   WorldPos2d := (FRoomPos * FAffinePack) * ((cRoomRadius*2+2)*0.86602540378443864676372317075294);
-  FRoomTransform := Mat4(Quat(Vec(0, 1, 0), 2 * Pi * (FRoomDir / 6)), Vec(WorldPos2d.x, 0, WorldPos2d.y));
+  Result := Vec(WorldPos2d.x, 0, WorldPos2d.y);
+end;
+
+function TBattleRoom.WorldRot: TQuat;
+begin
+  Result := Quat(Vec(0, 1, 0), 2 * Pi * (FRoomDir / 6));
+end;
+
+procedure TBattleRoom.UpdateRoomTransform;
+begin
+  FRoomTransform := Mat4(WorldRot(), WorldPos());
   FRoomTransformInv := Inv(FRoomTransform);
 end;
 
@@ -3032,6 +3052,18 @@ function TBattleRoom.IsMouseOnUI: Boolean;
 begin
   if FUI = nil then Exit(False);
   Result := FUI.IsMouseOnUI;
+end;
+
+procedure TBattleRoom.AutoOpenDoors;
+var
+  i: Integer;
+begin
+  if FUnits = nil then Exit;
+  for i := 0 to FUnits.Count - 1 do
+    if FUnits[i] is TBot then
+      if not (FUnits[i] as TRoomUnit).IsDead() then
+        Exit;
+  FMap.RoomFloor.DoorsOpened := True;
 end;
 
 procedure TBattleRoom.AutoCloseDoors;
@@ -3176,16 +3208,29 @@ begin
 end;
 
 procedure TBattleRoom.EndTurn();
+
+  function AnybodyAlive(): Boolean;
+  var
+    i: Integer;
+  begin
+    Result := False;
+    if FUnits = nil then Exit;
+    for i := 0 to FUnits.Count - 1 do
+      if not (FUnits[i] as TRoomUnit).IsDead() then
+        Exit(True);
+  end;
+
 var unt: TRoomUnit;
 begin
   if (FActions.Count > 0) then Exit;
+  if not AnybodyAlive() then Exit;
 
   FActiveUnit := (FActiveUnit + 1) mod FUnits.Count;
   unt := FUnits[FActiveUnit] as TRoomUnit;
   unt.AP := unt.MaxAP;
 
   UI.SetActiveUnit(unt);
-  if unt.HP <= 0 then
+  if unt.IsDead() then
     EndTurn()
   else
   begin
@@ -3220,6 +3265,7 @@ begin
       Exit;
     end;
 
+  AutoOpenDoors();
   AutoCloseDoors();
 
   //update active skill information

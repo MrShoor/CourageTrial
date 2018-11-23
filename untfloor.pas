@@ -70,6 +70,7 @@ type
   end;
 
   TBattleRoomAdapter = record
+    RoomRot: Integer;
     dummy: TBattleRoom;
     room : TBattleRoom;
   end;
@@ -307,7 +308,7 @@ var map: IFloorMapNonWeightedGraph;
 begin
   map := TFloorMapGraph.Create(Self);
   if map.GetNeighbour(ADoorIdx, ABattleRoom.RoomPos, newRoom) then
-    MoveToRoom(newRoom, (ADoorIdx + 3) mod 6);
+    MoveToRoom(newRoom, ADoorIdx + 3);
 end;
 
 function TFloorMap.ObtainBattleRoom(const ARoomCoord: TVec2i): TBattleRoom;
@@ -319,6 +320,7 @@ begin
   begin
     broom := TBattleRoom.Create(Self);
     broom.RoomPos := ARoomCoord;
+    broom.RoomDir := pRoom^.RoomRot;
     broom.GenerateWithLoad('rooms\r1.room', GetRoomDoors(ARoomCoord));
     broom.UI := FUI;
     broom.OnLeaveBattleRoom := {$IfDef FPC}@{$EndIf}DoLeaveBattleRoom;
@@ -332,14 +334,19 @@ function TFloorMap.GetRoomDoors(const ARoomCoord: TVec2i): TDoors;
 var map: IFloorMapNonWeightedGraph;
     dummy: TVec2i;
     i: Integer;
+    rot: Integer;
 begin
+  rot := FRooms[ARoomCoord].RoomRot;
   map := TFloorMapGraph.Create(Self);
   for i := 0 to map.MaxNeighbourCount(ARoomCoord) - 1 do
-    Result[i] := map.GetNeighbour(i, ARoomCoord, dummy);
+  begin
+    Result[i] := map.GetNeighbour(i + rot, ARoomCoord, dummy);
+  end;
 end;
 
 procedure TFloorMap.MoveToRoom(const ARoomCoord: TVec2i; const AFromDoor: Integer);
 var broom: TBattleRoom;
+    doorIdx: Integer;
 begin
   if FCurrentRoom <> nil then
     if FCurrentRoom.RoomPos = ARoomCoord then Exit;
@@ -349,7 +356,10 @@ begin
 
   if FPlayer = nil then CreatePlayer;
   FUI.SetPlayer(FPlayer);
-  FCurrentRoom.AttachPlayer(FPlayer, AFromDoor);
+
+  doorIdx := (AFromDoor - broom.RoomDir) mod 6;
+  if doorIdx < 0 then doorIdx := doorIdx + 6;
+  FCurrentRoom.AttachPlayer(FPlayer, doorIdx);
 end;
 
 procedure TFloorMap.SetCurrentRoom(const ARoomCoord: TVec2i);
@@ -378,10 +388,13 @@ procedure TFloorMap.Create2Rooms;
 var empty: TBattleRoomAdapter;
 begin
   ZeroClear(empty, SizeOf(empty));
+  empty.RoomRot := 0;
   FRooms.Add(Vec(0, 0), empty);
+  empty.RoomRot := 1;
   FRooms.Add(Vec(1, 0), empty);
 
   SetCurrentRoom(Vec(0, 0));
+  ObtainBattleRoom(Vec(1, 0));
 end;
 
 procedure TFloorMap.Draw2DUI();
