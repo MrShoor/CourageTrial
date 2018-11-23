@@ -91,7 +91,10 @@ type
     procedure DoOnEndTurnBtnClick(ASender: TObject);
     procedure DoLeaveBattleRoom(const ABattleRoom: TBattleRoom; const ADoorIdx: Integer);
 
+    function ObtainBattleRoom(const ARoomCoord: TVec2i): TBattleRoom;
+
     function  GetRoomDoors(const ARoomCoord: TVec2i): TDoors;
+    procedure MoveToRoom(const ARoomCoord: TVec2i; const AFromDoor: Integer);
     procedure SetCurrentRoom(const ARoomCoord: TVec2i);
   protected
     procedure AfterRegister; override;
@@ -304,7 +307,25 @@ var map: IFloorMapNonWeightedGraph;
 begin
   map := TFloorMapGraph.Create(Self);
   if map.GetNeighbour(ADoorIdx, ABattleRoom.RoomPos, newRoom) then
-    SetCurrentRoom(newRoom);
+    MoveToRoom(newRoom, (ADoorIdx + 3) mod 6);
+end;
+
+function TFloorMap.ObtainBattleRoom(const ARoomCoord: TVec2i): TBattleRoom;
+var broom: TBattleRoom;
+    pRoom: PBattleRoomAdapter;
+begin
+  pRoom := PBattleRoomAdapter(FRooms.PItem[ARoomCoord]);
+  if pRoom^.room = nil then
+  begin
+    broom := TBattleRoom.Create(Self);
+    broom.RoomPos := ARoomCoord;
+    broom.GenerateWithLoad('rooms\r1.room', GetRoomDoors(ARoomCoord));
+    broom.UI := FUI;
+    broom.OnLeaveBattleRoom := {$IfDef FPC}@{$EndIf}DoLeaveBattleRoom;
+
+    pRoom^.room := broom;
+  end;
+  Result := pRoom^.room;
 end;
 
 function TFloorMap.GetRoomDoors(const ARoomCoord: TVec2i): TDoors;
@@ -317,26 +338,28 @@ begin
     Result[i] := map.GetNeighbour(i, ARoomCoord, dummy);
 end;
 
-procedure TFloorMap.SetCurrentRoom(const ARoomCoord: TVec2i);
+procedure TFloorMap.MoveToRoom(const ARoomCoord: TVec2i; const AFromDoor: Integer);
 var broom: TBattleRoom;
-    pRoom: PBattleRoomAdapter;
 begin
   if FCurrentRoom <> nil then
     if FCurrentRoom.RoomPos = ARoomCoord then Exit;
 
-  pRoom := PBattleRoomAdapter(FRooms.PItem[ARoomCoord]);
-  if pRoom^.room = nil then
-  begin
-    broom := TBattleRoom.Create(Self);
-    broom.RoomPos := ARoomCoord;
-    broom.GenerateWithLoad('rooms\r1.room', GetRoomDoors(ARoomCoord));
-    broom.UI := FUI;
-    broom.OnLeaveBattleRoom := {$IfDef FPC}@{$EndIf}DoLeaveBattleRoom;
+  broom := ObtainBattleRoom(ARoomCoord);
+  FCurrentRoom := broom;
 
-    pRoom^.room := broom;
-  end;
+  if FPlayer = nil then CreatePlayer;
+  FUI.SetPlayer(FPlayer);
+  FCurrentRoom.AttachPlayer(FPlayer, AFromDoor);
+end;
 
-  FCurrentRoom := pRoom^.room;
+procedure TFloorMap.SetCurrentRoom(const ARoomCoord: TVec2i);
+var broom: TBattleRoom;
+begin
+  if FCurrentRoom <> nil then
+    if FCurrentRoom.RoomPos = ARoomCoord then Exit;
+
+  broom := ObtainBattleRoom(ARoomCoord);
+  FCurrentRoom := broom;
 
   if FPlayer = nil then CreatePlayer;
   FUI.SetPlayer(FPlayer);

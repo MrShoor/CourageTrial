@@ -239,12 +239,12 @@ type
     FDoors: array[0..5] of TRoomDoor;
     FDoorsOpened: Boolean;
     procedure SetDoorsOpened(AValue: Boolean);
-    procedure InitModels;
   protected
     procedure AfterRegister; override;
     procedure AddHexFloor();
     procedure AddWalls();
   public
+    procedure InitModels;
     procedure WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType); override;
 
     property DoorsOpened: Boolean read FDoorsOpened write SetDoorsOpened;
@@ -646,6 +646,22 @@ type
     function ProcessAction: Boolean; virtual; abstract;
   end;
 
+  { TBRA_ComingIn }
+
+  TBRA_ComingIn = class(TBRA_Action)
+  private
+    FRoomUnit: TRoomUnit;
+    FMovePath: IRoomPath;
+    FMovePathIdx: Integer;
+    FMovePathWeight: Single;
+    function MoveToNextCell: Boolean;
+  public
+    function Name: string; override;
+    function ProcessAction: Boolean; override;
+
+    constructor Create(const AUnit: TRoomUnit; const ADoorIdx: Integer);
+  end;
+
   { TBRA_UnitMovementAction }
 
   TBRA_UnitMovementAction = class(TBRA_Action)
@@ -766,12 +782,15 @@ type
     FMovePath : IRoomPath;
     FRayPath : IRoomPath;
 
+    FTryLeaveIndex: Integer;
+
     FEmptyLight: IavPointLight;
 
     FPlayerActiveSkill: IUnitSkill;
 
     function IsBotTurn: Boolean;
     function IsMouseOnUI: Boolean;
+    procedure AutoCloseDoors;
   protected
     procedure AfterRegister; override;
     function World: TbWorld;
@@ -808,7 +827,9 @@ type
     procedure DrawObstaclePreview(const AName: String; const bmp: TBitmap);
 
     procedure DetachPlayer();
+    procedure AttachPlayer(const APlayer: TPlayer; const ADoorIdx: Integer);
     procedure AttachPlayer(const APlayer: TPlayer; const ARoomPos: TVec2i; ARoomDir: Integer);
+    procedure TryLeaveRoom(const AUnit: TRoomUnit; const ADoorIdx: Integer);
 
     procedure SaveRoomMap(const AStream: TStream);
     procedure LoadRoomMap(const AStream: TStream);
@@ -859,6 +880,69 @@ function FindRoomClass(const AName: string): TRoomObjectClass;
 begin
   if gvRegRommClasses = nil then Exit(nil);
   if not gvRegRommClasses.TryGetValue(AName, Result) then Result := nil;
+end;
+
+{ TBRA_ComingIn }
+
+function TBRA_ComingIn.MoveToNextCell: Boolean;
+begin
+  if FMovePath = nil then Exit(False);
+  FRoomUnit.RoomPos := FMovePath[FMovePathIdx];
+
+  Inc(FMovePathIdx);
+  if FMovePathIdx > FMovePath.Count - 1 then Exit(False);
+
+  FRoomUnit.RoomDir := FRoomUnit.Room.Direction(FRoomUnit.RoomPos, FMovePath[FMovePathIdx]);
+
+  FMovePathWeight := 0;
+end;
+
+function TBRA_ComingIn.Name: string;
+begin
+  Result := ClassName;
+end;
+
+function TBRA_ComingIn.ProcessAction: Boolean;
+var fromPt, toPt: TVec3;
+begin
+  if FMovePath = nil then Exit(False);
+  if FMovePath.Count = 0 then Exit(False);
+
+  Result := True;
+  FMovePathWeight := FMovePathWeight + FRoomUnit.Main.UpdateStatesInterval / 1000 * FRoomUnit.GetUnitMoveSpeed;
+  if FMovePathWeight >= 1 then
+    if not MoveToNextCell then
+    begin
+      FRoomUnit.SetAnimation(['Idle0'], True);
+      FRoomUnit.RegisterAtRoom();
+      Exit(False);
+    end;
+
+  fromPt := FRoomUnit.Room.UI.TilePosToWorldPos(FRoomUnit.RoomPos);
+  toPt := FRoomUnit.Room.UI.TilePosToWorldPos(FMovePath[FMovePathIdx]);
+  FRoomUnit.Pos := Lerp(fromPt, toPt, FMovePathWeight);
+end;
+
+constructor TBRA_ComingIn.Create(const AUnit: TRoomUnit; const ADoorIdx: Integer);
+var door: TRoomDoor;
+begin
+  FRoomUnit := AUnit;
+  FMovePathIdx := 0;
+  FMovePathWeight := 0;
+
+  door := AUnit.Room.RoomFloor.FDoors[ADoorIdx];
+  Assert(door <> nil);
+
+  door.Opened := True;
+  FMovePath := TRoomPath.Create();
+  FMovePath.Add(TTileUtils.RotateTileCoord(Vec(-1,1), door.RoomDir) + door.RoomPos);
+  FMovePath.Add(door.RoomPos);
+
+  if (FMovePath <> nil) and (FRoomUnit <> nil) then
+  begin
+    FRoomUnit.RoomDir := FRoomUnit.Room.Direction(FRoomUnit.RoomPos, FMovePath[0]);
+    FRoomUnit.SetAnimation(['Walk'], True);
+  end;
 end;
 
 { TRoomDoor }
@@ -1606,6 +1690,7 @@ function TBRA_UnitMovementAction.MoveToNextCell: Boolean;
 begin
   RoomUnit.RoomPos := MovePath[MovePathIdx];
   RoomUnit.AP := RoomUnit.AP - 1;
+
   if RoomUnit.AP <= 0 then Exit(False);
   if MovePath = nil then Exit(False);
   if Cancelled then Exit(False);
@@ -1633,6 +1718,7 @@ end;
 
 function TBRA_UnitMovementAction.ProcessAction: Boolean;
 var fromPt, toPt: TVec3;
+    n: Integer;
 begin
   if MovePath = nil then Exit(False);
   if MovePath.Count = 0 then Exit(False);
@@ -1644,6 +1730,15 @@ begin
     if not MoveToNextCell then
     begin
       RoomUnit.SetAnimation(['Idle0'], True);
+
+      if RoomUnit is TPlayer then
+        if RoomUnit.Room.RoomFloor.DoorsOpened then
+        begin
+          n := RoomUnit.Room.RoomFloor.DoorCellIndex(RoomUnit.RoomPos);
+          if n >= 0 then
+            RoomUnit.Room.BattleRoom.TryLeaveRoom(RoomUnit, n);
+        end;
+
       Exit(False);
     end;
 
@@ -1867,12 +1962,19 @@ procedure TRoomUnit.AfterRegister;
 begin
   inherited AfterRegister;
   Name := 'Игрок';
-  FUnitSkills := TUnitSkillArr.Create();
-  FSlots10 := TUnitSkillArr.Create();
-  FSlots10.SetSize(10);
-  FInventory := TUnitInventory.Create(Self);
 
-  FBuffs := TUnitBuffsArr.Create();
+  if FUnitSkills = nil then
+    FUnitSkills := TUnitSkillArr.Create();
+  if FSlots10 = nil then
+  begin
+    FSlots10 := TUnitSkillArr.Create();
+    FSlots10.SetSize(10);
+  end;
+  if FInventory = nil then
+    FInventory := TUnitInventory.Create(Self);
+
+  if FBuffs = nil then
+    FBuffs := TUnitBuffsArr.Create();
 end;
 
 procedure TRoomUnit.WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType);
@@ -2437,7 +2539,10 @@ begin
 
   FreeAndNil(FRoomFloor);
   if FRadius > 0 then
+  begin
     FRoomFloor := TRoomFloor.Create(Self);
+    FRoomFloor.InitModels;
+  end;
 end;
 
 function TRoomMap.NextPointOnRay(const APt: TVec2i; const ADir, ADirStep: TVec2i): TVec2i;
@@ -2929,17 +3034,29 @@ begin
   Result := FUI.IsMouseOnUI;
 end;
 
+procedure TBattleRoom.AutoCloseDoors;
+var
+  i: Integer;
+begin
+  if (not FMap.RoomFloor.DoorsOpened) and (FActions.Count = 0) then
+  begin
+    for i := 0 to 5 do
+      if FMap.RoomFloor.FDoors[i] <> nil then
+      begin
+        if FMap.ObjectAt(FMap.RoomFloor.FDoors[i].RoomPos) = nil then
+          FMap.RoomFloor.FDoors[i].Opened := False;
+      end;
+  end;
+end;
+
 procedure TBattleRoom.AfterRegister;
 begin
   inherited AfterRegister;
+  FTryLeaveIndex := -1;
   FAffinePack.Row[0] := Vec(0.86602540378443864676372317075294, 0.5);
   FAffinePack.Row[1] := Vec(0, 1);
   FAffinePackInv := Inv(FAffinePack);
   UpdateRoomTransform;
-
-  Main.Camera.At := Vec(0,0,0);
-  Main.Camera.Up := Vec(0,1,0);
-  Main.Camera.Eye := Main.Camera.At + Vec(10, 10, 5);
 
   FUnits := TRoomUnitArr.Create();
   FActions := TBRA_ActionArr.Create();
@@ -3093,9 +3210,17 @@ procedure TBattleRoom.UpdateStep();
 var bot: TBot;
     new_action: IBRA_Action;
     i: LongInt;
-    n: Integer;
 begin
   if FUnits.Count = 0 then Exit;
+  if FPlayer = nil then Exit;
+  if FTryLeaveIndex >= 0 then
+    if Assigned(FOnLeaveBattleRoom) then
+    begin
+      FOnLeaveBattleRoom(Self, FTryLeaveIndex);
+      Exit;
+    end;
+
+  AutoCloseDoors();
 
   //update active skill information
   if FPlayerActiveSkill <> nil then
@@ -3140,14 +3265,6 @@ begin
     if not FActions[i].ProcessAction() then
       FActions.DeleteWithSwap(i);
   end;
-
-  if Assigned(FOnLeaveBattleRoom) then
-    if FPlayer <> nil then
-    begin
-      n := FMap.RoomFloor.DoorCellIndex(FPlayer.RoomPos);
-      if n >= 0 then
-        FOnLeaveBattleRoom(Self, n);
-    end;
 end;
 
 procedure TBattleRoom.PrepareToDraw();
@@ -3376,6 +3493,34 @@ begin
   FRayPath := nil;
   FMap.CurrentPlayer := nil;
   FPlayer := nil;
+  FTryLeaveIndex := -1;
+end;
+
+procedure TBattleRoom.AttachPlayer(const APlayer: TPlayer; const ADoorIdx: Integer);
+var
+  door: TRoomDoor;
+begin
+  if TRoomMap(APlayer.Parent).BattleRoom <> Self then
+  begin
+    TRoomMap(APlayer.Parent).BattleRoom.DetachPlayer();
+  end;
+
+  if FPlayer = nil then
+  begin
+    FPlayer := APlayer;
+    FPlayer.Parent := Map;
+
+    door := APlayer.Room.RoomFloor.FDoors[ADoorIdx];
+    Assert(door <> nil);
+
+    FPlayer.RoomPos := TTileUtils.RotateTileCoord(Vec(-1,2), door.RoomDir) + door.RoomPos;
+    FUnits.Insert(0, FPlayer);
+    FActiveUnit := FUnits.Count - 1;
+    FMap.CurrentPlayer := FPlayer;
+    EndTurn();
+    AddAction(TBRA_ComingIn.Create(FPlayer, ADoorIdx));
+    FTryLeaveIndex := -1;
+  end;
 end;
 
 procedure TBattleRoom.AttachPlayer(const APlayer: TPlayer; const ARoomPos: TVec2i; ARoomDir: Integer);
@@ -3406,6 +3551,11 @@ begin
     FMap.CurrentPlayer := FPlayer;
     EndTurn();
   end;
+end;
+
+procedure TBattleRoom.TryLeaveRoom(const AUnit: TRoomUnit; const ADoorIdx: Integer);
+begin
+  FTryLeaveIndex := ADoorIdx;
 end;
 
 {$IfDef FPC}

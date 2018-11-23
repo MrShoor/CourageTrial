@@ -77,6 +77,10 @@ end;
 procedure TfrmMain.FormCreate(Sender: TObject);
 begin
   FMain := TavMainRender.Create(nil);
+  FMain.Camera.At := Vec(0,0,0);
+  FMain.Camera.Up := Vec(0,1,0);
+  FMain.Camera.Eye := FMain.Camera.At + Vec(10, 10, 5);
+
   FDefFBO := Create_FrameBuffer(FMain, [TTextureFormat.RGBA, TTextureFormat.D32f], [True, False]);
 
   InitWorld;
