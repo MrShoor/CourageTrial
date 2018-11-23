@@ -192,6 +192,9 @@ begin
   FMain.States.DepthFunc := cfGreater;
   FMain.States.ColorMask[0] := AllChanells;
   FMain.UpdateStatesInterval := 8;
+  FMain.Camera.At := Vec(0, 0, 0);
+  FMain.Camera.Up := Vec(0, 1, 0);
+  FMain.Camera.Eye := Vec(-10, 20, -10);
 
   FWorld := TbWorld.Create(FMain);
   FWorld.Renderer.SetEnviromentCubemap(ExeRelativeFileName('waterfall.dds'));
@@ -394,8 +397,8 @@ begin
     UpdateWindow(FMain.Window);
   end;
   FRoom := TBattleRoom.Create(FWorld);
-  FRoom.SetEditMode();
   FRoom.GenerateEmpty();
+  FRoom.SetEditMode();
 
   lbObjects.Clear;
   for i := 0 to FRoom.Obstacles.Count - 1 do
