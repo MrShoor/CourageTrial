@@ -39,6 +39,8 @@ type
     function IsValid(const ACell: TVec2i): Boolean;
   end;
 
+  TDoors = array [0..5] of Boolean;
+
   IVec2iArr = {$IfDef FPC}specialize{$EndIf}IArray<TVec2i>;
   TVec2iArr = {$IfDef FPC}specialize{$EndIf}TArray<TVec2i>;
   IVec3iArr = {$IfDef FPC}specialize{$EndIf}IArray<TVec3i>;
@@ -166,6 +168,7 @@ type
     class function CircleLen(const ARadius: Integer): Integer;
     class function PolarToTileCoord(const ARadius, AIndex: Integer): TVec2i;
     class function RotateTileCoord(const APos: TVec2i; ADir: Integer): TVec2i;
+    class function NeighbourTile(const ACurrent: TVec2i; const AIndex: Integer): TVec2i;
   end;
 
   { TRoomObject }
@@ -240,7 +243,7 @@ type
   protected
     procedure AfterRegister; override;
     procedure AddHexFloor();
-    procedure AddWalls(const ADoors: array of Boolean);
+    procedure AddWalls();
   public
     procedure WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType); override;
 
@@ -536,6 +539,7 @@ type
     FInEditMode: Boolean;
 
     FRadius: Integer;
+    FDoors : TDoors;
 
     FRoomUI: TRoomUI;
 
@@ -554,6 +558,7 @@ type
     property BattleRoom: TBattleRoom read GetBattleRoom;
 
     property Radius: Integer read FRadius write SetRadius;
+    procedure SetDoorsRadius(const ADoors: TDoors; const ARadius: Integer);
 
     procedure Draw();
     procedure AddMessage(const AStr: string);
@@ -798,7 +803,7 @@ type
     procedure UpdateStep();
     procedure PrepareToDraw();
     procedure Draw3DUI();
-    procedure GenerateWithLoad(const AFileName: string);
+    procedure GenerateWithLoad(const AFileName: string; const ADoors: TDoors);
     procedure GenerateEmpty();
     procedure DrawObstaclePreview(const AName: String; const bmp: TBitmap);
 
@@ -821,7 +826,7 @@ implementation
 {$R 'shaders\CT_shaders.rc'}
 
 uses
-  untEnemies, untGraphics, untItems, untSkills, untBuffs, untRoomObstacles;
+  untEnemies, untGraphics, untItems, untSkills, untRoomObstacles;
 
 type
   IRoomClassesMap = {$IfDef FPC}specialize{$EndIf}IHashMap<string, TRoomObjectClass>;
@@ -1049,7 +1054,7 @@ procedure TRoomFloor.InitModels;
 begin
   if FInited then Exit;
   AddHexFloor();
-  AddWalls([True, True, True, True, True, False]);
+  AddWalls();
   FInited := True;
 end;
 
@@ -1087,7 +1092,7 @@ begin
   end;
 end;
 
-procedure TRoomFloor.AddWalls(const ADoors: array of Boolean);
+procedure TRoomFloor.AddWalls();
 var OWall: array[0..1] of IVec3iArr;
     OWallConn: IVec3iArr;
     v, vCenter: TVec2i;
@@ -1096,7 +1101,6 @@ var OWall: array[0..1] of IVec3iArr;
     tileDir: Integer;
     tilePos: TVec2i;
 begin
-  Assert(Length(ADoors) = 6);
   Assert(Room.Radius mod 2 = 0, 'Odd map radius is not valid');
 
   OWall[0] := TVec3iArr.Create();
@@ -1109,7 +1113,7 @@ begin
     tileDir := j;
     tilePos := TTileUtils.RotateTileCoord(vCenter, tileDir);
 
-    if ADoors[j] then
+    if Room.FDoors[j] then
     begin
       FDoors[j] := TRoomDoor.Create(Self);
       FDoors[j].LoadModels;
@@ -1478,6 +1482,11 @@ begin
       Assert(False);
       Result := APos;
   end;
+end;
+
+class function TTileUtils.NeighbourTile(const ACurrent: TVec2i; const AIndex: Integer): TVec2i;
+begin
+  Result := RotateTileCoord(Vec(0, 1), AIndex) + ACurrent;
 end;
 
 { TObstacle }
@@ -2463,40 +2472,7 @@ end;
 
 function TRoomMap.NeighbourTile(const ACurrent: TVec2i; const AIndex: Integer): TVec2i;
 begin
-  case AIndex of
-    0:
-      begin
-        Result.x := ACurrent.x-1;
-        Result.y := ACurrent.y;
-      end;
-    1:
-      begin
-        Result.x := ACurrent.x+1;
-        Result.y := ACurrent.y;
-      end;
-    2:
-      begin
-        Result.x := ACurrent.x-1;
-        Result.y := ACurrent.y+1;
-      end;
-    3:
-      begin
-        Result.x := ACurrent.x;
-        Result.y := ACurrent.y+1;
-      end;
-    4:
-      begin
-        Result.x := ACurrent.x;
-        Result.y := ACurrent.y-1;
-      end;
-    5:
-      begin
-        Result.x := ACurrent.x+1;
-        Result.y := ACurrent.y-1;
-      end;
-  else
-    Assert(False);
-  end;
+  Result := TTileUtils.NeighbourTile(ACurrent, AIndex);
 end;
 
 procedure TRoomMap.AfterRegister;
@@ -2517,6 +2493,12 @@ begin
     if obj is TBattleRoom then Exit(TBattleRoom(obj));
   until obj = nil;
   Result := nil;
+end;
+
+procedure TRoomMap.SetDoorsRadius(const ADoors: TDoors; const ARadius: Integer);
+begin
+  FDoors := ADoors;
+  Radius := ARadius;
 end;
 
 procedure TRoomMap.Draw();
@@ -3240,7 +3222,7 @@ begin
   Main.States.DepthWrite := oldDepthWrite;
 end;
 
-procedure TBattleRoom.GenerateWithLoad(const AFileName: string);
+procedure TBattleRoom.GenerateWithLoad(const AFileName: string; const ADoors: TDoors);
 
   procedure LoadObstacles;
   var fs: TFileStream;
@@ -3285,7 +3267,7 @@ var
 begin
   FreeAndNil(FMap);
   FMap := TRoomMap.Create(Self);
-  FMap.Radius := cRoomRadius;
+  FMap.SetDoorsRadius(ADoors, cRoomRadius);
 
   LoadObstacles();
 
@@ -3294,10 +3276,14 @@ begin
 end;
 
 procedure TBattleRoom.GenerateEmpty();
+var doors: TDoors;
+    i: Integer;
 begin
+  for i := 0 to Length(doors) - 1 do doors[i] := True;
+
   FreeAndNil(FMap);
   FMap := TRoomMap.Create(Self);
-  FMap.Radius := cRoomRadius;
+  FMap.SetDoorsRadius(doors, cRoomRadius);
 
   FEmptyLight := World.Renderer.CreatePointLight();
   FEmptyLight.Pos := Vec(0, 10, 0);
@@ -3379,19 +3365,31 @@ end;
 procedure TBattleRoom.DetachPlayer();
 var n: Integer;
 begin
+  FPlayer.UnregisterAtRoom();
   n := FUnits.IndexOf(FPlayer);
   if n >= 0 then
     FUnits.Delete(n);
   FActiveUnit := 0;
   FPlayerActiveSkill := nil;
   FActions.Clear();
-  FMovePath.Clear();
-  FRayPath.Clear();
+  FMovePath := nil;
+  FRayPath := nil;
   FMap.CurrentPlayer := nil;
   FPlayer := nil;
 end;
 
 procedure TBattleRoom.AttachPlayer(const APlayer: TPlayer; const ARoomPos: TVec2i; ARoomDir: Integer);
+
+  function GetSpawnPlace(): TVec2i;
+  begin
+    repeat
+      Result.x := Random(FMap.Radius*2+1) - FMap.Radius;
+      Result.y := Random(FMap.Radius*2+1) - FMap.Radius;
+      if FMap.IsCellExists(Result) and not FMap.IsCellBlocked(Result) then
+        Exit(Result);
+    until False;
+  end;
+
 begin
   if TRoomMap(APlayer.Parent).BattleRoom <> Self then
   begin
@@ -3402,6 +3400,7 @@ begin
   begin
     FPlayer := APlayer;
     FPlayer.Parent := Map;
+    FPlayer.SetRoomPosDir(GetSpawnPlace, FPlayer.RoomDir);
     FUnits.Insert(0, FPlayer);
     FActiveUnit := FUnits.Count - 1;
     FMap.CurrentPlayer := FPlayer;

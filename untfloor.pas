@@ -8,10 +8,14 @@ unit untFloor;
 interface
 
 uses
-  Classes, SysUtils, avRes, avContnrs, avMiniControls, untLevel, mutils, intfUtils,
+  Classes, SysUtils, avRes, avContnrs, avMiniControls, avTypes, untLevel, mutils, intfUtils,
+  avContnrsDefaults,
+  avPathFinder,
   ui_unit, ui_inventory, ui_skills, ui_gamecamera, ui_messages;
 
 type
+  TFloorMap = class;
+  IFloorMapNonWeightedGraph = {$IfDef FPC}specialize{$EndIf}INonWeightedGraph<TVec2i>;
 
   { TGameUI }
 
@@ -50,12 +54,33 @@ type
     property OnEndTurnBtnClick: TNotifyEvent read FOnEndTurnBtnClick write FOnEndTurnBtnClick;
   end;
 
+  { TFloorMapGraph }
+
+  TFloorMapGraph = class(TInterfacedObject, IEqualityComparer, IFloorMapNonWeightedGraph)
+  private
+    FFloor: TFloorMap;
+    function Hash(const Value): Cardinal;
+    function IsEqual(const Left, Right): Boolean;
+
+    function MaxNeighbourCount(const ANode: TVec2i): Integer;
+    function NodeComparer: IEqualityComparer;
+    function GetNeighbour(Index: Integer; const ACurrent: TVec2i; out ANeighbour: TVec2i): Boolean; overload;
+  public
+    constructor Create(AFloor: TFloorMap);
+  end;
+
+  TBattleRoomAdapter = record
+    dummy: TBattleRoom;
+    room : TBattleRoom;
+  end;
+  PBattleRoomAdapter = ^TBattleRoomAdapter;
+
   { TFloorMap }
 
   TFloorMap = class(TavMainRenderChild)
   private type
-    TRoomsMap = {$IFDef FPC}specialize{$EndIf} THashMap<TVec2i, TBattleRoom>;
-    IRoomsMap = {$IFDef FPC}specialize{$EndIf} IHashMap<TVec2i, TBattleRoom>;
+    TRoomsMap = {$IFDef FPC}specialize{$EndIf} THashMap<TVec2i, TBattleRoomAdapter>;
+    IRoomsMap = {$IFDef FPC}specialize{$EndIf} IHashMap<TVec2i, TBattleRoomAdapter>;
   private
     FCurrentRoom: TBattleRoom;
     FRooms: IRoomsMap;
@@ -65,6 +90,9 @@ type
     procedure CreatePlayer;
     procedure DoOnEndTurnBtnClick(ASender: TObject);
     procedure DoLeaveBattleRoom(const ABattleRoom: TBattleRoom; const ADoorIdx: Integer);
+
+    function  GetRoomDoors(const ARoomCoord: TVec2i): TDoors;
+    procedure SetCurrentRoom(const ARoomCoord: TVec2i);
   protected
     procedure AfterRegister; override;
   public
@@ -76,6 +104,41 @@ type
   end;
 
 implementation
+
+{ TFloorMapGraph }
+
+function TFloorMapGraph.Hash(const Value): Cardinal;
+begin
+  Result := Murmur2DefSeed(Value, SizeOf(TVec2i));
+end;
+
+function TFloorMapGraph.IsEqual(const Left, Right): Boolean;
+var nl: TVec2i absolute Left;
+    nr: TVec2i absolute Right;
+begin
+  Result := (nl.x = nr.x) and (nl.y = nr.y);
+end;
+
+function TFloorMapGraph.MaxNeighbourCount(const ANode: TVec2i): Integer;
+begin
+  Result := 6;
+end;
+
+function TFloorMapGraph.NodeComparer: IEqualityComparer;
+begin
+  Result := Self;
+end;
+
+function TFloorMapGraph.GetNeighbour(Index: Integer; const ACurrent: TVec2i; out ANeighbour: TVec2i): Boolean;
+begin
+  ANeighbour := TTileUtils.NeighbourTile(ACurrent, Index);
+  Result := FFloor.FRooms.Contains(ANeighbour);
+end;
+
+constructor TFloorMapGraph.Create(AFloor: TFloorMap);
+begin
+  FFloor := AFloor;
+end;
 
 { TGameUI }
 
@@ -236,9 +299,48 @@ begin
 end;
 
 procedure TFloorMap.DoLeaveBattleRoom(const ABattleRoom: TBattleRoom; const ADoorIdx: Integer);
+var map: IFloorMapNonWeightedGraph;
+    newRoom: TVec2i;
 begin
-  WriteLn('Room Leaved ', ADoorIdx);
-  ABattleRoom.OnLeaveBattleRoom := nil;
+  map := TFloorMapGraph.Create(Self);
+  if map.GetNeighbour(ADoorIdx, ABattleRoom.RoomPos, newRoom) then
+    SetCurrentRoom(newRoom);
+end;
+
+function TFloorMap.GetRoomDoors(const ARoomCoord: TVec2i): TDoors;
+var map: IFloorMapNonWeightedGraph;
+    dummy: TVec2i;
+    i: Integer;
+begin
+  map := TFloorMapGraph.Create(Self);
+  for i := 0 to map.MaxNeighbourCount(ARoomCoord) - 1 do
+    Result[i] := map.GetNeighbour(i, ARoomCoord, dummy);
+end;
+
+procedure TFloorMap.SetCurrentRoom(const ARoomCoord: TVec2i);
+var broom: TBattleRoom;
+    pRoom: PBattleRoomAdapter;
+begin
+  if FCurrentRoom <> nil then
+    if FCurrentRoom.RoomPos = ARoomCoord then Exit;
+
+  pRoom := PBattleRoomAdapter(FRooms.PItem[ARoomCoord]);
+  if pRoom^.room = nil then
+  begin
+    broom := TBattleRoom.Create(Self);
+    broom.RoomPos := ARoomCoord;
+    broom.GenerateWithLoad('rooms\r1.room', GetRoomDoors(ARoomCoord));
+    broom.UI := FUI;
+    broom.OnLeaveBattleRoom := {$IfDef FPC}@{$EndIf}DoLeaveBattleRoom;
+
+    pRoom^.room := broom;
+  end;
+
+  FCurrentRoom := pRoom^.room;
+
+  if FPlayer = nil then CreatePlayer;
+  FUI.SetPlayer(FPlayer);
+  FCurrentRoom.AttachPlayer(FPlayer, Vec(0,0), 0);
 end;
 
 procedure TFloorMap.AfterRegister;
@@ -250,27 +352,13 @@ begin
 end;
 
 procedure TFloorMap.Create2Rooms;
-var broom: TBattleRoom;
+var empty: TBattleRoomAdapter;
 begin
-  broom := TBattleRoom.Create(Self);
-  broom.RoomPos := Vec(0,0);
-  broom.GenerateWithLoad('rooms\r1.room');
-  broom.UI := FUI;
-  broom.OnLeaveBattleRoom := {$IfDef FPC}@{$EndIf}DoLeaveBattleRoom;
-  FRooms.Add(broom.RoomPos, broom);
+  ZeroClear(empty, SizeOf(empty));
+  FRooms.Add(Vec(0, 0), empty);
+  FRooms.Add(Vec(1, 0), empty);
 
-  FCurrentRoom := broom;
-
-  broom := TBattleRoom.Create(Self);
-  broom.RoomPos := Vec(1,0);
-  broom.GenerateWithLoad('rooms\r1.room');
-  broom.UI := FUI;
-  broom.OnLeaveBattleRoom := {$IfDef FPC}@{$EndIf}DoLeaveBattleRoom;
-  FRooms.Add(broom.RoomPos, broom);
-
-  CreatePlayer();
-  FUI.SetPlayer(FPlayer);
-  FCurrentRoom.AttachPlayer(FPlayer, Vec(0,0), 0);
+  SetCurrentRoom(Vec(0, 0));
 end;
 
 procedure TFloorMap.Draw2DUI();
