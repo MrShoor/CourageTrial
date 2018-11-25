@@ -101,6 +101,8 @@ end;
 procedure TfrmMain.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
   FFloor.CurrentRoom.KeyPress(Key);
+  if Key = Ord(' ') then
+    FWorld.Renderer.InvalidateShaders;
 end;
 
 procedure TfrmMain.FormMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);

@@ -1,0 +1,1 @@
+..\..\BackTerria\Tools\bTexturePacker\bTexPacker.exe pack_rules.json
