@@ -77,6 +77,7 @@ type
     procedure miOpenClick(Sender: TObject);
     procedure miSaveClick(Sender: TObject);
     procedure RenderPanelDblClick(Sender: TObject);
+    procedure RenderPanelMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure RenderPanelMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
     procedure RenderPanelPaint(Sender: TObject);
   private
@@ -346,6 +347,15 @@ begin
         FState_AddObject.CancelState();
     end;
   end;
+end;
+
+procedure TfmrMain.RenderPanelMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var movedTile: TVec2i;
+begin
+  if Button <> mbMiddle then Exit;
+  movedTile := FRoom.Map.UI.GetTileAtCoords(FMain.Cursor.Ray);
+  FRoom.Map.RoomFloor.IsHole[movedTile] := not FRoom.Map.RoomFloor.IsHole[movedTile];
+  FMain.InvalidateWindow;
 end;
 
 procedure TfmrMain.RenderPanelMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);

@@ -237,14 +237,23 @@ type
     FInited: Boolean;
     FDoors: array[0..5] of TRoomDoor;
     FDoorsOpened: Boolean;
+    FHoles: IVec2iSet;
+    function GetIsHole(const ATileCoord: TVec2i): Boolean;
     procedure SetDoorsOpened(AValue: Boolean);
+    procedure SetIsHole(const ATileCoord: TVec2i; AValue: Boolean);
+
+    procedure ValidateFloor;
+    procedure InvalidateFloor;
   protected
+    FFloorModels: IavModelInstanceArr;
     procedure AfterRegister; override;
-    procedure AddHexFloor();
     procedure AddWalls();
   public
-    procedure InitModels;
+    procedure InitModels();
     procedure WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType); override;
+
+    function AllHoles: IVec2iSet;
+    property IsHole[const ATileCoord: TVec2i]: Boolean read GetIsHole write SetIsHole;
 
     property DoorsOpened: Boolean read FDoorsOpened write SetDoorsOpened;
     function DoorCellIndex(const ATileCoord: TVec2i): Integer;
@@ -434,6 +443,7 @@ type
     procedure SetTileColor(const APos: TVec2i; const AColorID: TTileColorID);
     function  GetTileColor(const APos: TVec2i): TTileColorID;
 
+    procedure ValidateTiles;
     procedure SetMapRadius(const ARadius: Integer);
   protected
     procedure AfterRegister; override;
@@ -1137,10 +1147,201 @@ begin
       FDoors[i].Opened := FDoorsOpened;
 end;
 
-procedure TRoomFloor.InitModels;
+function TRoomFloor.GetIsHole(const ATileCoord: TVec2i): Boolean;
+begin
+  Result := FHoles.Contains(ATileCoord);
+end;
+
+procedure TRoomFloor.SetIsHole(const ATileCoord: TVec2i; AValue: Boolean);
+begin
+  if AValue then
+  begin
+    if FHoles.Add(ATileCoord) then
+      InvalidateFloor;
+  end
+  else
+  begin
+    if FHoles.Delete(ATileCoord) then
+      InvalidateFloor;
+  end;
+end;
+
+procedure TRoomFloor.ValidateFloor;
+
+  function GetPitIndex(const ACrd: TVec2i; out AIdx: Integer; out ADir: Integer): Boolean;
+
+    function MatchPattern(ACurrDir: Integer; Pattern: array of Integer): Boolean;
+    var i: Integer;
+    begin
+      Assert(Length(Pattern) = 6);
+      for i := 0 to 5 do
+      begin
+        if Pattern[i] = 2 then Continue;
+        if (Pattern[i] = 1) <> (FHoles.Contains( TTileUtils.RotateTileCoord(Vec(1, 0), ACurrDir + i) + ACrd ) ) then
+          Exit(False);
+      end;
+      Result := True;
+    end;
+
+  var
+    i: Integer;
+  begin
+    Result := FHoles.Contains(ACrd);
+    if not Result then Exit;
+    for i := 0 to 5 do
+    begin
+      ADir := i;
+      if MatchPattern(ADir, [1, 1, 0, 2, 2, 0]) then
+      begin
+        AIdx := 0;
+        Exit;
+      end;
+
+      if MatchPattern(ADir, [1, 1, 1, 0, 2, 0]) then
+      begin
+        AIdx := 1;
+        Exit;
+      end;
+
+      if MatchPattern(ADir, [1, 1, 1, 1, 0, 0]) then
+      begin
+        AIdx := 2;
+        Exit;
+      end;
+
+      if MatchPattern(ADir, [1, 0, 1, 1, 1, 1]) then
+      begin
+        AIdx := 4;
+        Exit;
+      end;
+    end;
+    AIdx := -1;
+    ADir := 0;
+  end;
+
+var idx: Integer;
+    i, j, n: Integer;
+    hex: array [0..4] of IVec2iArr;
+    pit: array [0..5] of IVec3iArr;
+    meshInst: IavMeshInstance;
+    pitIdx: Integer;
+    pitDir: Integer;
+    pitModelName: string;
+    connectorsCount: Integer;
+    connectorDir: Integer;
+begin
+  if FFloorModels <> nil then Exit;
+  FFloorModels := TavModelInstanceArr.Create();
+
+  for i := 0 to Length(hex) - 1 do
+    hex[i] := TVec2iArr.Create();
+  for i := 0 to Length(pit) - 1 do
+    pit[i] := TVec3iArr.Create();
+
+  idx := 2;
+  for i := -Room.Radius to Room.Radius do
+    for j := -Room.Radius to Room.Radius do
+    begin
+      if Room.Distance(Vec(0,0), Vec(i, j)) > Room.FRadius then Continue;
+      if GetPitIndex(Vec(i, j), pitIdx, pitDir) then
+      begin
+        if pitIdx >= 0 then
+          pit[pitIdx].Add(Vec(i, j, pitDir));
+      end
+      else
+      begin
+        //idx := Random(5) + 1;
+        if Room.InEditMode then
+          idx := 1
+        else
+          idx := WeightedRandom([5, 50, 2, 1, 1]);
+        hex[idx].Add(Vec(i,j));
+      end;
+    end;
+
+  for j := 0 to Length(hex) - 1 do
+  begin
+    if hex[j].Count = 0 then Continue;
+
+    meshInst := World.Renderer.FindPrefabInstances('Hex'+IntToStr(j+1));
+    n := FFloorModels.Add(World.Renderer.ModelsCollection.AddFromMesh(meshInst.Mesh, hex[j].Count));
+    for i := 0 to hex[j].Count - 1 do
+      FFloorModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(hex[j][i], 0);
+  end;
+
+  for j := 0 to Length(pit) - 1 do
+  begin
+    if pit[j].Count = 0 then Continue;
+
+    case j of
+      0: pitModelName := 'Pit_corner0';
+      1: pitModelName := 'Pit_corner1';
+      2: pitModelName := 'Pit_line';
+      3: pitModelName := 'Pit_corner0';
+      4: pitModelName := 'Pit_corner1';
+    else
+      Assert(False);
+      Continue;
+    end;
+
+    meshInst := World.Renderer.FindPrefabInstances(pitModelName);
+    n := FFloorModels.Add(World.Renderer.ModelsCollection.AddFromMesh(meshInst.Mesh, pit[j].Count));
+    for i := 0 to pit[j].Count - 1 do
+      FFloorModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(pit[j][i].xy, pit[j][i].z);
+
+    case j of
+      0: pitModelName := 'Pit_corner0_hex';
+      1: pitModelName := 'Pit_corner1_hex';
+      2: pitModelName := 'Pit_line_hex';
+      3: pitModelName := '';
+      4: pitModelName := 'Pit_corner1_hex2';
+    else
+      Assert(False);
+      Continue;
+    end;
+
+    if pitModelName <> '' then
+    begin
+      meshInst := World.Renderer.FindPrefabInstances(pitModelName);
+      n := FFloorModels.Add(World.Renderer.ModelsCollection.AddFromMesh(meshInst.Mesh, pit[j].Count));
+      for i := 0 to pit[j].Count - 1 do
+        FFloorModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(pit[j][i].xy, pit[j][i].z);
+    end;
+  end;
+
+  connectorsCount := 0;
+  for j := 0 to Length(pit) - 1 do
+    Inc(connectorsCount, pit[j].Count);
+  if connectorsCount > 0 then
+  begin
+    meshInst := World.Renderer.FindPrefabInstances('Pit_connector');
+    n := FFloorModels.Add(World.Renderer.ModelsCollection.AddFromMesh(meshInst.Mesh, connectorsCount));
+    connectorsCount := 0;
+    for j := 0 to Length(pit) - 1 do
+    begin
+      if pit[j].Count = 0 then Continue;
+      for i := 0 to pit[j].Count - 1 do
+      begin
+        if j = 4 then
+          connectorDir := (pit[j][i].z + 2) mod 6
+        else
+          connectorDir := pit[j][i].z;
+        FFloorModels[n].MultiMesh[connectorsCount + i].Transform := Room.UI.TileToWorldTransform(pit[j][i].xy, connectorDir);
+      end;
+      Inc(connectorsCount, pit[j].Count);
+    end;
+  end;
+end;
+
+procedure TRoomFloor.InvalidateFloor;
+begin
+  FFloorModels := nil;
+end;
+
+procedure TRoomFloor.InitModels();
 begin
   if FInited then Exit;
-  AddHexFloor();
+  InvalidateFloor;
   AddWalls();
   FInited := True;
 end;
@@ -1149,34 +1350,7 @@ procedure TRoomFloor.AfterRegister;
 begin
   inherited AfterRegister;
   FNonRegistrable := True;
-end;
-
-procedure TRoomFloor.AddHexFloor();
-var idx: Integer;
-    i, j, n: Integer;
-    hex: array [0..4] of IVec2iArr;
-    meshInst: IavMeshInstance;
-begin
-  for i := 0 to Length(hex) - 1 do
-    hex[i] := TVec2iArr.Create();
-
-  idx := 2;
-  for i := -Room.Radius to Room.Radius do
-    for j := -Room.Radius to Room.Radius do
-    begin
-      if Room.Distance(Vec(0,0), Vec(i, j)) > Room.FRadius then Continue;
-      //idx := Random(5) + 1;
-      idx := WeightedRandom([5, 50, 2, 1, 1]);
-      hex[idx].Add(Vec(i,j));
-    end;
-
-  for j := 0 to Length(hex) - 1 do
-  begin
-    meshInst := World.Renderer.FindPrefabInstances('Hex'+IntToStr(j+1));
-    n := FModels.Add(World.Renderer.ModelsCollection.AddFromMesh(meshInst.Mesh, hex[j].Count));
-    for i := 0 to hex[j].Count - 1 do
-      FModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(hex[j][i], 0);
-  end;
+  FHoles := TVec2iSet.Create();
 end;
 
 procedure TRoomFloor.AddWalls();
@@ -1248,9 +1422,18 @@ begin
 end;
 
 procedure TRoomFloor.WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType);
+var
+  i: Integer;
 begin
-  InitModels;
+  ValidateFloor;
   inherited WriteModels(ACollection, AType);
+  for i := 0 to FFloorModels.Count - 1 do
+    ACollection.Add(FFloorModels[i]);
+end;
+
+function TRoomFloor.AllHoles: IVec2iSet;
+begin
+  Result := FHoles;
 end;
 
 function TRoomFloor.DoorCellIndex(const ATileCoord: TVec2i): Integer;
@@ -2337,6 +2520,7 @@ var
   j, i: Integer;
   n: Integer;
 begin
+  ValidateTiles;
   n := 0;
   for j := -FRadius to FRadius do
     for i := -FRadius to FRadius do
@@ -2403,6 +2587,7 @@ function TRoomUI.AutoTileColor(const APos: TVec2i): TTileColorID;
 var rm: TRoomMap;
     obj: TRoomObject;
 begin
+  ValidateTiles;
   rm := Parent as TRoomMap;
   if not rm.IsCellExists(APos) then Exit(TTileColorID.None);
   obj := rm.ObjectAt(APos);
@@ -2422,6 +2607,7 @@ procedure TRoomUI.DrawUI(const ATransform: TMat4);
 var tmpColors: TVec4Arr;
   i: Integer;
 begin
+  ValidateTiles;
   if FTilesData.Count = 0 then Exit;
   SetLength(tmpColors, Length(FColors));
 
@@ -2456,6 +2642,7 @@ end;
 
 procedure TRoomUI.SetColors(ID: TTileColorID; const AValue: TVec4);
 begin
+  ValidateTiles;
   FColors[ID] := AValue;
 end;
 
@@ -2466,6 +2653,7 @@ var
   rm: TRoomMap;
 begin
   if FFogOfWarValid then Exit;
+  ValidateTiles;
   rm := Parent as TRoomMap;
 
   w := FRadius * 2 + 1;
@@ -2501,6 +2689,7 @@ end;
 procedure TRoomUI.SetTileColor(const APos: TVec2i; const AColorID: TTileColorID);
 var pTile: PHexTile;
 begin
+  ValidateTiles;
   if not (Parent as TRoomMap).IsCellExists(APos) then Exit;
 
   pTile := PHexTile(FTilesData.PItem[PosToIndex(APos)]);
@@ -2511,19 +2700,18 @@ end;
 
 function TRoomUI.GetTileColor(const APos: TVec2i): TTileColorID;
 begin
+  ValidateTiles;
   Result := PHexTile(FTilesData.PItem[PosToIndex(APos)])^.vsColor;
 end;
 
-procedure TRoomUI.SetMapRadius(const ARadius: Integer);
+procedure TRoomUI.ValidateTiles;
 var
   j, i: Integer;
   new_tile: THexTile;
   w: Integer;
 begin
-  if ARadius = FRadius then Exit;
-  FRadius := ARadius;
+  if FTilesData.Count > 0 then Exit;
   w := FRadius * 2 + 1;
-  FTilesData.Clear();
   FTilesData.Capacity := w*w;
   for j := -FRadius to FRadius do
     for i := -FRadius to FRadius do
@@ -2536,6 +2724,13 @@ begin
       FTilesData.Add(new_tile);
     end;
   FTilesVB.Invalidate;
+end;
+
+procedure TRoomUI.SetMapRadius(const ARadius: Integer);
+begin
+  if ARadius = FRadius then Exit;
+  FRadius := ARadius;
+  FTilesData.Clear();
 end;
 
 { TRoomMap }
@@ -2814,6 +3009,8 @@ end;
 function TRoomMap.IsCellExists(const APos: TVec2i): Boolean;
 begin
   Result := Distance(Vec(0,0), APos) <= (FRadius - 1);
+  if Result then
+    if FRoomFloor.IsHole[APos] then Exit(False);
   if not Result then
     if FRoomFloor <> nil then
       Result := FRoomFloor.DoorCellIndex(APos) >= 0;
@@ -3611,7 +3808,9 @@ end;
 procedure TBattleRoom.SaveRoomMap(const AStream: TStream);
 var obs: TObstacle;
     obsCount: Integer;
-    i: Integer;
+    i, n: Integer;
+    holes: IVec2iSet;
+    hole: TVec2i;
 begin
   obsCount := Map.ChildCount(TObstacle);
   AStream.WriteBuffer(obsCount, SizeOf(obsCount));
@@ -3625,15 +3824,23 @@ begin
       obs.WriteStream(AStream);
     end;
   end;
+
+  holes := Map.RoomFloor.AllHoles;
+  n := holes.Count;
+  AStream.WriteBuffer(n, SizeOf(n));
+  holes.Reset;
+  while holes.Next(hole) do
+    AStream.WriteBuffer(hole, SizeOf(hole));
 end;
 
 procedure TBattleRoom.LoadRoomMap(const AStream: TStream);
 var obs: TObstacle;
     obsCount: Integer;
-    i: Integer;
+    i, n: Integer;
     astr_clsName : AnsiString;
     clsName : string;
     roomCls : TRoomObjectClass;
+    hole: TVec2i;
 begin
   obsCount := 0;
   AStream.ReadBuffer(obsCount, SizeOf(obsCount));
@@ -3647,6 +3854,15 @@ begin
     Assert(roomCls.InheritsFrom(TObstacle));
     obs := CreateRoomObject(roomCls) as TObstacle;
     obs.ReadStream(AStream);
+  end;
+
+  hole := Vec(0, 0);
+  n := 0;
+  AStream.ReadBuffer(n, SizeOf(n));
+  for i := 0 to n - 1 do
+  begin
+    AStream.ReadBuffer(hole, SizeOf(hole));
+    FMap.RoomFloor.IsHole[hole] := True;
   end;
 end;
 

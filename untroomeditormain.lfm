@@ -13,7 +13,7 @@ object fmrMain: TfmrMain
   OnDestroy = FormDestroy
   OnKeyDown = FormKeyDown
   ParentDoubleBuffered = False
-  LCLVersion = '2.0.0.2'
+  LCLVersion = '2.0.0.1'
   object RenderPanel: TPanel
     Left = 292
     Height = 844
@@ -23,6 +23,7 @@ object fmrMain: TfmrMain
     BevelOuter = bvNone
     TabOrder = 0
     OnDblClick = RenderPanelDblClick
+    OnMouseDown = RenderPanelMouseDown
     OnMouseMove = RenderPanelMouseMove
     OnPaint = RenderPanelPaint
   end
