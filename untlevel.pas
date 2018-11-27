@@ -1427,8 +1427,9 @@ var
 begin
   ValidateFloor;
   inherited WriteModels(ACollection, AType);
-  for i := 0 to FFloorModels.Count - 1 do
-    ACollection.Add(FFloorModels[i]);
+  if AType = mtDefault then
+    for i := 0 to FFloorModels.Count - 1 do
+      ACollection.Add(FFloorModels[i]);
 end;
 
 function TRoomFloor.AllHoles: IVec2iSet;
