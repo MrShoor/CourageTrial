@@ -184,6 +184,8 @@ type
     function CanRegister(target: TavObject): boolean; override;
     procedure SetRoomDir(const AValue: Integer); virtual;
     procedure SetRoomPos(const AValue: TVec2i); virtual;
+  protected
+    procedure AfterRegister; override;
   public
     function BlockedCellsCount: Integer; virtual;
     function GetBlockedCell(AIndex: Integer): TVec2i; virtual;
@@ -457,6 +459,7 @@ type
     function GetTileAtCoords(const ARay: TLine): TVec2i; overload;
     function GetTileAtCoords(const ACoord: TVec2): TVec2i; overload;
 
+    function TilePosToRoom3DPos(const ATilePos: TVec2i): TVec3;
     function TilePosToWorldPos(const ATilePos: TVec2i): TVec3;
     function TileToWorldTransform(const ATilePos: TVec2i; const ATileRot: Integer): TMat4;
 
@@ -1347,10 +1350,16 @@ begin
 end;
 
 procedure TRoomFloor.AfterRegister;
+var NewBox: TAABB;
 begin
   inherited AfterRegister;
   FNonRegistrable := True;
   FHoles := TVec2iSet.Create();
+
+  NewBox.min := Room.UI.TilePosToWorldPos(Vec(0,0));
+  NewBox.max := NewBox.min + Vec(cRoomRadius+1, 4, cRoomRadius+1);
+  NewBox.min := NewBox.min - Vec(cRoomRadius+1, 2, cRoomRadius+1);
+  BBox := NewBox;
 end;
 
 procedure TRoomFloor.AddWalls();
@@ -1778,9 +1787,22 @@ begin
 end;
 
 procedure TObstacle.LoadModels(const AObstacle: TObstacleDesc);
+var wholeBox: TAABB;
+    cellBox : TAABB;
+    cellpos: TVec3;
+    i: Integer;
 begin
   FObstacle := AObstacle;
   AddModel(FObstacle.name, mtDefault);
+  wholeBox := EmptyAABB;
+  for i := 0 to AObstacle.cells.Count - 1 do
+  begin
+    cellpos := Room.UI.TilePosToRoom3DPos(AObstacle.cells[i].xy);
+    cellBox.min := cellpos - Vec(0.5, 0.1, 0.5);
+    cellBox.max := cellpos + Vec(0.5, 2.0, 0.5);
+    wholeBox := wholeBox + cellBox;
+  end;
+  BBox := wholeBox;
 end;
 
 procedure TObstacle.WriteStream(const AStream: TStream);
@@ -2367,6 +2389,12 @@ begin
   Pos := FRoom.UI.TilePosToWorldPos(AValue);
 end;
 
+procedure TRoomObject.AfterRegister;
+begin
+  inherited AfterRegister;
+  BBox := AABB(Vec(-0.5, 0, -0.5), Vec(0.5, 1.0, 0.5));
+end;
+
 procedure TRoomObject.SetRoomDir(const AValue: Integer);
 
   function DirToQuat(const ADir: Integer): TQuat;
@@ -2569,6 +2597,13 @@ begin
       Result := vi[i];
     end;
   end;
+end;
+
+function TRoomUI.TilePosToRoom3DPos(const ATilePos: TVec2i): TVec3;
+var v: TVec2;
+begin
+  v := ATilePos * FAffinePack;
+  Result := Vec(v.x, 0, v.y);
 end;
 
 function TRoomUI.TilePosToWorldPos(const ATilePos: TVec2i): TVec3;
