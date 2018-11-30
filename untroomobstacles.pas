@@ -88,6 +88,7 @@ begin
   //FLight.Color := Vec(1,1,1.0)*4.41;
   FLight.Color := Pow(Vec(1,0.655,0),1.0)*4.41*4;
   FLight.CastShadows := st512;
+  FLight.Auto_ShadowRenderType := True;
 end;
 
 procedure TLightSource.SetRoomPosDir(const APos: TVec2i; const ADir: Integer; const AAutoRegister: Boolean);

@@ -120,7 +120,7 @@ procedure TavmCameraControl.Notify_MouseWheel(const APt: TVec2; AWheelShift: Int
 begin
   inherited Notify_MouseWheel(APt, AWheelShift, AShifts);
   FDist := FDist * Power(FWheelSens, AWheelShift);
-  FDist := Clamp(FDist, 1, 50);
+  FDist := Clamp(FDist, 1, 150);
   UpdateCameraPosition;
 end;
 

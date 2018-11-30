@@ -704,7 +704,6 @@ procedure TBot.AfterRegister;
 begin
   inherited AfterRegister;
   FLastSeen := TLastSeenMap.Create();
-  SubscribeForUpdateStep;
   FBotID := gvBotID;
   Inc(gvBotID);
 
@@ -1086,7 +1085,7 @@ begin
     Exit;
   end;
 
-  if not InViewField(FBS_LostEnemy.LastPt) then
+  if not InViewField(FBS_LostEnemy.LastPt) and (RoomDir <> Room.Direction(RoomPos, FBS_LostEnemy.LastPt)) then
   begin
     if AP = 1 then
       FBS_LostEnemy.SkipTurn := False;

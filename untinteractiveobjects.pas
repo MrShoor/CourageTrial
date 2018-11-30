@@ -18,6 +18,8 @@ type
   private
     FInventory: IInventory;
     FAnim: IavAnimationController;
+
+    FInAction : IBRA_Action;
   protected
     procedure UpdateStep; override;
     procedure AfterRegister; override;
@@ -41,8 +43,13 @@ type
     FItem: IUnitItem;
     FItemInstance: IavModelInstance;
     FAnim: IavAnimationController;
+
     procedure Equip(const AItem: IUnitItem);
   protected
+    procedure AfterValidateTransform; override;
+    procedure Notify_PlayerLeave; override;
+    procedure Notify_PlayerEnter; override;
+
     procedure UpdateStep; override;
     procedure AfterRegister; override;
   public
@@ -123,10 +130,34 @@ begin
 
   m := FModels[0].Mesh.BindPoseTransform;
   inst := World.Renderer.CreateModelInstances([AItem.Model]);
+  inst[0].Static := False;
   inst[0].Mesh.Transform := m;
   inst[0].Mesh.Pose := FModels[0].Mesh.Pose;
   inst[0].Mesh.Transform := Transform();
   FItemInstance := inst[0];
+
+  if FItemInstance <> nil then
+    if FRoom.BattleRoom.Player <> nil then
+      SubscribeForUpdateStep;
+end;
+
+procedure TRoomAltar.AfterValidateTransform;
+begin
+  if FItemInstance <> nil then
+    FItemInstance.Mesh.Transform := Transform();
+end;
+
+procedure TRoomAltar.Notify_PlayerLeave;
+begin
+  inherited Notify_PlayerLeave;
+  UnSubscribeFromUpdateStep;
+end;
+
+procedure TRoomAltar.Notify_PlayerEnter;
+begin
+  inherited Notify_PlayerEnter;
+  if FItemInstance <> nil then
+    SubscribeForUpdateStep;
 end;
 
 procedure TRoomAltar.UpdateStep;
@@ -138,12 +169,14 @@ begin
     if FItemInstance <> nil then
       FItemInstance.Mesh.Transform := Transform();
   end;
+
+  if FItemInstance = nil then
+    UnSubscribeFromUpdateStep;
 end;
 
 procedure TRoomAltar.AfterRegister;
 begin
   inherited AfterRegister;
-  SubscribeForUpdateStep;
 end;
 
 procedure TRoomAltar.WriteModels(const ACollection: IavModelInstanceArr;
@@ -171,11 +204,11 @@ end;
 procedure TRoomAltar.LoadModels(const AObstacle: TObstacleDesc);
 begin
   inherited LoadModels(AObstacle);
-  FAnim := Create_IavAnimationController(FModels[0].Mesh.Pose, World.GameTime);
-  FAnim.AnimationSequence_StartAndStopOther(['Altar_Idle0'], True);
-
   if not Room.InEditMode then
     Equip(TArcherBow.Create);
+
+  FAnim := Create_IavAnimationController(FModels[0].Mesh.Pose, World.GameTime);
+  FAnim.AnimationSequence_StartAndStopOther(['Altar_Idle0'], True);
 end;
 
 function TRoomAltar.Interactive_CellsCount: Integer;
@@ -266,6 +299,13 @@ procedure TRoomChest.UpdateStep;
 begin
   inherited UpdateStep;
   FAnim.SetTime(World.GameTime);
+
+  if FInAction <> nil then
+    if FInAction.Done then
+      FInAction := nil;
+
+  if FInAction = nil then
+    UnSubscribeFromUpdateStep;
 end;
 
 procedure TRoomChest.AfterRegister;
@@ -275,8 +315,6 @@ begin
 
   FInventory.Push(TAxe.Create, 0);
   FInventory.Push(TArcherBow.Create, 0);
-
-  SubscribeForUpdateStep;
 end;
 
 procedure TRoomChest.SetAnimation(const AName: string);
@@ -329,6 +367,8 @@ begin
     AUnit.RoomDir := Room.Direction(AUnit.RoomPos, RoomPos);
 
     Result := TBRA_LootChestAction.Create(Self, AUnit);
+    FInAction := Result;
+    SubscribeForUpdateStep;
     Exit;
   end;
 end;

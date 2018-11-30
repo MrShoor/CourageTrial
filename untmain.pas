@@ -56,14 +56,22 @@ var
 
 implementation
 
+uses
+  Math;
+
 {$R *.lfm}
 
 { TUPSObject }
 
 procedure TUPSObject.EMUps(var msg: TavMessage);
+var
+  i: Integer;
 begin
-  FWorld.UpdateStep();
-  FFloor.CurrentRoom.UpdateStep();
+  FWorld.UpdateStep(msg.param);
+  for i := 0 to min(msg.param, 8) - 1 do
+  begin
+    FFloor.CurrentRoom.UpdateStep();
+  end;
 end;
 
 procedure TUPSObject.SetState(AWorld: TbWorld; AFloor: TFloorMap);
@@ -130,8 +138,8 @@ begin
     FMain.Init3D(apiDX11);
   end;
   FMain.Projection.DepthRange := Vec(1, 0);
-  FMain.Projection.NearPlane := 0.1;
-  FMain.Projection.FarPlane := 100;
+  FMain.Projection.NearPlane := 0.2;
+  FMain.Projection.FarPlane := 200;
   FMain.States.DepthFunc := cfGreater;
   FMain.States.ColorMask[0] := AllChanells;
   FMain.UpdateStatesInterval := 8;
@@ -149,7 +157,6 @@ begin
 
     FFloor.CurrentRoom.PrepareToDraw();
     FWorld.Renderer.PrepareToDraw;
-    FMain.Clear(Black, True, FMain.Projection.DepthRange.y, True);
     FWorld.Renderer.DrawWorld;
   	FFloor.Draw2DUI();
 
@@ -178,7 +185,8 @@ begin
   PreloadModels;
 
   FFloor := TFloorMap.Create(FWorld);
-  FFloor.Create2Rooms;
+  //FFloor.Create2Rooms;
+  FFloor.CreateLab(5);
 
   if FUPSObj = nil then
     FUPSObj := TUPSObject.Create(FMain);

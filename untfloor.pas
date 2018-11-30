@@ -97,10 +97,13 @@ type
     function  GetRoomDoors(const ARoomCoord: TVec2i): TDoors;
     procedure MoveToRoom(const ARoomCoord: TVec2i; const AFromDoor: Integer);
     procedure SetCurrentRoom(const ARoomCoord: TVec2i);
+
+    procedure ShowAllRooms();
   protected
     procedure AfterRegister; override;
   public
     procedure Create2Rooms;
+    procedure CreateLab(ARoomCount: Integer);
 
     procedure Draw2DUI();
 
@@ -321,7 +324,7 @@ begin
     broom := TBattleRoom.Create(Self);
     broom.RoomPos := ARoomCoord;
     broom.RoomDir := pRoom^.RoomRot;
-    broom.GenerateWithLoad('rooms\r1.room', GetRoomDoors(ARoomCoord));
+    broom.GenerateWithLoad('rooms\r'+IntToStr(Random(3)+1)+'.room', GetRoomDoors(ARoomCoord));
     broom.UI := FUI;
     broom.OnLeaveBattleRoom := {$IfDef FPC}@{$EndIf}DoLeaveBattleRoom;
 
@@ -376,6 +379,14 @@ begin
   FCurrentRoom.AttachPlayer(FPlayer, Vec(0,0), 0);
 end;
 
+procedure TFloorMap.ShowAllRooms();
+var roomCoords: TVec2i;
+begin
+  FRooms.Reset;
+  while FRooms.NextKey(roomCoords) do
+    ObtainBattleRoom(roomCoords);
+end;
+
 procedure TFloorMap.AfterRegister;
 begin
   inherited AfterRegister;
@@ -393,8 +404,73 @@ begin
   empty.RoomRot := 1;
   FRooms.Add(Vec(1, 0), empty);
 
+  empty.RoomRot := 0;
+  FRooms.Add(Vec(-1, 0), empty);
+  FRooms.Add(Vec(-1, 1), empty);
+  FRooms.Add(Vec(-1, 2), empty);
+  FRooms.Add(Vec(-1, 3), empty);
+  FRooms.Add(Vec(-2, 3), empty);
+  FRooms.Add(Vec(-3, 3), empty);
+  FRooms.Add(Vec(-3, 2), empty);
+  FRooms.Add(Vec(-3, 1), empty);
+
   SetCurrentRoom(Vec(0, 0));
-  ObtainBattleRoom(Vec(1, 0));
+  ShowAllRooms();
+end;
+
+procedure TFloorMap.CreateLab(ARoomCount: Integer);
+
+  function AddRoomCoords: TVec2i;
+
+    function GetNeighboursCount(const ACrd: TVec2i): Integer;
+    var i: Integer;
+    begin
+      Result := 0;
+      for i := 0 to 5 do
+        if FRooms.Contains(TTileUtils.RotateTileCoord(Vec(1, 0), i) + ACrd) then
+          Inc(Result);
+    end;
+
+  var roomCrd: TVec2i;
+      rooms2: IVec2iArr;
+      i, phase: Integer;
+  begin
+    rooms2 := untLevel.TVec2iArr.Create;
+
+    FRooms.Reset;
+    while FRooms.NextKey(roomCrd) do
+      if GetNeighboursCount(roomCrd) < 3 then
+        rooms2.Add(roomCrd);
+
+    repeat
+      roomCrd := rooms2[Random(rooms2.Count)];
+      phase := Random(6);
+      for i := 0 to 5 do
+      begin
+        Result := TTileUtils.RotateTileCoord(Vec(1, 0), i + phase) + roomCrd;
+        if FRooms.Contains(Result) then Break;
+        if GetNeighboursCount(Result) < 3 then Exit;
+      end;
+    until False;
+    Result := Vec(0,0);
+  end;
+
+var empty: TBattleRoomAdapter;
+
+begin
+  ZeroClear(empty, SizeOf(empty));
+  empty.RoomRot := Random(6);
+  FRooms.Add(Vec(0, 0), empty);
+
+  while ARoomCount > 1 do
+  begin
+    empty.RoomRot := Random(6);
+    FRooms.Add(AddRoomCoords(), empty);
+    Dec(ARoomCount);
+  end;
+
+  SetCurrentRoom(Vec(0, 0));
+  ShowAllRooms();
 end;
 
 procedure TFloorMap.Draw2DUI();

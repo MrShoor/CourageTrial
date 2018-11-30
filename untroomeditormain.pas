@@ -361,10 +361,13 @@ end;
 procedure TfmrMain.RenderPanelMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
 var movedTile: TVec2i;
 begin
+  movedTile := FRoom.Map.UI.GetTileAtCoords(FMain.Cursor.Ray);
+  Caption := IntToStr(movedTile.x) + ' ' + IntToStr(movedTile.y);
+
   if FState = easNone then Exit;
   if FState = easAddObject then
   begin
-    movedTile := FRoom.Map.UI.GetTileAtCoords(FMain.Cursor.Ray);
+//    movedTile := FRoom.Map.UI.GetTileAtCoords(FMain.Cursor.Ray);
     FState_AddObject.UpdateState(movedTile, FState_AddObject.obstacle.RoomDir);
   end;
 end;
@@ -382,7 +385,6 @@ begin
     begin
       FRoom.PrepareToDraw();
       FWorld.Renderer.PrepareToDraw;
-      FMain.Clear(Black, True, FMain.Projection.DepthRange.y, True);
       FWorld.Renderer.DrawWorld;
     end;
 

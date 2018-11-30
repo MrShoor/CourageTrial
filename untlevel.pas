@@ -18,6 +18,7 @@ uses
 
 const
   cRoomRadius = 20;
+  //cRoomRadius = 16;
 
 type
   {$IfnDef FPC}
@@ -51,10 +52,17 @@ type
   IVec2iWeightedSet = {$IfDef FPC}specialize{$EndIf}IHashMap<TVec2i, Integer>;
   TVec2iWeightedSet = {$IfDef FPC}specialize{$EndIf}THashMap<TVec2i, Integer>;
 
+  { IBRA_Action }
+
   IBRA_Action = interface
+    function GetDone: Boolean;
+    procedure SetDone(const AValue: Boolean);
+
     function Name: string;
     procedure TryCancel;
     function ProcessAction: Boolean;
+
+    property Done: Boolean read GetDone write SetDone;
   end;
   IBRA_ActionArr = {$IfDef FPC}specialize{$EndIf} IArray<IBRA_Action>;
   TBRA_ActionArr = {$IfDef FPC}specialize{$EndIf} TArray<IBRA_Action>;
@@ -185,6 +193,11 @@ type
     procedure SetRoomDir(const AValue: Integer); virtual;
     procedure SetRoomPos(const AValue: TVec2i); virtual;
   protected
+    function  GetStatic: Boolean; override;
+  protected
+    procedure Notify_PlayerLeave; virtual;
+    procedure Notify_PlayerEnter; virtual;
+
     procedure AfterRegister; override;
   public
     function BlockedCellsCount: Integer; virtual;
@@ -219,6 +232,7 @@ type
   private
     FOpened: Boolean;
     FAnim  : IavAnimationController;
+    FUnsubscribeTime: Int64;
     procedure SetOpened(AValue: Boolean);
     procedure KillBlockingUnits;
   protected
@@ -351,6 +365,9 @@ type
 
     function AddAnimationPrefix(const ANameSequence: array of string): TStringArray;
   protected
+    procedure Notify_PlayerLeave; override;
+    procedure Notify_PlayerEnter; override;
+
     procedure AfterRegister; override;
   public
     procedure WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType); override;
@@ -565,6 +582,9 @@ type
   protected
     procedure AfterRegister; override;
     function GetBattleRoom: TBattleRoom;
+
+    procedure Notify_PlayerLeave;
+    procedure Notify_PlayerEnter;
   public
     property InEditMode: Boolean read FInEditMode write FInEditMode;
     property UI: TRoomUI read FRoomUI;
@@ -653,6 +673,10 @@ type
   { TBRA_Action }
 
   TBRA_Action = class(TInterfacedObject, IBRA_Action)
+  private
+    FDone: Boolean;
+    function GetDone: Boolean;
+    procedure SetDone(const AValue: Boolean);
   public
     function Name: string; virtual;
     procedure TryCancel; virtual;
@@ -974,9 +998,17 @@ begin
     RegisterAtRoom();
 
   if FOpened then
+  begin
+    SubscribeForUpdateStep;
+    FUnsubscribeTime := World.GameTime + 2000;
     FAnim.AnimationSequence_StartAndStopOther(['Door_Opening'], False)
+  end
   else
+  begin
+    SubscribeForUpdateStep;
+    FUnsubscribeTime := World.GameTime + 2000;
     FAnim.AnimationSequence_StartAndStopOther(['Door_Closing'], False);
+  end;
 end;
 
 procedure TRoomDoor.KillBlockingUnits;
@@ -998,6 +1030,9 @@ begin
   inherited UpdateStep;
   if FAnim <> nil then
     FAnim.SetTime(World.GameTime);
+
+  if FUnsubscribeTime < World.GameTime then
+    UnSubscribeFromUpdateStep;
 end;
 
 procedure TRoomDoor.LoadModels;
@@ -1006,7 +1041,6 @@ begin
   model := World.Renderer.CreateModelInstances(['Door'])[0];
   FModels.Add(model);
   FAnim := Create_IavAnimationController(model.Mesh.Pose, World.GameTime);
-  SubscribeForUpdateStep;
 end;
 
 function TRoomDoor.BlockedCellsCount: Integer;
@@ -1428,6 +1462,15 @@ begin
     tilePos := TTileUtils.RotateTileCoord(OWallConn[i].xy, tileDir);
     FModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(tilePos, tileDir);
   end;
+
+  meshInst := World.Renderer.FindPrefabInstances('OWall333');
+  n := FModels.Add(World.Renderer.ModelsCollection.AddFromMesh(meshInst.Mesh, 6));
+  for i := 0 to 5 do
+  begin
+    tileDir := i;
+    tilePos := TTileUtils.RotateTileCoord(Vec(Room.Radius, 0), tileDir);
+    FModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(tilePos, tileDir);
+  end;
 end;
 
 procedure TRoomFloor.WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType);
@@ -1686,7 +1729,9 @@ end;
 procedure TRoomBullet.LoadModels(const AModelName: string);
 begin
   AddModel(AModelName, mtDefault);
+  FModels[0].Static := False;
   FMaxRange := 100;
+  Static := False;
 end;
 
 { TBRA_UnitTurnAction }
@@ -1830,6 +1875,16 @@ begin
 end;
 
 { TBRA_Action }
+
+function TBRA_Action.GetDone: Boolean;
+begin
+  Result := FDone;
+end;
+
+procedure TBRA_Action.SetDone(const AValue: Boolean);
+begin
+  FDone := AValue;
+end;
 
 function TBRA_Action.Name: string;
 begin
@@ -2092,6 +2147,7 @@ begin
   inst[0].Mesh.Transform := m;
   inst[0].Mesh.Pose := FModels[0].Mesh.Pose;
   inst[0].Mesh.Transform := Transform();
+  inst[0].Static := False;
 
   FEquippedModel[AItem.Slot] := inst[0];
   FEquippedItem[AItem.Slot] := AItem;
@@ -2167,6 +2223,16 @@ begin
     Result[i] := FAnimationPrefix + ANameSequence[i];
 end;
 
+procedure TRoomUnit.Notify_PlayerLeave;
+begin
+  UnSubscribeFromUpdateStep;
+end;
+
+procedure TRoomUnit.Notify_PlayerEnter;
+begin
+  SubscribeForUpdateStep;
+end;
+
 procedure TRoomUnit.AfterRegister;
 begin
   inherited AfterRegister;
@@ -2195,7 +2261,7 @@ begin
     for i := Low(TRoomUnitEqSlot) to High(TRoomUnitEqSlot) do
       if FEquippedModel[i] <> nil then
       begin
-        FEquippedModel[i].Mesh.Transform := Transform();
+        FEquippedModel[i].Transform := Transform();
         ACollection.Add(FEquippedModel[i]);
       end;
   end;
@@ -2387,6 +2453,23 @@ begin
   if not FNonRegistrable then
     if FRegistered then FRoom.PutObject(Self);
   Pos := FRoom.UI.TilePosToWorldPos(AValue);
+end;
+
+function TRoomObject.GetStatic: Boolean;
+begin
+  Result := inherited GetStatic;
+  if not Result then
+    Result := FRoom.BattleRoom.Player = nil;
+end;
+
+procedure TRoomObject.Notify_PlayerLeave;
+begin
+
+end;
+
+procedure TRoomObject.Notify_PlayerEnter;
+begin
+
 end;
 
 procedure TRoomObject.AfterRegister;
@@ -2838,6 +2921,24 @@ begin
     if obj is TBattleRoom then Exit(TBattleRoom(obj));
   until obj = nil;
   Result := nil;
+end;
+
+procedure TRoomMap.Notify_PlayerLeave;
+var
+  i: Integer;
+begin
+  for i := 0 to ChildCount - 1 do
+    if Child[i] is TRoomObject then
+      TRoomObject(Child[i]).Notify_PlayerLeave;
+end;
+
+procedure TRoomMap.Notify_PlayerEnter;
+var
+  i: Integer;
+begin
+  for i := 0 to ChildCount - 1 do
+    if Child[i] is TRoomObject then
+      TRoomObject(Child[i]).Notify_PlayerEnter;
 end;
 
 procedure TRoomMap.SetDoorsRadius(const ADoors: TDoors; const ARadius: Integer);
@@ -3542,7 +3643,10 @@ begin
   for i := FActions.Count - 1 downto 0 do
   begin
     if not FActions[i].ProcessAction() then
+    begin
+      FActions[i].Done := True;
       FActions.DeleteWithSwap(i);
+    end;
   end;
 end;
 
@@ -3773,6 +3877,8 @@ begin
   FMap.CurrentPlayer := nil;
   FPlayer := nil;
   FTryLeaveIndex := -1;
+
+  FMap.Notify_PlayerLeave;
 end;
 
 procedure TBattleRoom.AttachPlayer(const APlayer: TPlayer; const ADoorIdx: Integer);
@@ -3787,6 +3893,7 @@ begin
   if FPlayer = nil then
   begin
     FPlayer := APlayer;
+    FMap.Notify_PlayerEnter;
     FPlayer.Parent := Map;
 
     door := APlayer.Room.RoomFloor.FDoors[ADoorIdx];
@@ -3823,6 +3930,7 @@ begin
   if FPlayer = nil then
   begin
     FPlayer := APlayer;
+    FMap.Notify_PlayerEnter;
     FPlayer.Parent := Map;
     FPlayer.SetRoomPosDir(GetSpawnPlace, FPlayer.RoomDir);
     FUnits.Insert(0, FPlayer);
