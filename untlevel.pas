@@ -177,6 +177,7 @@ type
     class function PolarToTileCoord(const ARadius, AIndex: Integer): TVec2i;
     class function RotateTileCoord(const APos: TVec2i; ADir: Integer): TVec2i;
     class function NeighbourTile(const ACurrent: TVec2i; const AIndex: Integer): TVec2i;
+    class function DirToQuat(const ADir: Integer): TQuat;
   end;
 
   { TRoomObject }
@@ -232,7 +233,6 @@ type
   private
     FOpened: Boolean;
     FAnim  : IavAnimationController;
-    FUnsubscribeTime: Int64;
     procedure SetOpened(AValue: Boolean);
     procedure KillBlockingUnits;
   protected
@@ -999,14 +999,14 @@ begin
 
   if FOpened then
   begin
-    SubscribeForUpdateStep;
-    FUnsubscribeTime := World.GameTime + 2000;
+    SubscribeForUpdateStep(2000);
+    FAnim.SetTime(World.GameTime);
     FAnim.AnimationSequence_StartAndStopOther(['Door_Opening'], False)
   end
   else
   begin
-    SubscribeForUpdateStep;
-    FUnsubscribeTime := World.GameTime + 2000;
+    SubscribeForUpdateStep(2000);
+    FAnim.SetTime(World.GameTime);
     FAnim.AnimationSequence_StartAndStopOther(['Door_Closing'], False);
   end;
 end;
@@ -1030,9 +1030,6 @@ begin
   inherited UpdateStep;
   if FAnim <> nil then
     FAnim.SetTime(World.GameTime);
-
-  if FUnsubscribeTime < World.GameTime then
-    UnSubscribeFromUpdateStep;
 end;
 
 procedure TRoomDoor.LoadModels;
@@ -1390,9 +1387,8 @@ begin
   FNonRegistrable := True;
   FHoles := TVec2iSet.Create();
 
-  NewBox.min := Room.UI.TilePosToWorldPos(Vec(0,0));
-  NewBox.max := NewBox.min + Vec(cRoomRadius+1, 4, cRoomRadius+1);
-  NewBox.min := NewBox.min - Vec(cRoomRadius+1, 2, cRoomRadius+1);
+  NewBox.max :=  Vec(cRoomRadius+1, 4, cRoomRadius+1);
+  NewBox.min := -Vec(cRoomRadius+1, 2, cRoomRadius+1);
   BBox := NewBox;
 end;
 
@@ -1463,7 +1459,7 @@ begin
     FModels[n].MultiMesh[i].Transform := Room.UI.TileToWorldTransform(tilePos, tileDir);
   end;
 
-  meshInst := World.Renderer.FindPrefabInstances('OWall333');
+  meshInst := World.Renderer.FindPrefabInstances('OWall3');
   n := FModels.Add(World.Renderer.ModelsCollection.AddFromMesh(meshInst.Mesh, 6));
   for i := 0 to 5 do
   begin
@@ -1812,6 +1808,11 @@ end;
 class function TTileUtils.NeighbourTile(const ACurrent: TVec2i; const AIndex: Integer): TVec2i;
 begin
   Result := RotateTileCoord(Vec(0, 1), AIndex) + ACurrent;
+end;
+
+class function TTileUtils.DirToQuat(const ADir: Integer): TQuat;
+begin
+  Result := Quat(Vec(0, 1, 0), 2 * Pi * (ADir / 6));
 end;
 
 { TObstacle }
@@ -2476,15 +2477,11 @@ procedure TRoomObject.AfterRegister;
 begin
   inherited AfterRegister;
   BBox := AABB(Vec(-0.5, 0, -0.5), Vec(0.5, 1.0, 0.5));
+  Rot := TTileUtils.DirToQuat(FRoom.BattleRoom.RoomDir);
+  Pos := FRoom.BattleRoom.WorldPos;
 end;
 
 procedure TRoomObject.SetRoomDir(const AValue: Integer);
-
-  function DirToQuat(const ADir: Integer): TQuat;
-  begin
-    Result := Quat(Vec(0, 1, 0), 2 * Pi * (ADir / 6));
-  end;
-
 begin
   if FRoomDir = AValue then Exit;
   if not FNonRegistrable then
@@ -2492,7 +2489,7 @@ begin
   FRoomDir := AValue;
   if not FNonRegistrable then
     if FRegistered then FRoom.PutObject(Self);
-  Rot := DirToQuat(AValue + FRoom.BattleRoom.RoomDir);
+  Rot := TTileUtils.DirToQuat(AValue + FRoom.BattleRoom.RoomDir);
 end;
 
 function TRoomObject.CanRegister(target: TavObject): boolean;
@@ -2650,7 +2647,10 @@ begin
   ray := ARay * (Parent as TRoomMap).BattleRoom.RoomTransformInv;
 
   if Intersect(Plane(0,1,0,FPlaneY), ray, IntPt) then
-    Result := GetTileAtCoords(Vec(IntPt.x, IntPt.z))
+  begin
+    Result := GetTileAtCoords(Vec(IntPt.x, IntPt.z));
+    Result := Clamp(Result, -Radius, Radius);
+  end
   else
     Result := Vec(0,0);
 end;

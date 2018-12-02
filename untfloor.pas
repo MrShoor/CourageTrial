@@ -307,11 +307,17 @@ end;
 
 procedure TFloorMap.DoLeaveBattleRoom(const ABattleRoom: TBattleRoom; const ADoorIdx: Integer);
 var map: IFloorMapNonWeightedGraph;
+    worldDir: Integer;
     newRoom: TVec2i;
+    newDoor: Integer;
 begin
   map := TFloorMapGraph.Create(Self);
-  if map.GetNeighbour(ADoorIdx, ABattleRoom.RoomPos, newRoom) then
-    MoveToRoom(newRoom, ADoorIdx + 3);
+  worldDir := (ADoorIdx + ABattleRoom.RoomDir) mod 6;
+  if map.GetNeighbour(worldDir, ABattleRoom.RoomPos, newRoom) then
+  begin
+    newDoor := worldDir + 3;
+    MoveToRoom(newRoom, newDoor);
+  end;
 end;
 
 function TFloorMap.ObtainBattleRoom(const ARoomCoord: TVec2i): TBattleRoom;
@@ -399,20 +405,25 @@ procedure TFloorMap.Create2Rooms;
 var empty: TBattleRoomAdapter;
 begin
   ZeroClear(empty, SizeOf(empty));
-  empty.RoomRot := 0;
-  FRooms.Add(Vec(0, 0), empty);
   empty.RoomRot := 1;
+  FRooms.Add(Vec(0, 0), empty);
+  empty.RoomRot := 2;
   FRooms.Add(Vec(1, 0), empty);
 
-  empty.RoomRot := 0;
-  FRooms.Add(Vec(-1, 0), empty);
-  FRooms.Add(Vec(-1, 1), empty);
-  FRooms.Add(Vec(-1, 2), empty);
-  FRooms.Add(Vec(-1, 3), empty);
-  FRooms.Add(Vec(-2, 3), empty);
-  FRooms.Add(Vec(-3, 3), empty);
-  FRooms.Add(Vec(-3, 2), empty);
-  FRooms.Add(Vec(-3, 1), empty);
+  //empty.RoomRot := 3;
+  //FRooms.Add(Vec(2, 0), empty);
+  //
+  //empty.RoomRot := 4;
+  //FRooms.Add(Vec(3, 0), empty);
+  //
+  //empty.RoomRot := 5;
+  //FRooms.Add(Vec(4, 0), empty);
+  //
+  //empty.RoomRot := 6;
+  //FRooms.Add(Vec(5, 0), empty);
+  //
+  //empty.RoomRot := 7;
+  //FRooms.Add(Vec(6, 0), empty);
 
   SetCurrentRoom(Vec(0, 0));
   ShowAllRooms();
