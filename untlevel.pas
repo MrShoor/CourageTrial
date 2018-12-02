@@ -496,6 +496,8 @@ type
     function Hash(const Value): Cardinal;
     function IsEqual(const Left, Right): Boolean;
 
+    function IsCellExists(const ACell: TVec2i): Boolean;
+
     function MaxNeighbourCount(const ANode: TVec2i): Integer;
     function NodeComparer: IEqualityComparer;
     function GetNeighbour(Index: Integer; const AFrom, ACurrent, ATarget: TVec2i; out ANeighbour: TVec2i; out MoveWeight, DistWeight: Single): Boolean; overload;
@@ -662,6 +664,8 @@ type
   private
     FAnim: array of IavAnimationController;
   protected
+    procedure Notify_PlayerLeave; override;
+    procedure Notify_PlayerEnter; override;
     procedure UpdateStep; override;
   public
     procedure SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean); override;
@@ -1725,6 +1729,7 @@ end;
 procedure TRoomBullet.LoadModels(const AModelName: string);
 begin
   AddModel(AModelName, mtDefault);
+  BBox := AABB(Vec(-0.5, -0.5, -0.5), Vec(0.5, 0.5, 0.5));
   FModels[0].Static := False;
   FMaxRange := 100;
   Static := False;
@@ -2062,6 +2067,13 @@ begin
   Result := (nl.x = nr.x) and (nl.y = nr.y);
 end;
 
+function TRoomMapGraph.IsCellExists(const ACell: TVec2i): Boolean;
+begin
+  Result := FRoomMap.IsCellExists(ACell);
+  if Result then
+    if FRoomMap.RoomFloor.IsHole[ACell] then Exit(False);
+end;
+
 function TRoomMapGraph.MaxNeighbourCount(const ANode: TVec2i): Integer;
 begin
   Result := 6;
@@ -2075,7 +2087,7 @@ end;
 function TRoomMapGraph.GetNeighbour(Index: Integer; const AFrom, ACurrent, ATarget: TVec2i; out ANeighbour: TVec2i; out MoveWeight, DistWeight: Single): Boolean;
 begin
   ANeighbour := FRoomMap.NeighbourTile(ACurrent, Index);
-  Result := FRoomMap.IsCellExists(ANeighbour);
+  Result := IsCellExists(ANeighbour);
   if not Result then Exit;
   Result := IsNonBlockingObject(FRoomMap.ObjectAt(ANeighbour));
   if not Result then Exit;
@@ -2087,7 +2099,7 @@ end;
 function TRoomMapGraph.GetNeighbour(Index: Integer; const ACurrent: TVec2i; out ANeighbour: TVec2i): Boolean;
 begin
   ANeighbour := FRoomMap.NeighbourTile(ACurrent, Index);
-  Result := FRoomMap.IsCellExists(ANeighbour);
+  Result := IsCellExists(ANeighbour);
   if not Result then Exit;
   Result := IsNonBlockingObject(FRoomMap.ObjectAt(ANeighbour));
 end;
@@ -3146,8 +3158,6 @@ end;
 function TRoomMap.IsCellExists(const APos: TVec2i): Boolean;
 begin
   Result := Distance(Vec(0,0), APos) <= (FRadius - 1);
-  if Result then
-    if FRoomFloor.IsHole[APos] then Exit(False);
   if not Result then
     if FRoomFloor <> nil then
       Result := FRoomFloor.DoorCellIndex(APos) >= 0;
@@ -3254,6 +3264,16 @@ begin
 end;
 
 { TPlayer }
+
+procedure TPlayer.Notify_PlayerLeave;
+begin
+
+end;
+
+procedure TPlayer.Notify_PlayerEnter;
+begin
+
+end;
 
 procedure TPlayer.UpdateStep;
 var
@@ -3740,7 +3760,7 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string; const ADoors: TD
     repeat
       Result.x := Random(FMap.Radius*2+1) - FMap.Radius;
       Result.y := Random(FMap.Radius*2+1) - FMap.Radius;
-      if FMap.IsCellExists(Result) and not FMap.IsCellBlocked(Result) then
+      if FMap.IsCellExists(Result) and (not FMap.RoomFloor.IsHole[Result]) and not FMap.IsCellBlocked(Result) then
         Exit(Result);
     until False;
   end;
@@ -3916,7 +3936,7 @@ procedure TBattleRoom.AttachPlayer(const APlayer: TPlayer; const ARoomPos: TVec2
     repeat
       Result.x := Random(FMap.Radius*2+1) - FMap.Radius;
       Result.y := Random(FMap.Radius*2+1) - FMap.Radius;
-      if FMap.IsCellExists(Result) and not FMap.IsCellBlocked(Result) then
+      if FMap.IsCellExists(Result) and (not FMap.RoomFloor.IsHole[Result]) and not FMap.IsCellBlocked(Result) then
         Exit(Result);
     until False;
   end;

@@ -18,8 +18,6 @@ type
   private
     FInventory: IInventory;
     FAnim: IavAnimationController;
-
-    FInAction : IBRA_Action;
   protected
     procedure UpdateStep; override;
     procedure AfterRegister; override;
@@ -299,13 +297,6 @@ procedure TRoomChest.UpdateStep;
 begin
   inherited UpdateStep;
   FAnim.SetTime(World.GameTime);
-
-  if FInAction <> nil then
-    if FInAction.Done then
-      FInAction := nil;
-
-  if FInAction = nil then
-    UnSubscribeFromUpdateStep;
 end;
 
 procedure TRoomChest.AfterRegister;
@@ -319,6 +310,8 @@ end;
 
 procedure TRoomChest.SetAnimation(const AName: string);
 begin
+  SubscribeForUpdateStep(2000);
+  FAnim.SetTime(World.GameTime);
   FAnim.AnimationSequence_StartAndStopOther([AName], False);
 end;
 
@@ -367,8 +360,6 @@ begin
     AUnit.RoomDir := Room.Direction(AUnit.RoomPos, RoomPos);
 
     Result := TBRA_LootChestAction.Create(Self, AUnit);
-    FInAction := Result;
-    SubscribeForUpdateStep;
     Exit;
   end;
 end;
