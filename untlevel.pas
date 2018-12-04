@@ -78,6 +78,7 @@ type
   TUnitItemKind = (ikUnknown, ikConsumable, ikBow, ikAxe);
 const
   cUnitItemKindNames : array [TUnitItemKind] of string = ('???', 'Съедобное', 'Лук', 'Топор');
+  cUnitItemKind_Weapons : set of TUnitItemKind = [ikBow, ikAxe];
 
 type
   IUnitItem = interface;
@@ -133,12 +134,14 @@ type
     function  GetEquipped: Boolean;
     procedure SetEquipped(const AValue: Boolean);
 
+    function Name  : string;
     function Kind  : TUnitItemKind;
     function Slot  : TRoomUnitEqSlot;
     function Model : string;
     function Ico48 : string;
 
     function Weapon_Damage: TVec2i;
+    function ExtraDesc: string;
 
     function SkillsCount: Integer;
     function Skill(ASkillIndex: Integer): IUnitSkill;
@@ -382,7 +385,7 @@ type
     function AllBuffs(): IUnitBuffsArr;
     procedure ProcessBuffs;
 
-    function Inventory(): IInventory; override;
+    function  Inventory(): IInventory; override;
     procedure Unequip(const ASlot: TRoomUnitEqSlot);
     function  Equip(const AItem: IUnitItem): Boolean;
     function  GetEquip(const ASlot: TRoomUnitEqSlot): IUnitItem;
@@ -626,6 +629,7 @@ type
     procedure UnRegInventoryObject(const AObject: TRoomObject);
     function  InventoryObjectsAt(const APos: TVec2i; const ANonEmpty: Boolean): IRoomObjectArr;
 
+    function  InAction: Boolean;
     procedure AddAction(AAction: IBRA_Action);
 
     property CurrentPlayer: TRoomUnit read FCurrentPlayer write FCurrentPlayer;
@@ -869,6 +873,7 @@ type
 
     property OnLeaveBattleRoom: TOnLeaveBattleRoom read FOnLeaveBattleRoom write FOnLeaveBattleRoom;
 
+    function  InAction(): Boolean;
     procedure AddAction(AAction: IBRA_Action);
 
     procedure UpdateStep();
@@ -2159,9 +2164,24 @@ var
   m: TMat4;
   inst: IavModelInstanceArr;
 begin
+  if AItem = nil then Exit(False);
   if AItem.Slot = esNone then Exit(False);
+  if AP <= 0 then
+  begin
+    Room.AddMessage(string('Нет очков хода чтобы экипировать ') + AItem.Name);
+    Exit(False);
+  end;
+  AP := AP - 1;
 
   Unequip(AItem.Slot);
+  if (AItem.Slot = esBothHands) then
+  begin
+    Unequip(esLeftHand);
+    Unequip(esRightHand);
+  end
+  else
+    if AItem.Slot in [esLeftHand, esRightHand] then
+      Unequip(esBothHands);
 
   m := FModels[0].Mesh.BindPoseTransform;
   inst := World.Renderer.CreateModelInstances([AItem.Model]);
@@ -2188,6 +2208,16 @@ var
   m: TMat4;
   inst: IavModelInstanceArr;
 begin
+  TemporaryUnEquip(ASlot);
+  if (ASlot = esBothHands) then
+  begin
+    TemporaryUnEquip(esLeftHand);
+    TemporaryUnEquip(esRightHand);
+  end
+  else
+    if ASlot in [esLeftHand, esRightHand] then
+      TemporaryUnEquip(esBothHands);
+
   m := FModels[0].Mesh.BindPoseTransform;
   inst := World.Renderer.CreateModelInstances([AModel]);
   inst[0].Mesh.Transform := m;
@@ -2293,6 +2323,23 @@ begin
 end;
 
 procedure TRoomUnit.WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType);
+
+  function IsEquipOverrided(slot: TRoomUnitEqSlot): Boolean;
+  begin
+    if FTemporaryEquippedModel[slot] <> nil then Exit(True);
+    if slot = esBothHands then
+    begin
+      if FTemporaryEquippedModel[esLeftHand] <> nil then Exit(True);
+      if FTemporaryEquippedModel[esRightHand] <> nil then Exit(True);
+    end
+    else
+      if slot in [esRightHand, esLeftHand] then
+      begin
+        if FTemporaryEquippedModel[esBothHands] <> nil then Exit(True);
+      end;
+    Result := False;
+  end;
+
 var i: TRoomUnitEqSlot;
 begin
   inherited WriteModels(ACollection, AType);
@@ -2300,10 +2347,13 @@ begin
   begin
     for i := Low(TRoomUnitEqSlot) to High(TRoomUnitEqSlot) do
     begin
-      if FTemporaryEquippedModel[i] <> nil then
+      if IsEquipOverrided(i) then
       begin
-        FTemporaryEquippedModel[i].Transform := Transform();
-        ACollection.Add(FTemporaryEquippedModel[i]);
+        if FTemporaryEquippedModel[i] <> nil then
+        begin
+          FTemporaryEquippedModel[i].Transform := Transform();
+          ACollection.Add(FTemporaryEquippedModel[i]);
+        end;
       end
       else
       begin
@@ -3295,6 +3345,11 @@ begin
   end;
 end;
 
+function TRoomMap.InAction: Boolean;
+begin
+  Result := BattleRoom.InAction();
+end;
+
 procedure TRoomMap.AddAction(AAction: IBRA_Action);
 begin
   GetBattleRoom.AddAction(AAction);
@@ -3363,6 +3418,11 @@ var
   bow: IUnitItem;
   axe: IUnitItem;
 begin
+  MaxAP := 10;
+  MaxHP := 100;
+  HP := MaxHP;
+  AP := MaxAP;
+
   ViewAngle := 0.5 * Pi + EPS;
   ViewRange := 20.5;
   ViewWholeRange := 2.5;
@@ -3409,10 +3469,6 @@ begin
     FAnim[i] := Create_IavAnimationController(FModels[i].Mesh.Pose, World.GameTime);
   SetAnimation(['Idle0'], True);
   SubscribeForUpdateStep;
-
-  MaxAP := 10;
-  MaxHP := 100;
-  HP := MaxHP;
 
   Preview96_128 := 'ui\units\player.png';
 end;
@@ -3637,6 +3693,11 @@ begin
         UI.AddMessage('Ваш ход');
     end;
   end;
+end;
+
+function TBattleRoom.InAction(): Boolean;
+begin
+  Result := (FActions.Count > 0) or not IsPlayerTurn;
 end;
 
 procedure TBattleRoom.AddAction(AAction: IBRA_Action);

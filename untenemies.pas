@@ -553,6 +553,11 @@ var
   i: Integer;
   bow: IUnitItem;
 begin
+  MaxAP := 8;
+  MaxHP := 100;
+  HP := MaxHP;
+  AP := MaxAP;
+
   Name := 'Лучница';
   ViewRange := 16;
   ViewAngle := Pi/3+EPS;
@@ -576,9 +581,6 @@ begin
     FAnim[i] := Create_IavAnimationController(FModels[i].Mesh.Pose, World.GameTime);
   SetAnimation(['Idle0'], True);
 
-  MaxAP := 8;
-  MaxHP := 100;
-  HP := MaxHP;
   FRetreatLimits := 5;
 
   Preview96_128 := 'ui\units\archer.png';
@@ -1255,6 +1257,11 @@ end;
 
 procedure TBotMutant1.LoadModels();
 begin
+  MaxAP := 8;
+  MaxHP := 100;
+  HP := MaxHP;
+  AP := MaxAP;
+
   Name := 'Мутант';
   ViewRange := 10;
   ViewAngle := Pi/3+EPS;
@@ -1265,10 +1272,6 @@ begin
   FAnim := Create_IavAnimationController(FModels[0].Mesh.Pose, World.GameTime);
 
   SetAnimation(['Idle0'], True);
-
-  MaxAP := 8;
-  MaxHP := 100;
-  HP := MaxHP;
 
   Preview96_128 := 'ui\units\mutant1.png';
 

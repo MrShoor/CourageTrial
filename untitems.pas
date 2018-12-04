@@ -21,12 +21,14 @@ type
     function  GetEquipped: Boolean;
     procedure SetEquipped(const AValue: Boolean);
 
+    function Name  : string;          virtual; abstract;
     function Kind  : TUnitItemKind;   virtual; abstract;
     function Slot  : TRoomUnitEqSlot; virtual; abstract;
     function Model : string;          virtual; abstract;
     function Ico48 : string;          virtual; abstract;
 
     function Weapon_Damage: TVec2i; virtual;
+    function ExtraDesc: string; virtual;
 
     function SkillsCount: Integer; virtual;
     function Skill(ASkillIndex: Integer): IUnitSkill; virtual;
@@ -40,6 +42,7 @@ type
 
   TArcherBow = class(TUnitItem)
   public
+    function Name  : string;          override;
     function Kind  : TUnitItemKind;   override;
     function Slot  : TRoomUnitEqSlot; override;
     function Model : string;          override;
@@ -52,6 +55,7 @@ type
 
   TAxe = class(TUnitItem)
   public
+    function Name  : string;          override;
     function Kind  : TUnitItemKind;   override;
     function Slot  : TRoomUnitEqSlot; override;
     function Model : string;          override;
@@ -63,16 +67,25 @@ type
   { THealBottle }
 
   THealBottle = class(TUnitItem)
+  private
+    FHealEff: Integer;
   public
-    function Kind : TUnitItemKind;   override;
-    function Slot : TRoomUnitEqSlot; override;
-    function Model: string;          override;
-    function Ico48: string;          override;
+    function Name  : string;          override;
+    function Kind  : TUnitItemKind;   override;
+    function Slot  : TRoomUnitEqSlot; override;
+    function Model : string;          override;
+    function Ico48 : string;          override;
+
+    function ExtraDesc: string; override;
 
     function Consume(AUnit: TRoomUnit): IBRA_Action; override;
+    constructor Create; override;
   end;
 
 implementation
+
+uses
+  Math;
 
 type
 
@@ -106,6 +119,11 @@ end;
 
 { THealBottle }
 
+function THealBottle.Name: string;
+begin
+  Result := 'Зелье здоровья';
+end;
+
 function THealBottle.Kind: TUnitItemKind;
 begin
   Result := ikConsumable;
@@ -126,12 +144,44 @@ begin
   Result := 'potion_hp.png';
 end;
 
-function THealBottle.Consume(AUnit: TRoomUnit): IBRA_Action;
+function THealBottle.ExtraDesc: string;
 begin
+  Result := 'Восстанавливает '+IntToStr(FHealEff)+ ' ОЗ';
+end;
+
+function THealBottle.Consume(AUnit: TRoomUnit): IBRA_Action;
+var
+  n: Integer;
+begin
+  n := AUnit.Inventory().Items.IndexOf(Self);
+  if n < 0 then Exit(nil);
+
+  if AUnit.AP < 1 then
+  begin
+    AUnit.Room.AddMessage('Требуется 1 очко действий.');
+    Exit(nil);
+  end;
+  AUnit.AP := AUnit.AP - 1;
   Result := TBRA_DrinkPotion.Create(AUnit, Self);
+  if Result <> nil then
+  begin
+    AUnit.HP := Min(AUnit.HP + FHealEff, AUnit.MaxHP);
+    AUnit.Inventory().Pop(n);
+  end;
+end;
+
+constructor THealBottle.Create;
+begin
+  inherited Create;
+  FHealEff := 30;
 end;
 
 { TAxe }
+
+function TAxe.Name: string;
+begin
+  Result := 'Топорик';
+end;
 
 function TAxe.Kind: TUnitItemKind;
 begin
@@ -176,6 +226,11 @@ begin
   Result := Vec(0,0);
 end;
 
+function TUnitItem.ExtraDesc: string;
+begin
+  Result := '';
+end;
+
 function TUnitItem.SkillsCount: Integer;
 begin
   Result := Length(FSkills);
@@ -197,6 +252,11 @@ begin
 end;
 
 { TArcherBow }
+
+function TArcherBow.Name: string;
+begin
+  Result := 'Лук';
+end;
 
 function TArcherBow.Kind: TUnitItemKind;
 begin

@@ -16,10 +16,33 @@ const
   cScrollBarWidth = 24;
 
 type
+
+  { TavmItemHint }
+
+  TavmItemHint = class(TavmCustomControl)
+  private
+    FItem: IUnitItem;
+
+    FNameText  : ITextLines;
+    FStatsText : ITextLines;
+    //FReqText   : ITextLines;
+    procedure BuildTextLines;
+    procedure SetItem(const AValue: IUnitItem);
+  protected
+    procedure AfterRegister; override;
+    procedure DoValidate; override;
+    procedure HitTestLocal(const ALocalPt: TVec2; var AControl: TavmBaseControl); override;
+  public
+    property Item: IUnitItem read FItem write SetItem;
+  end;
+
   { TavmInventory }
 
   TavmInventory = class(TavmCustomControl)
   private
+    FHint  : TavmItemHint;
+    FLastMoveTime: Int64;
+    FLastMoveCoords: TVec2;
     FScroll: TavmDefaultScroll;
 
     FGridHeight: Integer;
@@ -41,7 +64,11 @@ type
     function ItemRect(CellX, CellY: Integer): TRectF; overload;
     function ItemRect(AIndex: Integer): TRectF; overload;
     function HitToItems(const APt: TVec2): Integer;
+    function ItemAt(const APt: TVec2): IUnitItem;
   protected
+    procedure Notify_MouseEnter; override;
+    procedure Notify_MouseLeave; override;
+    procedure Notify_MouseMove(const APt: TVec2; AShifts: TShifts); override;
     procedure Notify_DragStart(ABtn: Integer; const APt: TVec2; AShifts: TShifts); override;
     procedure Notify_DragMove (ABtn: Integer; const APt: TVec2; AShifts: TShifts); override;
     procedure Notify_DragStop (ABtn: Integer; const APt: TVec2; AShifts: TShifts); override;
@@ -50,6 +77,7 @@ type
     procedure DoValidate; override;
     procedure AfterRegister; override;
     procedure DrawControl(const AMat: TMat3); override;
+    procedure OnUPS; override;
   public
     property GridWidth : Integer read FGridWidth write SetGridWidth;
     property GridHeight: Integer read FGridHeight write SetGridHeight;
@@ -68,6 +96,104 @@ type
   end;
 
 implementation
+
+{ TavmItemHint }
+
+procedure TavmItemHint.BuildTextLines;
+
+  function GetDamageStr(): string;
+  var dmg: TVec2i;
+  begin
+    dmg := FItem.Weapon_Damage;
+    if dmg.x = dmg.y then
+      Result := IntToStr(dmg.x)
+    else
+      Result := IntToStr(dmg.x) + '-' + IntToStr(dmg.y);
+  end;
+
+const cTextYSpace = 10;
+      cTextXSpace = 30;
+var
+  tb: ITextBuilder;
+  y : Single;
+begin
+  if FItem = nil then
+  begin
+    FNameText := nil;
+    FStatsText := nil;
+    Exit;
+  end;
+
+  Canvas.Font.Color := Vec(1,1,1,1);
+  Canvas.Font.Size  := 32;
+  Canvas.Font.Style := [gsBold];
+  tb := Canvas.TextBuilder;
+  tb.Align := laCenter;
+  tb.WriteLn(FItem.Name);
+
+  FNameText := tb.Finish();
+  FNameText.BoundsX := Vec(cTextXSpace, Size.x - cTextXSpace);
+
+  Canvas.Font.Size := 24;
+  Canvas.Font.Style := [];
+  tb := Canvas.TextBuilder;
+  tb.Align := laLeft;
+  if FItem.Kind in cUnitItemKind_Weapons then
+    tb.WriteLn(string('Урон: ') + GetDamageStr());
+  if FItem.Kind = ikConsumable then
+    tb.WriteLn(string('Потребляемое'));
+  if FItem.ExtraDesc <> '' then
+  begin
+    tb.WriteWrapped(FItem.ExtraDesc);
+    tb.WriteWrappedEnd(Size.x - cTextXSpace*2, True);
+  end;
+
+  FStatsText := tb.Finish();
+  FStatsText.BoundsX := Vec(cTextXSpace, Size.x - cTextXSpace);
+
+  y := cTextYSpace;
+  FNameText.BoundsY := Vec(y, y + FNameText.TotalHeight());
+  y := y + FNameText.TotalHeight() + cTextYSpace;
+  FStatsText.BoundsY := Vec(y, y + FStatsText.TotalHeight());
+  y := y + FStatsText.TotalHeight() + cTextYSpace;
+
+  Size := Vec(Size.x, y);
+end;
+
+procedure TavmItemHint.SetItem(const AValue: IUnitItem);
+begin
+  if FItem = AValue then Exit;
+  FItem := AValue;
+  BuildTextLines;
+  Invalidate;
+end;
+
+procedure TavmItemHint.AfterRegister;
+begin
+  inherited AfterRegister;
+  Size := Vec(280, 100);
+end;
+
+procedure TavmItemHint.DoValidate;
+begin
+  inherited DoValidate;
+  Canvas.Clear;
+  Canvas.Brush.Color := Vec(0.125, 0.125, 0.125, 1);
+  Canvas.AddFill(Vec(0,0), Size);
+
+  Canvas.Pen.Color := Vec(0,0,0,1);
+  Canvas.Pen.Width := 1;
+  Canvas.AddRectangle(Vec(0,0), Size);
+
+  Canvas.AddText(FNameText);
+  Canvas.AddText(FStatsText);
+  //Canvas.AddText(FReqText);
+end;
+
+procedure TavmItemHint.HitTestLocal(const ALocalPt: TVec2; var AControl: TavmBaseControl);
+begin
+  inherited HitTestLocal(ALocalPt, AControl);
+end;
 
 { TavmInventory }
 
@@ -140,6 +266,49 @@ begin
   end;
 end;
 
+function TavmInventory.ItemAt(const APt: TVec2): IUnitItem;
+var idx: Integer;
+begin
+  Result := nil;
+  if FInventory = nil then Exit;
+  idx := HitToItems(APt);
+  if idx < 0 then Exit;
+  if idx >= FInventory.Items.Count then Exit;
+  Result := FInventory.Items[idx];
+end;
+
+procedure TavmInventory.Notify_MouseEnter;
+begin
+  inherited Notify_MouseEnter;
+  UPSSubscribe;
+end;
+
+procedure TavmInventory.Notify_MouseLeave;
+begin
+  inherited Notify_MouseLeave;
+  UPSUnSubscribe;
+  FHint.Visible := False;
+end;
+
+procedure TavmInventory.Notify_MouseMove(const APt: TVec2; AShifts: TShifts);
+const cHintDirection: TVec2 = (x: 0.7; y: 0.7);
+var
+  rct: TRectF;
+begin
+  inherited Notify_MouseMove(APt, AShifts);
+  //update hint state
+  if FLastMoveCoords = APt then Exit;
+  FLastMoveCoords := APt;
+  FLastMoveTime := Main.Time64;
+  FHint.Item := ItemAt(APt);
+  if FHint.Item <> nil then
+  begin
+    FHint.Origin := Sign(cHintDirection) * Vec(-0.5, -0.5) + Vec(0.5, 0.5);
+    rct := ItemRect(HitToItems(APt));
+    FHint.Pos := Lerp(rct.min, rct.max, cHintDirection * Vec(0.5, 0.5) + Vec(0.5, 0.5));
+  end;
+end;
+
 procedure TavmInventory.Notify_DragStart(ABtn: Integer; const APt: TVec2; AShifts: TShifts);
 begin
   inherited Notify_DragStart(ABtn, APt, AShifts);
@@ -151,6 +320,7 @@ end;
 procedure TavmInventory.Notify_DragMove(ABtn: Integer; const APt: TVec2; AShifts: TShifts);
 begin
   inherited Notify_DragMove(ABtn, APt, AShifts);
+  //update drag state
   if (ABtn <> 1) then Exit;
   if (FDraggedItem < 0) then Exit;
   FDraggetItemCoord := APt;
@@ -178,6 +348,7 @@ procedure TavmInventory.Notify_MouseDblClick(ABtn: Integer; const APt: TVec2; AS
 var itemIdx: Integer;
     item: IUnitItem;
     action: IBRA_Action;
+    unt: TRoomUnit;
 begin
   inherited Notify_MouseDblClick(ABtn, APt, AShifts);
   if FInventory = nil then Exit;
@@ -190,9 +361,13 @@ begin
     ikUnknown: Exit;
     ikConsumable:
       begin
-        action := item.Consume(FInventory.Owner as TRoomUnit);
-        if action <> nil then
-          FInventory.Owner.Room.AddAction(action);
+        unt := FInventory.Owner as TRoomUnit;
+        if not unt.IsDead() and not unt.Room.InAction then
+        begin
+          action := item.Consume(unt);
+          if action <> nil then
+            FInventory.Owner.Room.AddAction(action);
+        end;
       end;
     ikBow, ikAxe:
       begin
@@ -347,6 +522,11 @@ begin
   Pos := Vec(10, 10);
   GridWidth := 5;
   GridHeight := 10;
+
+  FHint := TavmItemHint.Create(Self);
+  FHint.Pos := Vec(0,0);
+  FHint.Origin := Vec(1, 0);
+  FHint.Visible := False;
 end;
 
 procedure TavmInventory.DrawControl(const AMat: TMat3);
@@ -358,6 +538,14 @@ begin
       Invalidate;
     end;
   inherited DrawControl(AMat);
+end;
+
+procedure TavmInventory.OnUPS;
+begin
+  inherited OnUPS;
+  FHint.Visible := (Main.Time64 - FLastMoveTime > 100) and
+                   (not FDragStarted[0]) and
+                   (FHint.Item <> nil);
 end;
 
 procedure TavmInventory.SetDropPosition(const AValue: Integer);

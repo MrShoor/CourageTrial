@@ -118,6 +118,8 @@ type
     function DamageScale : Single; override;
     function Accuracy    : TVec2; override;
 
+    function Req_WeaponType: TUnitItemKind; override;
+
     function Animation: string; override;
     function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; override;
     function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean; override;
@@ -186,6 +188,11 @@ end;
 function TSkill_AxeAttack.Accuracy: TVec2;
 begin
   Result := Vec(0.9, 0.9);
+end;
+
+function TSkill_AxeAttack.Req_WeaponType: TUnitItemKind;
+begin
+  Result := ikAxe;
 end;
 
 function TSkill_AxeAttack.Animation: string;
