@@ -9,6 +9,7 @@ interface
 
 uses
   Classes, SysUtils, avRes, avContnrs, avMiniControls, avTypes, untLevel, mutils, intfUtils,
+  avBase,
   avContnrsDefaults,
   avPathFinder,
   ui_unit, ui_inventory, ui_skills, ui_gamecamera, ui_messages;
@@ -83,6 +84,8 @@ type
     TRoomsMap = {$IFDef FPC}specialize{$EndIf} THashMap<TVec2i, TBattleRoomAdapter>;
     IRoomsMap = {$IFDef FPC}specialize{$EndIf} IHashMap<TVec2i, TBattleRoomAdapter>;
   private
+    FAllRoomFiles: TStringList;
+
     FCurrentRoom: TBattleRoom;
     FRooms: IRoomsMap;
 
@@ -102,12 +105,17 @@ type
   protected
     procedure AfterRegister; override;
   public
+    class function RoomsDirectory: UnicodeString;
+
     procedure Create2Rooms;
     procedure CreateLab(ARoomCount: Integer);
 
     procedure Draw2DUI();
 
     property CurrentRoom: TBattleRoom read FCurrentRoom;
+  public
+    constructor Create(AParent: TavObject); override;
+    destructor Destroy; override;
   end;
 
 implementation
@@ -323,14 +331,17 @@ end;
 function TFloorMap.ObtainBattleRoom(const ARoomCoord: TVec2i): TBattleRoom;
 var broom: TBattleRoom;
     pRoom: PBattleRoomAdapter;
+    dir  : string;
 begin
+  dir := string(RoomsDirectory);
   pRoom := PBattleRoomAdapter(FRooms.PItem[ARoomCoord]);
   if pRoom^.room = nil then
   begin
     broom := TBattleRoom.Create(Self);
     broom.RoomPos := ARoomCoord;
     broom.RoomDir := pRoom^.RoomRot;
-    broom.GenerateWithLoad('rooms\r'+IntToStr(Random(3)+1)+'.room', GetRoomDoors(ARoomCoord));
+    //broom.GenerateWithLoad('rooms\r'+IntToStr(Random(3)+1)+'.room', GetRoomDoors(ARoomCoord));
+    broom.GenerateWithLoad(dir + '\' + FAllRoomFiles[Random(FAllRoomFiles.Count)], GetRoomDoors(ARoomCoord));
     broom.UI := FUI;
     broom.OnLeaveBattleRoom := {$IfDef FPC}@{$EndIf}DoLeaveBattleRoom;
 
@@ -399,6 +410,11 @@ begin
   FRooms := TRoomsMap.Create();
   FUI := TGameUI.Create(Self);
   FUI.OnEndTurnBtnClick := {$IfDef FPC}@{$EndIf}DoOnEndTurnBtnClick;
+end;
+
+class function TFloorMap.RoomsDirectory: UnicodeString;
+begin
+  Result := UnicodeString(ExtractFileDir(ParamStr(0))+'\rooms');
 end;
 
 procedure TFloorMap.Create2Rooms;
@@ -487,6 +503,34 @@ end;
 procedure TFloorMap.Draw2DUI();
 begin
   FUI.Draw2DUI();
+end;
+
+constructor TFloorMap.Create(AParent: TavObject);
+
+  procedure ReadDirectory(const ADir: UnicodeString);
+  var sr: TUnicodeSearchRec;
+      filter: UnicodeString;
+  begin
+    filter := ADir+'\*.room';
+    if FindFirst(filter, faAnyFile, sr) = 0 then
+    begin
+      repeat
+        FAllRoomFiles.Add(sr.name);
+      until FindNext(sr) <> 0;
+      FindClose(sr);
+    end;
+  end;
+
+begin
+  inherited Create(AParent);
+  FAllRoomFiles := TStringList.Create;
+  ReadDirectory(RoomsDirectory);
+end;
+
+destructor TFloorMap.Destroy;
+begin
+  FreeAndNil(FAllRoomFiles);
+  inherited Destroy;
 end;
 
 end.

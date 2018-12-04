@@ -185,8 +185,8 @@ begin
   PreloadModels;
 
   FFloor := TFloorMap.Create(FWorld);
-  FFloor.Create2Rooms;
-  //FFloor.CreateLab(5);
+  //FFloor.Create2Rooms;
+  FFloor.CreateLab(8);
 
   if FUPSObj = nil then
     FUPSObj := TUPSObject.Create(FMain);
