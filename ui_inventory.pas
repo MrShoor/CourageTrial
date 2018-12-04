@@ -177,6 +177,7 @@ end;
 procedure TavmInventory.Notify_MouseDblClick(ABtn: Integer; const APt: TVec2; AShifts: TShifts);
 var itemIdx: Integer;
     item: IUnitItem;
+    action: IBRA_Action;
 begin
   inherited Notify_MouseDblClick(ABtn, APt, AShifts);
   if FInventory = nil then Exit;
@@ -185,10 +186,22 @@ begin
   if itemIdx < 0 then Exit;
   if itemIdx >= FInventory.Items.Count then Exit;
   item := FInventory.Items[itemIdx];
-  if item.Equipped then
-    TPlayer(FInventory.Owner).Unequip(item.Slot)
-  else
-    TPlayer(FInventory.Owner).Equip(item);
+  case item.Kind of
+    ikUnknown: Exit;
+    ikConsumable:
+      begin
+        action := item.Consume(FInventory.Owner as TRoomUnit);
+        if action <> nil then
+          FInventory.Owner.Room.AddAction(action);
+      end;
+    ikBow, ikAxe:
+      begin
+        if item.Equipped then
+          TPlayer(FInventory.Owner).Unequip(item.Slot)
+        else
+          TPlayer(FInventory.Owner).Equip(item);
+      end;
+  end;
   Invalidate;
 end;
 

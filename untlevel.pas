@@ -143,6 +143,8 @@ type
     function SkillsCount: Integer;
     function Skill(ASkillIndex: Integer): IUnitSkill;
 
+    function Consume(AUnit: TRoomUnit): IBRA_Action;
+
     property Equipped: Boolean read GetEquipped write SetEquipped;
   end;
   IUnitItemArr = {$IfDef FPC}specialize{$EndIf}IArray<IUnitItem>;
@@ -355,6 +357,7 @@ type
     FUnitSkills   : IUnitSkillArr;
     FEquippedItem : array [TRoomUnitEqSlot] of IUnitItem;
     FEquippedModel: array [TRoomUnitEqSlot] of IavModelInstance;
+    FTemporaryEquippedModel: array [TRoomUnitEqSlot] of IavModelInstance;
     FInventory: IInventory;
 
     FAllSkillsCacheInventoryLastStateID: Integer;
@@ -383,6 +386,9 @@ type
     procedure Unequip(const ASlot: TRoomUnitEqSlot);
     function  Equip(const AItem: IUnitItem): Boolean;
     function  GetEquip(const ASlot: TRoomUnitEqSlot): IUnitItem;
+
+    procedure TemporaryEquip(ASlot: TRoomUnitEqSlot; const AModel: string);
+    procedure TemporaryUnEquip(ASlot: TRoomUnitEqSlot);
 
     procedure LoadModels(); virtual;
 
@@ -663,11 +669,16 @@ type
   TPlayer = class (TRoomUnit)
   private
     FAnim: array of IavAnimationController;
+    FActiveSkill: IUnitSkill;
+    function  GetActiveSkill: IUnitSkill;
+    procedure SetActiveSkill(const AValue: IUnitSkill);
   protected
     procedure Notify_PlayerLeave; override;
     procedure Notify_PlayerEnter; override;
     procedure UpdateStep; override;
   public
+    property ActiveSkill: IUnitSkill read GetActiveSkill write SetActiveSkill;
+
     procedure SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean); override;
     function  GetUnitMoveSpeed: Single; override;
 
@@ -827,8 +838,6 @@ type
 
     FEmptyLight: IavPointLight;
 
-    FPlayerActiveSkill: IUnitSkill;
-
     function IsBotTurn: Boolean;
     function IsMouseOnUI: Boolean;
     procedure AutoOpenDoors;
@@ -838,7 +847,6 @@ type
     function World: TbWorld;
   public
     procedure SetEditMode();
-    procedure SetPlayerActiveSkill(const ASkill: IUnitSkill);
 
     property RoomPos: TVec2i read FRoomPos write SetRoomPos;
     property RoomDir: Integer read FRoomDir write SetRoomDir;
@@ -2175,6 +2183,25 @@ begin
   Result := FEquippedItem[ASlot];
 end;
 
+procedure TRoomUnit.TemporaryEquip(ASlot: TRoomUnitEqSlot; const AModel: string);
+var
+  m: TMat4;
+  inst: IavModelInstanceArr;
+begin
+  m := FModels[0].Mesh.BindPoseTransform;
+  inst := World.Renderer.CreateModelInstances([AModel]);
+  inst[0].Mesh.Transform := m;
+  inst[0].Mesh.Pose := FModels[0].Mesh.Pose;
+  inst[0].Mesh.Transform := Transform();
+  inst[0].Static := False;
+  FTemporaryEquippedModel[ASlot] := inst[0];
+end;
+
+procedure TRoomUnit.TemporaryUnEquip(ASlot: TRoomUnitEqSlot);
+begin
+  FTemporaryEquippedModel[ASlot] := nil;
+end;
+
 function TRoomUnit.AllSkills(): IUnitSkillArr;
 var i, j: Integer;
     items: IUnitItemArr;
@@ -2272,11 +2299,21 @@ begin
   if AType = mtDefault then
   begin
     for i := Low(TRoomUnitEqSlot) to High(TRoomUnitEqSlot) do
-      if FEquippedModel[i] <> nil then
+    begin
+      if FTemporaryEquippedModel[i] <> nil then
       begin
-        FEquippedModel[i].Transform := Transform();
-        ACollection.Add(FEquippedModel[i]);
+        FTemporaryEquippedModel[i].Transform := Transform();
+        ACollection.Add(FTemporaryEquippedModel[i]);
+      end
+      else
+      begin
+        if FEquippedModel[i] <> nil then
+        begin
+          FEquippedModel[i].Transform := Transform();
+          ACollection.Add(FEquippedModel[i]);
+        end;
       end;
+    end;
   end;
 end;
 
@@ -3265,6 +3302,27 @@ end;
 
 { TPlayer }
 
+function TPlayer.GetActiveSkill: IUnitSkill;
+begin
+  Result := nil;
+  if FActiveSkill = nil then Exit;
+  if not FActiveSkill.UseReady(Self) then Exit;
+  if AllSkills().IndexOf(FActiveSkill) < 0 then Exit;
+  Result := FActiveSkill;
+end;
+
+procedure TPlayer.SetActiveSkill(const AValue: IUnitSkill);
+begin
+  if AValue = nil then
+  begin
+    FActiveSkill := nil;
+    Exit;
+  end;
+  if AllSkills().IndexOf(AValue) < 0 then Exit;
+  if not AValue.UseReady(Self) then Exit;
+  FActiveSkill := AValue;
+end;
+
 procedure TPlayer.Notify_PlayerLeave;
 begin
 
@@ -3320,6 +3378,7 @@ begin
 
   FUnitSkills.Add(TSkill_Kick.Create(nil, 0));
   FUnitSkills.Add(TSkill_Shoot.Create(nil, 0));
+  FUnitSkills.Add(TSkill_AxeAttack.Create(nil, 0));
 
   FSlots10[0] := FUnitSkills[0];
   FSlots10[1] := FUnitSkills[1];
@@ -3335,6 +3394,8 @@ begin
   Equip(axe);
   axe := TAxe.Create;
   Inventory().Push(axe, 0);
+
+  Inventory().Push(THealBottle.Create, 0);
 
   //AddModel('Gop_Body', mtDefault);
   //AddModel('Gop_Bottoms', mtDefault);
@@ -3459,28 +3520,6 @@ begin
   FMap.InEditMode := True;
 end;
 
-procedure TBattleRoom.SetPlayerActiveSkill(const ASkill: IUnitSkill);
-  procedure SetActiveSkillInternal(const ASkill: IUnitSkill);
-  begin
-    FPlayerActiveSkill := ASkill;
-
-  end;
-
-var skills: IUnitSkillArr;
-begin
-  if FPlayer = nil then Exit;
-  if ASkill = nil then
-  begin
-    SetActiveSkillInternal(ASkill);
-    Exit;
-  end;
-
-  skills := FPlayer.AllSkills();
-  if skills.IndexOf(ASkill) < 0 then Exit;
-  if not ASkill.UseReady(FPlayer) then Exit;
-  SetActiveSkillInternal(ASkill);
-end;
-
 procedure TBattleRoom.KeyPress(KeyCode: Integer);
 var inv_objs: IRoomObjectArr;
     n: Integer;
@@ -3501,7 +3540,7 @@ begin
           n := 9
         else
           n := n - 1;
-        SetPlayerActiveSkill(FPlayer.SkillSlots[n]);
+        FPlayer.ActiveSkill := FPlayer.SkillSlots[n];
       end;
     end;
     Ord('G') :
@@ -3545,9 +3584,9 @@ begin
       new_action := TBRA_UnitMovementAction.Create(FPlayer, FMovePath);
     end;
 
-    if (obj is TRoomUnit) and (FPlayer <> obj) and (FPlayerActiveSkill <> nil) then
+    if (obj is TRoomUnit) and (FPlayer <> obj) and (FPlayer.ActiveSkill <> nil) then
     begin
-      new_action := FPlayerActiveSkill.DoAction(0, FPlayer, obj as TRoomUnit);
+      new_action := FPlayer.ActiveSkill.DoAction(0, FPlayer, obj as TRoomUnit);
     end;
 
     if (obj is TRoomInteractiveObject) then
@@ -3622,12 +3661,7 @@ begin
   AutoOpenDoors();
   AutoCloseDoors();
 
-  //update active skill information
-  if FPlayerActiveSkill <> nil then
-    if not FPlayerActiveSkill.UseReady(FPlayer) then
-      SetPlayerActiveSkill(nil);
-
-  UI.SetPlayerActiveSkill(FPlayerActiveSkill);
+  UI.SetPlayerActiveSkill(FPlayer.ActiveSkill);
   UI.UpdateStep(IsPlayerTurn);
 
   //moved tile update
@@ -3890,7 +3924,6 @@ begin
   if n >= 0 then
     FUnits.Delete(n);
   FActiveUnit := 0;
-  FPlayerActiveSkill := nil;
   FActions.Clear();
   FMovePath := nil;
   FRayPath := nil;

@@ -31,6 +31,8 @@ type
     function SkillsCount: Integer; virtual;
     function Skill(ASkillIndex: Integer): IUnitSkill; virtual;
 
+    function Consume(AUnit: TRoomUnit): IBRA_Action; virtual;
+
     constructor Create; virtual;
   end;
 
@@ -58,7 +60,76 @@ type
     function Weapon_Damage: TVec2i; override;
   end;
 
+  { THealBottle }
+
+  THealBottle = class(TUnitItem)
+  public
+    function Kind : TUnitItemKind;   override;
+    function Slot : TRoomUnitEqSlot; override;
+    function Model: string;          override;
+    function Ico48: string;          override;
+
+    function Consume(AUnit: TRoomUnit): IBRA_Action; override;
+  end;
+
 implementation
+
+type
+
+  { TBRA_DrinkPotion }
+
+  TBRA_DrinkPotion = class(TBRA_Action)
+  private
+    FUnit: TRoomUnit;
+    FStopTime: Int64;
+  public
+    function ProcessAction: Boolean; override;
+    constructor Create(AUnit: TRoomUnit; const AItem: IUnitItem);
+  end;
+
+{ TBRA_DrinkPotion }
+
+function TBRA_DrinkPotion.ProcessAction: Boolean;
+begin
+  Result := FUnit.World.GameTime < FStopTime;
+  if not Result then
+    FUnit.TemporaryUnEquip(esLeftHand);
+end;
+
+constructor TBRA_DrinkPotion.Create(AUnit: TRoomUnit; const AItem: IUnitItem);
+begin
+  FUnit := AUnit;
+  FUnit.TemporaryEquip(esLeftHand, AItem.Model);
+  FUnit.SetAnimation(['Drink', 'Idle0'], True);
+  FStopTime := FUnit.World.GameTime + 1000;
+end;
+
+{ THealBottle }
+
+function THealBottle.Kind: TUnitItemKind;
+begin
+  Result := ikConsumable;
+end;
+
+function THealBottle.Slot: TRoomUnitEqSlot;
+begin
+  Result := esNone;
+end;
+
+function THealBottle.Model: string;
+begin
+  Result := 'PotionA';
+end;
+
+function THealBottle.Ico48: string;
+begin
+  Result := 'potion_hp.png';
+end;
+
+function THealBottle.Consume(AUnit: TRoomUnit): IBRA_Action;
+begin
+  Result := TBRA_DrinkPotion.Create(AUnit, Self);
+end;
 
 { TAxe }
 
@@ -113,6 +184,11 @@ end;
 function TUnitItem.Skill(ASkillIndex: Integer): IUnitSkill;
 begin
   Result := FSkills[ASkillIndex];
+end;
+
+function TUnitItem.Consume(AUnit: TRoomUnit): IBRA_Action;
+begin
+  Result := nil;
 end;
 
 constructor TUnitItem.Create;

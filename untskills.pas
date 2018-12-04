@@ -100,10 +100,133 @@ type
     function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
   end;
 
+  { TSkill_AxeAttack }
+
+  TSkill_AxeAttack = class(TUnitSkill)
+  private
+  public
+    function WearedOnly: Boolean; override;
+    function UseReady(AUnit: TRoomUnit): Boolean; override;
+
+    function Name: string; override;
+    function Desc: string; override;
+    function Ico : string; override;
+
+    function Cost        : Integer; override;
+    function Range       : Single; override;
+    function Damage      : TVec2i; override;
+    function DamageScale : Single; override;
+    function Accuracy    : TVec2; override;
+
+    function Animation: string; override;
+    function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; override;
+    function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean; override;
+
+    function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; override;
+    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
+  end;
+
 implementation
 
 uses
   Math;
+
+{ TSkill_AxeAttack }
+
+function TSkill_AxeAttack.WearedOnly: Boolean;
+begin
+  Result := True;
+end;
+
+function TSkill_AxeAttack.UseReady(AUnit: TRoomUnit): Boolean;
+var itm: IUnitItem;
+begin
+  if AUnit = nil then Exit(False);
+  itm := AUnit.GetEquip(esRightHand);
+  if itm = nil then Exit(False);
+  if itm.Kind <> ikAxe then Exit(False);
+  Result := True;
+end;
+
+function TSkill_AxeAttack.Name: string;
+begin
+  Result := 'Рубануть';
+end;
+
+function TSkill_AxeAttack.Desc: string;
+begin
+  Result := 'Базовый навык владения топором';
+end;
+
+function TSkill_AxeAttack.Ico: string;
+begin
+  Result := 'axe_attack.png';
+end;
+
+function TSkill_AxeAttack.Cost: Integer;
+begin
+  Result := 3;
+end;
+
+function TSkill_AxeAttack.Range: Single;
+begin
+  Result := 1;
+end;
+
+function TSkill_AxeAttack.Damage: TVec2i;
+begin
+  Result := Vec(0, 0);
+end;
+
+function TSkill_AxeAttack.DamageScale: Single;
+begin
+  Result := 1;
+end;
+
+function TSkill_AxeAttack.Accuracy: TVec2;
+begin
+  Result := Vec(0.9, 0.9);
+end;
+
+function TSkill_AxeAttack.Animation: string;
+begin
+  Result := 'Axe0_Attack0';
+end;
+
+function TSkill_AxeAttack.SampleDamage(AOwner, ATarget: TRoomUnit): Integer;
+var itm: IUnitItem;
+    dmg: TVec2;
+begin
+  itm := AOwner.GetEquip(esRightHand);
+  if itm = nil then Exit(0);
+  dmg := itm.Weapon_Damage + Damage;
+  dmg.x := dmg.x * DamageScale;
+  dmg.y := dmg.y * DamageScale;
+  Result := Round( Lerp(dmg.x, dmg.y, Random) );
+end;
+
+function TSkill_AxeAttack.SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean;
+begin
+  Result := Random <= Accuracy.x;
+end;
+
+function TSkill_AxeAttack.DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
+begin
+  Result := nil;
+  if not CanUse(ASkillIndex, AOwner, ATarget) then Exit;
+  AOwner.AP := AOwner.AP - Cost;
+  AOwner.Room.AddMessage(AOwner.Name + ' наносит рубящий удар');
+  Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Self, 2000, 866);
+end;
+
+function TSkill_AxeAttack.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
+begin
+  Result := inherited CanUse(ASkillIndex, AOwner, ATarget, AReservedPoints);
+  if not Result then Exit;
+  Result := False;
+  if AOwner.AP - AReservedPoints < Cost then Exit;
+  Result := True;
+end;
 
 { TSkill_Shoot }
 

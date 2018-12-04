@@ -405,7 +405,7 @@ procedure TFloorMap.Create2Rooms;
 var empty: TBattleRoomAdapter;
 begin
   ZeroClear(empty, SizeOf(empty));
-  empty.RoomRot := 1;
+  empty.RoomRot := 0;
   FRooms.Add(Vec(0, 0), empty);
   empty.RoomRot := 2;
   FRooms.Add(Vec(1, 0), empty);

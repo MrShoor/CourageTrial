@@ -129,8 +129,6 @@ type
     function HitToItems(const APt: TVec2): Integer;
     function SkillAt(const APt: TVec2): IUnitSkill;
   protected
-    function GetBattleRoom: TBattleRoom;
-
     procedure Notify_MouseEnter; override;
     procedure Notify_MouseLeave; override;
     procedure Notify_MouseMove(const APt: TVec2; AShifts: TShifts); override;
@@ -641,17 +639,6 @@ begin
   Result := FSkills.GetSkill(idx);
 end;
 
-function TavmSkills.GetBattleRoom: TBattleRoom;
-var obj: TavObject;
-begin
-  obj := Self;
-  repeat
-    obj := obj.Parent;
-    if obj is TBattleRoom then Exit(TBattleRoom(obj));
-  until obj = nil;
-  Result := nil;
-end;
-
 procedure TavmSkills.Notify_MouseEnter;
 begin
   inherited Notify_MouseEnter;
@@ -718,22 +705,16 @@ end;
 
 procedure TavmSkills.Notify_MouseUp(ABtn: Integer; const APt: TVec2; AShifts: TShifts);
 var itemIdx: Integer;
-    bRoom: TBattleRoom;
     skill: IUnitSkill;
 begin
-  if (ABtn = 1) and (not FDragStarted[ABtn]) then
+  if (ABtn = 1) and (not FDragStarted[ABtn]) and (FSkills.RoomUnit <> nil) and (FSkills.RoomUnit is TPlayer) then
   begin
-    bRoom := GetBattleRoom;
-    if bRoom = nil then Exit;
     skill := nil;
-
     itemIdx := HitToItems(APt);
     if (itemIdx >= 0) and (itemIdx < FSkills.Count) then
       skill := FSkills.GetSkill(itemIdx);
-
-    bRoom.SetPlayerActiveSkill(skill);
+    TPlayer(FSkills.RoomUnit).ActiveSkill := skill;
   end;
-
   inherited Notify_MouseUp(ABtn, APt, AShifts);
 end;
 
