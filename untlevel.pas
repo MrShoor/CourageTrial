@@ -13,7 +13,7 @@ uses
   Graphics,
   Math,
   Classes, SysUtils, avBase, avRes, bWorld, mutils, bLights, avMesh, avTypes, avTess, avContnrs, avContnrsDefaults,
-  avPathFinder, avModel, avTexLoader,
+  avPathFinder, avModel, avTexLoader, avRTTIUtils,
   untObstacles;
 
 const
@@ -642,6 +642,9 @@ type
   private
     FObstacle: TObstacleDesc;
   public
+    procedure LoadComplete; virtual;
+  public
+    function GetProps: TPersistent; virtual;
     property Obstacle: TObstacleDesc read FObstacle;
 
     function BlockedCellsCount: Integer; override;
@@ -650,7 +653,7 @@ type
     procedure LoadModels(const AObstacle: TObstacleDesc); virtual;
 
     procedure WriteStream(const AStream: TStream); virtual;
-    procedure ReadStream(const AStream: TStream); virtual;
+    procedure ReadStream(const AStream: TStream; AAutoRegister: Boolean = True); virtual;
   end;
 
   { TRoomInteractiveObject }
@@ -1835,8 +1838,19 @@ end;
 
 { TObstacle }
 
+procedure TObstacle.LoadComplete;
+begin
+
+end;
+
+function TObstacle.GetProps: TPersistent;
+begin
+  Result := nil;
+end;
+
 function TObstacle.BlockedCellsCount: Integer;
 begin
+  if FObstacle.cells = nil then Exit(0);
   Result := FObstacle.cells.Count;
 end;
 
@@ -1874,9 +1888,10 @@ begin
   FObstacle.WriteStream(AStream);
   AStream.WriteBuffer(FRoomPos, SizeOf(FRoomPos));
   AStream.WriteBuffer(FRoomDir, SizeOf(FRoomDir));
+  WritePersistent(AStream, GetProps());
 end;
 
-procedure TObstacle.ReadStream(const AStream: TStream);
+procedure TObstacle.ReadStream(const AStream: TStream; AAutoRegister: Boolean);
 var rPos: TVec2i;
     rDir: Integer;
 begin
@@ -1890,7 +1905,10 @@ begin
   AStream.ReadBuffer(rDir, SizeOf(rDir));
 
   LoadModels(FObstacle);
-  SetRoomPosDir(rPos, rDir);
+  SetRoomPosDir(rPos, rDir, AAutoRegister);
+
+  ReadPersistent(AStream, GetProps());
+  LoadComplete;
 end;
 
 { TBRA_Action }
@@ -3299,15 +3317,16 @@ var
   curr: TRoomObject;
 begin
   Assert(AObject <> nil);
-  for i := 0 to AObject.BlockedCellsCount() - 1 do
-  begin
-    v := AObject.GetAbsoluteBlockedCell(i);
-    if FObjects.TryGetValue(v, curr) then
+  if AObject.Registred then
+    for i := 0 to AObject.BlockedCellsCount() - 1 do
     begin
-      FObjects.Delete(v);
-      FRoomUI.TileColor[v] := TTileColorID.Normal;
+      v := AObject.GetAbsoluteBlockedCell(i);
+      if FObjects.TryGetValue(v, curr) then
+      begin
+        FObjects.Delete(v);
+        FRoomUI.TileColor[v] := TTileColorID.Normal;
+      end;
     end;
-  end;
   FRoomUI.InvalidateFogOfWar;
   Main.InvalidateWindow;
 end;

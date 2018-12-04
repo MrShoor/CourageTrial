@@ -13,7 +13,7 @@ uses
   Windows,
   {$IfDef FPC}
   LCLType,
-  FileUtil,
+  FileUtil, RTTIGrids,
   {$EndIf}
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls,
   Menus, StdCtrls,
@@ -28,13 +28,16 @@ const
 type
   TEditActionState = (easNone, easAddObject);
 
+  TOnCancelState = procedure (AObstacle: TObstacle) of object;
+
   { TAddObjectState }
 
   TAddObjectState = record
     obstacleDesc: TObstacleDesc;
     obstacle: TObstacle;
+    doOnCancelState: TOnCancelState;
     procedure SetStateNew(const ARoom: TBattleRoom; const AObstacleIndex: Integer); overload;
-    procedure SetStateNew(const ARoom: TBattleRoom; const AObstacle: TObstacleDesc); overload;
+    procedure SetStateNew(const ARoom: TBattleRoom; const ASourceObstacle: TObstacle); overload;
     procedure SetState(const AObstacle: TObstacle); overload;
     procedure UpdateState(const ARoomPos: TVec2i; const ARoomDir: Integer);
     procedure ClearState();
@@ -65,6 +68,7 @@ type
     Panel1: TPanel;
     SaveRoomDialog: TSaveDialog;
     Splitter2: TSplitter;
+    gridObjectProps: TTIPropertyGrid;
     ToolPanel: TPanel;
     RenderPanel: TPanel;
     Splitter1: TSplitter;
@@ -92,12 +96,17 @@ type
     FState: TEditActionState;
     FState_AddObject: TAddObjectState;
 
+    FSelectedObj: TObstacle;
+
     procedure ClearEditState;
 
     procedure RenderScene;
     procedure CreateNewRoom;
     function ObtainObstaclePreview(const AIndex: Integer): TBitmap;
     procedure CleanObstaclePreview;
+
+    procedure OnCancelState(AObstacle: TObstacle);
+    procedure SelectObject(const AObject: TObstacle);
   public
 
   end;
@@ -116,20 +125,33 @@ implementation
 { TAddObjectState }
 
 procedure TAddObjectState.SetStateNew(const ARoom: TBattleRoom; const AObstacleIndex: Integer);
-begin
-  SetStateNew(ARoom, ARoom.Obstacles[AObstacleIndex]);
-end;
-
-procedure TAddObjectState.SetStateNew(const ARoom: TBattleRoom; const AObstacle: TObstacleDesc);
 var cls: TRoomObjectClass;
 begin
   Assert(obstacle = nil);
-  obstacleDesc := AObstacle;
+  obstacleDesc := ARoom.Obstacles[AObstacleIndex];
   cls := FindRoomClass(obstacleDesc.clsname);
   if cls = nil then
     cls := TObstacle;
   obstacle := ARoom.CreateRoomObject(cls) as TObstacle;
   obstacle.LoadModels(obstacleDesc);
+end;
+
+procedure TAddObjectState.SetStateNew(const ARoom: TBattleRoom; const ASourceObstacle: TObstacle);
+var cls: TRoomObjectClass;
+    ms : TMemoryStream;
+begin
+  Assert(obstacle = nil);
+  obstacleDesc := ASourceObstacle.Obstacle;
+  cls := TRoomObjectClass(ASourceObstacle.ClassType);
+  obstacle := ARoom.CreateRoomObject(cls) as TObstacle;
+  ms := TMemoryStream.Create;
+  try
+    ASourceObstacle.WriteStream(ms);
+    ms.Position := 0;
+    obstacle.ReadStream(ms, False);
+  finally
+    FreeAndNil(ms);
+  end;
 end;
 
 procedure TAddObjectState.SetState(const AObstacle: TObstacle);
@@ -151,13 +173,14 @@ begin
     obstacle.RegisterAtRoom();
 end;
 
-procedure TAddObjectState.ClearState;
+procedure TAddObjectState.ClearState();
 begin
   obstacle := nil;
 end;
 
-procedure TAddObjectState.CancelState;
+procedure TAddObjectState.CancelState();
 begin
+  if Assigned(doOnCancelState) then doOnCancelState(obstacle);
   FreeAndNil(obstacle);
 end;
 
@@ -180,6 +203,7 @@ end;
 
 procedure TfmrMain.FormCreate(Sender: TObject);
 begin
+  FState_AddObject.doOnCancelState := {$IfDef FPC}@{$EndIf}OnCancelState;
   RenderPanel.OnPaint := {$IfDef FPC}@{$EndIf}RenderPanelPaint;
 
   lbObjects.ItemHeight := cPreviewSize + 16;
@@ -331,7 +355,7 @@ begin
         FState := easAddObject;
         if ssShift in {$IfDef FPC}GetKeyShiftState{$Else}KeyboardStateToShiftState{$EndIf} then
         begin
-          FState_AddObject.SetStateNew(FRoom, TObstacle(obj).Obstacle);
+          FState_AddObject.SetStateNew(FRoom, TObstacle(obj));
           FState_AddObject.obstacle.RoomPos := obj.RoomPos;
           FState_AddObject.obstacle.RoomDir := obj.RoomDir;
         end
@@ -344,18 +368,32 @@ begin
       if FState_AddObject.obstacle.Registred then
         FState_AddObject.ClearState()
       else
+      begin
         FState_AddObject.CancelState();
+      end;
     end;
   end;
 end;
 
 procedure TfmrMain.RenderPanelMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 var movedTile: TVec2i;
+    movedObj : TRoomObject;
 begin
-  if Button <> mbMiddle then Exit;
   movedTile := FRoom.Map.UI.GetTileAtCoords(FMain.Cursor.Ray);
-  FRoom.Map.RoomFloor.IsHole[movedTile] := not FRoom.Map.RoomFloor.IsHole[movedTile];
-  FMain.InvalidateWindow;
+  if Button = mbLeft then
+  begin
+    movedObj := FRoom.Map.ObjectAt(movedTile);
+    if movedObj is TObstacle then
+      SelectObject(TObstacle(movedObj))
+    else
+      SelectObject(nil);
+  end;
+
+  if Button = mbMiddle then
+  begin
+    FRoom.Map.RoomFloor.IsHole[movedTile] := not FRoom.Map.RoomFloor.IsHole[movedTile];
+    FMain.InvalidateWindow;
+  end;
 end;
 
 procedure TfmrMain.RenderPanelMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
@@ -446,6 +484,20 @@ var
 begin
   for i := 0 to Length(FObstaclePreviews) - 1 do
     FreeAndNil(FObstaclePreviews[i]);
+end;
+
+procedure TfmrMain.OnCancelState(AObstacle: TObstacle);
+begin
+  if FSelectedObj = AObstacle then SelectObject(nil);
+end;
+
+procedure TfmrMain.SelectObject(const AObject: TObstacle);
+begin
+  FSelectedObj := AObject;
+  if FSelectedObj = nil then
+    gridObjectProps.TIObject := nil
+  else
+    gridObjectProps.TIObject := FSelectedObj.GetProps();
 end;
 
 {$IFnDef FPC}

@@ -38,7 +38,7 @@ object fmrMain: TfmrMain
     TabOrder = 1
     object lbObjects: TListBox
       Left = 1
-      Height = 823
+      Height = 522
       Top = 1
       Width = 285
       Align = alClient
@@ -52,19 +52,33 @@ object fmrMain: TfmrMain
       Cursor = crVSplit
       Left = 1
       Height = 5
-      Top = 824
+      Top = 523
       Width = 285
       Align = alBottom
       ResizeAnchor = akBottom
     end
     object Panel1: TPanel
       Left = 1
-      Height = 14
-      Top = 829
+      Height = 315
+      Top = 528
       Width = 285
       Align = alBottom
-      Caption = 'Panel1'
+      ClientHeight = 315
+      ClientWidth = 285
       TabOrder = 2
+      object gridObjectProps: TTIPropertyGrid
+        Left = 1
+        Height = 313
+        Top = 1
+        Width = 283
+        Align = alClient
+        CheckboxForBoolean = False
+        DefaultValueFont.Color = clWindowText
+        Filter = [tkInteger, tkChar, tkEnumeration, tkFloat, tkSet, tkMethod, tkSString, tkLString, tkAString, tkWString, tkVariant, tkArray, tkRecord, tkInterface, tkClass, tkObject, tkWChar, tkBool, tkInt64, tkQWord, tkDynArray, tkInterfaceRaw, tkProcVar, tkUString, tkUChar, tkHelper, tkFile, tkClassRef, tkPointer]
+        Indent = 16
+        NameFont.Color = clWindowText
+        ValueFont.Color = clMaroon
+      end
     end
   end
   object Splitter1: TSplitter
