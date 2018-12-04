@@ -2677,8 +2677,8 @@ procedure TRoomObject.UnregisterAtRoom();
 begin
   if FNonRegistrable then Exit;
   if not FRegistered then Exit;
-  FRegistered := False;
   FRoom.RemoveObject(Self);
+  FRegistered := False;
 end;
 
 destructor TRoomObject.Destroy;
@@ -3306,7 +3306,7 @@ begin
     if (roomobj is TRoomUnit) then
       TRoomUnit(roomobj).OnRegisterRoomObject(AObject);
 
-  FRoomUI.InvalidateFogOfWar;
+//  FRoomUI.InvalidateFogOfWar;
   Main.InvalidateWindow;
 end;
 
