@@ -104,7 +104,7 @@ type
     function IsEnemy(const ARoomUnit: TRoomUnit): Boolean;
     function FindEnemy(): TRoomUnit; virtual;
 
-    function GetPointsOnRange(const AStartPoint: TVec2i; const ARange: Integer): IVec2iArr;
+    function GetPointsOnRange(const AStartPoint: TVec2i; const ARange, AMovePoints: Integer): IVec2iArr;
 
     function GetHiddenNeighbours(const AOriginPts: IVec2iArr): IVec2iArr; overload;
     function GetHiddenNeighbours(const AOriginPt: TVec2i): IVec2iArr; overload;
@@ -113,10 +113,17 @@ type
   protected
     FBotID: Integer;
     FLastSeen: ILastSeenMap;
+
+    FEmptyCells: IVec2iSet;
+
     FMoveAction: IBRA_Action;
     function GetMovePath(): IRoomPath; //to delete
+    function CanSeeFromThisPoint(const ACheckPoint: TVec2i): Boolean;
     procedure AddToLastSeenMap(const AUnit: TRoomUnit);
     procedure OnRegisterRoomObject(const ANewObject: TRoomObject); override;
+
+    function GetPossibleEnemyPoints(const AStartPoint: TVec2i): IVec2iSet; overload;
+    function GetPossibleEnemyPoints(const AOldEnemyPoints: IVec2iSet): IVec2iSet; overload;
   protected
     FBState: TBotState;
     FBS_SeeEnemy : TbsDesc_SeeEnemy;
@@ -126,6 +133,7 @@ type
     procedure SetBSState(const ABotState: TBotState);
   protected
     function FindOptimalRouteForCheck(const ACheckPts: IVec2iArr): IRoomPath; virtual; abstract;
+    function RayCastBooleanExcludeSelf(const AFromPt, AToPt: TVec2i): Boolean;
 
     procedure BehaviourCheck_LostEnemy();
     procedure BehaviourCheck_Retreat(AHPLimit: Integer; var ARetreatLimits: Integer);
@@ -155,6 +163,15 @@ type
   { TBotMutant1 }
 
   TBotMutant1 = class (TBot)
+  private type
+    TComparer_OptimalRouteForCheck = class(TInterfacedObject, IComparer)
+    private
+      FRoom: TRoomMap;
+      FCheckPts: IVec2iArr;
+    public
+      function Compare(const Left, Right): Integer;
+      constructor Create(const ARoom: TRoomMap; const ACheckPts: IVec2iArr);
+    end;
   private
     FAnim: IavAnimationController;
   protected
@@ -203,7 +220,8 @@ type
     function DoAction(): IBRA_Action; override;
   end;
 
-var gvDebugPoints: IVec2iArr;
+var gvDebugPoints : IVec2iArr;
+    gvDebugPoints2: IVec2iArr;
 
 implementation
 
@@ -211,6 +229,18 @@ uses
   untSkills, untItems;
 
 var gvBotID: Integer = 0;
+
+{ TBotMutant1.TComparer_OptimalRouteForCheck }
+
+function TBotMutant1.TComparer_OptimalRouteForCheck.Compare(const Left, Right): Integer;
+begin
+
+end;
+
+constructor TBotMutant1.TComparer_OptimalRouteForCheck.Create(const ARoom: TRoomMap; const ACheckPts: IVec2iArr);
+begin
+
+end;
 
 { TBotArcher1.TComparer_OptimalRouteForCheck }
 
@@ -594,9 +624,9 @@ procedure TBotArcher1.NewTurn();
   var points: IVec2iArr;
       i: Integer;
   begin
-    points := GetPointsOnRange(ATargetPos, cBestDistance);
+    points := GetPointsOnRange(ATargetPos, cBestDistance, AP - 1);
     for i := 0 to points.Count - 1 do
-      if FRoom.RayCastBoolean(points[i], ATargetPos) then
+      if RayCastBooleanExcludeSelf(points[i], ATargetPos) then
       begin
         Result := FindPath(points[i]);
         if RoomPos <> points[i] then
@@ -624,9 +654,9 @@ function TBotArcher1.DoAction(): IBRA_Action;
   var points: IVec2iArr;
       i: Integer;
   begin
-    points := GetPointsOnRange(ATargetPos, cBestDistance);
+    points := GetPointsOnRange(ATargetPos, cBestDistance, AP - 1);
     for i := 0 to points.Count - 1 do
-      if FRoom.RayCastBoolean(points[i], ATargetPos) then
+      if RayCastBooleanExcludeSelf(points[i], ATargetPos) then
       begin
         Result := FindPath(points[i]);
         if RoomPos <> points[i] then
@@ -653,6 +683,7 @@ begin
           FBS_SeeEnemy.OptimalRoute := GetOptimalRangePosition(FBS_SeeEnemy.Enemy.RoomPos);
         if FBS_SeeEnemy.OptimalRoute = nil then
         begin
+          LogAction('  Cant find optimal route');
           SetBSState(bsRetreat);
           FBS_Retreat.SetState(Self, FBS_SeeEnemy.Enemy.GetShootPoints(), 0);
           FBS_Retreat.SetEnemyPt(FBS_SeeEnemy.Enemy.RoomPos);
@@ -661,6 +692,7 @@ begin
         begin
           if not InViewField(FBS_SeeEnemy.Enemy.RoomPos) then
           begin
+            LogAction('  Dont see enemy. Turn on.');
             Result := TBRA_UnitTurnAction.Create(Self, FBS_SeeEnemy.Enemy.RoomPos);
             Exit;
           end;
@@ -671,11 +703,13 @@ begin
             if (FBS_SeeEnemy.OptimalRoute.Count = 0) or
                (FRoom.Distance(RoomPos, FBS_SeeEnemy.Enemy.RoomPos) < FRoom.Distance(FBS_SeeEnemy.OptimalRoute.Last, FBS_SeeEnemy.Enemy.RoomPos)) then
             begin
+              LogAction('  Time to attack.');
               Result := FUnitSkills[0].DoAction(0, Self, FBS_SeeEnemy.Enemy);
               Exit;
             end
             else
             begin
+              LogAction('  Move to safety distance 1.');
               Result := Action_MoveWithRoute(FBS_SeeEnemy.OptimalRoute);
               Exit;
             end;
@@ -684,10 +718,12 @@ begin
           begin
             if FBS_SeeEnemy.OptimalRoute.Count = 0 then
             begin
+              LogAction('  No optimal route.');
               Exit(nil);
             end
             else
             begin
+              LogAction('  Move to safety distance 2.');
               Result := Action_MoveWithRoute(FBS_SeeEnemy.OptimalRoute);
               Exit;
             end;
@@ -737,7 +773,7 @@ begin
   Result := nil;
 end;
 
-function TBot.GetPointsOnRange(const AStartPoint: TVec2i; const ARange: Integer): IVec2iArr;
+function TBot.GetPointsOnRange(const AStartPoint: TVec2i; const ARange, AMovePoints: Integer): IVec2iArr;
 var graph: IRoomMapNonWeightedGraph;
     bfs: IRoomMapBFS;
     pt: TVec2i;
@@ -762,6 +798,7 @@ begin
   bfs.Reset(RoomPos);
   while bfs.Next(pt, depth) do
   begin
+    if depth > AMovePoints then Break;
     movePt4.xy := pt;
     if not enemySet.TryGetValue(pt, movePt4.z) then movePt4.z := 0;
     movePt4.w := depth;
@@ -872,6 +909,17 @@ begin
   end;
 end;
 
+function TBot.CanSeeFromThisPoint(const ACheckPoint: TVec2i): Boolean;
+var range: Single;
+begin
+  Result := RayCastBooleanExcludeSelf(RoomPos, ACheckPoint);
+  if Result then
+  begin
+    range := max(ViewRange, ViewWholeRange);
+    if Room.Distance(RoomPos, ACheckPoint) > range then Exit(False);
+  end;
+end;
+
 procedure TBot.AddToLastSeenMap(const AUnit: TRoomUnit);
 begin
   FLastSeen.AddOrSet(AUnit.WeakRef, AUnit.RoomPos);
@@ -881,31 +929,65 @@ procedure TBot.OnRegisterRoomObject(const ANewObject: TRoomObject);
 var
   newEnemy: TRoomUnit;
 begin
-  if FBState = bsSeeEnemy then Exit;
   if ANewObject is TRoomUnit then
   begin
       if IsEnemy(TRoomUnit(ANewObject)) then
         if CanSee(TRoomUnit(ANewObject)) then
         begin
           AddToLastSeenMap(TRoomUnit(ANewObject));
-          if (FMoveAction <> nil) then
-            FMoveAction.TryCancel;
-          SetBSState(bsSeeEnemy);
-          FBS_SeeEnemy.SetState(TRoomUnit(ANewObject));
+          if FBState <> bsSeeEnemy then
+          begin
+            if (FMoveAction <> nil) then
+              FMoveAction.TryCancel;
+            SetBSState(bsSeeEnemy);
+            FBS_SeeEnemy.SetState(TRoomUnit(ANewObject));
+          end;
         end;
       if (ANewObject = Self) then
       begin
+        if FEmptyCells <> nil then
+          FEmptyCells := FEmptyCells.Union( GetObservablePointSet(nil, FEmptyCells) );
+
         newEnemy := FindEnemy();
         if newEnemy <> nil then
         begin
           AddToLastSeenMap(newEnemy);
-
-          if (FMoveAction <> nil) then
-            FMoveAction.TryCancel;
-          SetBSState(bsSeeEnemy);
-          FBS_SeeEnemy.SetState(TRoomUnit(newEnemy));
+          if FBState <> bsSeeEnemy then
+          begin
+            if (FMoveAction <> nil) then
+              FMoveAction.TryCancel;
+            SetBSState(bsSeeEnemy);
+            FBS_SeeEnemy.SetState(TRoomUnit(newEnemy));
+          end;
         end;
       end;
+  end;
+end;
+
+function TBot.GetPossibleEnemyPoints(const AStartPoint: TVec2i): IVec2iSet;
+var pts: IVec2iSet;
+begin
+  pts := TVec2iSet.Create();
+  pts.Add(AStartPoint);
+  Result := GetPossibleEnemyPoints(pts);
+end;
+
+function TBot.GetPossibleEnemyPoints(const AOldEnemyPoints: IVec2iSet): IVec2iSet;
+var graph: IRoomMapNonWeightedGraph;
+    iterator: IRoomMapBFS;
+    pt: TVec2i;
+    depth: Integer;
+begin
+  Result := AOldEnemyPoints.Diff(FEmptyCells);
+
+  graph := TRoomMapGraph_CustomFilter.Create(Room, TRoomCellFilter_ExcludeUnits.Create(Room));
+  iterator := TRoomMapBFS.Create(graph);
+  iterator.Reset(Result.ToIArray());
+  while iterator.Next(pt, depth) do
+  begin
+    if depth > 5 then Break;
+    if not FEmptyCells.Contains(pt) then
+      Result.Add(pt);
   end;
 end;
 
@@ -919,6 +1001,11 @@ begin
     bsRetreat: LogAction('bsRetreat');
     bsPatrol: LogAction('bsPatrol');
   end;
+end;
+
+function TBot.RayCastBooleanExcludeSelf(const AFromPt, AToPt: TVec2i): Boolean;
+begin
+  Result := FRoom.RayCastBoolean(AFromPt, AToPt, TRoomCellFilter_ViewableExclude_ObjectsExclude.Create(FRoom, [Self]));
 end;
 
 procedure TBot.BehaviourCheck_LostEnemy();
@@ -1063,92 +1150,187 @@ var
   i: Integer;
   worldPt: TVec3;
 begin
+  //go to another state
   if FBS_LostEnemy.Step >= ATryCount then
   begin
+    LogAction('  Cant find enemy. Go to another mode.');
+
     SetBSState(bsNothing);
     Result := DoAction();
     Exit;
   end;
 
-  if FBS_LostEnemy.OptimalRoute = nil then
-    FBS_LostEnemy.OptimalRoute := FindOptimalRouteForCheck(FBS_LostEnemy.CheckPt);
-
-  if FBS_LostEnemy.OptimalRoute = nil then
+  //try find enemy
+  newEnemy := FindEnemy();
+  if newEnemy <> nil then
   begin
-    SetBSState(bsNothing);
+    LogAction('  I see enemy!');
+    SetBSState(bsSeeEnemy);
+    FBS_SeeEnemy.SetState(newEnemy);
     Result := DoAction();
     Exit;
   end;
 
-  if (FBS_LostEnemy.OptimalRoute.Count > 0) then
+  //turn on last enemy point
+  if not InViewField(FBS_LostEnemy.LastPt) and CanSeeFromThisPoint(FBS_LostEnemy.LastPt) then
   begin
-    Result := Action_MoveWithRoute(FBS_LostEnemy.OptimalRoute);
-    FBS_LostEnemy.SkipTurn := True;
-    Exit;
-  end;
-
-  if not InViewField(FBS_LostEnemy.LastPt) and (RoomDir <> Room.Direction(RoomPos, FBS_LostEnemy.LastPt)) then
-  begin
-    if AP = 1 then
-      FBS_LostEnemy.SkipTurn := False;
+    LogAction('  Turn on lost enemy.');
     Result := TBRA_UnitTurnAction.Create(Self, FBS_LostEnemy.LastPt);
     Exit;
   end
   else
   begin
-    newEnemy := FindEnemy();
-    if newEnemy <> nil then
+    if FBS_LostEnemy.CheckPt.Count = 0 then
     begin
-      SetBSState(bsSeeEnemy);
-      FBS_SeeEnemy.SetState(newEnemy);
-      Result := DoAction();
-      Exit;
-    end
-    else
-    begin
-      if FBS_LostEnemy.SkipTurn then
-      begin
-        Result := nil;
-        FBS_LostEnemy.SkipTurn := False;
-        Exit;
-      end;
-      newPts := GetHiddenNeighbours(FBS_LostEnemy.CheckPt);
-      for i := 0 to FBS_LostEnemy.CheckPt.Count - 1 do
-        if not CanSee(FBS_LostEnemy.CheckPt[i]) then
-          newPts.Add(FBS_LostEnemy.CheckPt[i]);
-
-      if newPts.Count = 0 then
-      begin
-        SetBSState(bsNothing);
-        Result := DoAction();
-        Exit;
-      end;
-
-      worldPt := Vec(0,0,0);
-      for i := 0 to newPts.Count - 1 do
-        worldPt := worldPt + Room.UI.TilePosToWorldPos(newPts[i]);
-      worldPt := worldPt / newPts.Count;
-
-      FBS_LostEnemy.LastPt := Room.UI.GetTileAtCoords(Vec(worldPt.x, worldPt.z));
-      FBS_LostEnemy.CheckPt := newPts;
-      FBS_LostEnemy.OptimalRoute := nil;
-      Inc(FBS_LostEnemy.Step);
-      Result := DoAction();
-      Exit;
+      FBS_LostEnemy.CheckPt.Add(FBS_LostEnemy.LastPt);
     end;
   end;
+
+  //update check points
+  newPts := GetHiddenNeighbours(FBS_LostEnemy.CheckPt);
+  for i := 0 to FBS_LostEnemy.CheckPt.Count - 1 do
+    if not CanSee(FBS_LostEnemy.CheckPt[i]) then
+      newPts.Add(FBS_LostEnemy.CheckPt[i]);
+
+  //no points for check, go to another state
+  if newPts.Count = 0 then
+  begin
+    SetBSState(bsNothing);
+    Result := DoAction();
+    Exit;
+  end;
+
+  //evaluate estimated enemy position
+  worldPt := Vec(0,0,0);
+  for i := 0 to newPts.Count - 1 do
+    worldPt := worldPt + Room.UI.TilePosToWorldPos(newPts[i]);
+  worldPt := worldPt / newPts.Count;
+  FBS_LostEnemy.LastPt := Room.UI.GetTileAtCoords(Vec(worldPt.x, worldPt.z));
+  FBS_LostEnemy.CheckPt := newPts;
+  FBS_LostEnemy.OptimalRoute := nil;
+  Inc(FBS_LostEnemy.Step);
+
+  //find new route for check
+  if FBS_LostEnemy.OptimalRoute = nil then
+    FBS_LostEnemy.OptimalRoute := FindOptimalRouteForCheck(FBS_LostEnemy.CheckPt);
+
+  //no checkroute, go to another state
+  if FBS_LostEnemy.OptimalRoute = nil then
+  begin
+    LogAction('  No route for check. Go to another mode.');
+    SetBSState(bsNothing);
+    Result := DoAction();
+    Exit;
+  end;
+
+  //move with optimal route
+  if (FBS_LostEnemy.OptimalRoute.Count > 0) then
+  begin
+    LogAction('  Checking for lost enemy with optimal route.');
+    Result := Action_MoveWithRoute(FBS_LostEnemy.OptimalRoute);
+    Exit;
+  end;
+
+  //tryagain
+  Result := DoAction();
 end;
 
 function TBot.Behaviour_MeleeEnemySearch(ATryCount: Integer): IBRA_Action;
+var
+  newEnemy: TRoomUnit;
+  newPts: IVec2iArr;
+  i: Integer;
+  worldPt: TVec3;
 begin
-  SetBSState(bsNothing);
+  //go to another state
+  if FBS_LostEnemy.Step >= ATryCount then
+  begin
+    LogAction('  Cant find enemy. Go to another mode.');
+
+    SetBSState(bsNothing);
+    Result := DoAction();
+    Exit;
+  end;
+
+  //try find enemy
+  newEnemy := FindEnemy();
+  if newEnemy <> nil then
+  begin
+    LogAction('  I see enemy!');
+    SetBSState(bsSeeEnemy);
+    FBS_SeeEnemy.SetState(newEnemy);
+    Result := DoAction();
+    Exit;
+  end;
+
+  //turn on last enemy point
+  if not InViewField(FBS_LostEnemy.LastPt) and CanSeeFromThisPoint(FBS_LostEnemy.LastPt) then
+  begin
+    LogAction('  Turn on lost enemy.');
+    Result := TBRA_UnitTurnAction.Create(Self, FBS_LostEnemy.LastPt);
+    Exit;
+  end
+  else
+  begin
+    if FBS_LostEnemy.CheckPt.Count = 0 then
+    begin
+      FBS_LostEnemy.CheckPt.Add(FBS_LostEnemy.LastPt);
+    end;
+  end;
+
+  //update check points
+  newPts := GetHiddenNeighbours(FBS_LostEnemy.CheckPt);
+  for i := 0 to FBS_LostEnemy.CheckPt.Count - 1 do
+    if not CanSee(FBS_LostEnemy.CheckPt[i]) then
+      newPts.Add(FBS_LostEnemy.CheckPt[i]);
+
+  //no points for check, go to another state
+  if newPts.Count = 0 then
+  begin
+    SetBSState(bsNothing);
+    Result := DoAction();
+    Exit;
+  end;
+
+  //evaluate estimated enemy position
+  worldPt := Vec(0,0,0);
+  for i := 0 to newPts.Count - 1 do
+    worldPt := worldPt + Room.UI.TilePosToWorldPos(newPts[i]);
+  worldPt := worldPt / newPts.Count;
+  FBS_LostEnemy.LastPt := Room.UI.GetTileAtCoords(Vec(worldPt.x, worldPt.z));
+  FBS_LostEnemy.CheckPt := newPts;
+  FBS_LostEnemy.OptimalRoute := nil;
+  Inc(FBS_LostEnemy.Step);
+
+  //find new route for check
+  if FBS_LostEnemy.OptimalRoute = nil then
+    FBS_LostEnemy.OptimalRoute := FindOptimalRouteForCheck(FBS_LostEnemy.CheckPt);
+
+  //no checkroute, go to another state
+  if FBS_LostEnemy.OptimalRoute = nil then
+  begin
+    LogAction('  No route for check. Go to another mode.');
+    SetBSState(bsNothing);
+    Result := DoAction();
+    Exit;
+  end;
+
+  //move with optimal route
+  if (FBS_LostEnemy.OptimalRoute.Count > 0) then
+  begin
+    LogAction('  Checking for lost enemy with optimal route.');
+    Result := Action_MoveWithRoute(FBS_LostEnemy.OptimalRoute);
+    Exit;
+  end;
+
+  //tryagain
   Result := DoAction();
-  Exit;
 end;
 
 procedure TBot.NewTurn();
 begin
-
+  FEmptyCells := GetObservablePointSet(nil, nil);
+  gvDebugPoints := FEmptyCells.ToIArray();
 end;
 
 procedure TBot.LogAction(const AStr: string);
@@ -1180,21 +1362,48 @@ end;
 { TBotMutant1 }
 
 function TBotMutant1.FindOptimalRouteForCheck(const ACheckPts: IVec2iArr): IRoomPath;
-var movePtsWeighted: IVec2iWeightMap;
-    movePts: IVec2iSet;
-    shootPts: IVec2iSet;
-    pt: TVec2i;
-    checkPtsWeighted: IVec2iWeightedSet;
-    pWeight: PInteger;
-    weight : Integer;
-    i: Integer;
+//var movePtsWeighted: IVec2iWeightMap;
+//    movePts: IVec2iSet;
+//    shootPts: IVec2iSet;
+//    pt: TVec2i;
+//    checkPtsWeighted: IVec2iWeightedSet;
+//    pWeight: PInteger;
+//    weight : Integer;
+//    i: Integer;
+//
+//    ptsList: IVec4iArr;
+//    //cmp: IComparer;
 
-    ptsList: IVec4iArr;
-    //cmp: IComparer;
+var graph: IRoomMapNonWeightedGraph;
+    iterator: IRoomMapBFS;
+    checkPtsSet: IVec2iSet;
+    pt: TVec2i;
+    depth, i: Integer;
 begin
   Result := nil;
   if AP < 4 then Exit;
 
+  checkPtsSet := TVec2iSet.Create();
+  for i := 0 to ACheckPts.Count - 1 do
+    checkPtsSet.Add(ACheckPts[i]);
+
+  graph := TRoomMapGraph_CustomFilter.Create(Room, TRoomCellFilter_ExcludeUnits.Create(Room));
+  iterator := TRoomMapBFS.Create(graph);
+  iterator.Reset(RoomPos);
+  while iterator.Next(pt, depth) do
+  begin
+    if checkPtsSet.Contains(pt) then
+    begin
+      Result := FindPath(pt);
+      if Result <> nil then
+      begin
+        Result.Add(pt);
+        Exit;
+      end;
+    end;
+  end;
+
+  {
   movePtsWeighted := GetMovePointsWeighted(AP - 3);
   movePts := TVec2iSet.Create();
   movePts.Capacity := NextPow2(movePtsWeighted.Count);
@@ -1236,6 +1445,7 @@ begin
       Exit;
     end;
   end;
+  }
 end;
 
 procedure TBotMutant1.UpdateStep;
@@ -1289,7 +1499,6 @@ begin
     bsNothing: Result := Behaviour_DefaultNothing();
     bsSeeEnemy:
       begin
-
         if FUnitSkills[0].CanUse(0, Self, FBS_SeeEnemy.Enemy) then
         begin
           Result := FUnitSkills[0].DoAction(0, Self, FBS_SeeEnemy.Enemy);
@@ -1310,39 +1519,6 @@ begin
     bsLostEnemy: Result := Behaviour_MeleeEnemySearch(5);
     bsRetreat: Result := Behaviour_DefaultRetreat(1, 2);
     bsPatrol: Result := Behaviour_DefaultPatrol();
-  end;
-
-
-Exit;
-
-
-  player := FindEnemy();
-  if AP = 0 then Exit(nil);
-
-  if player = nil then
-  begin
-    path := GetMovePath();
-    if (path <> nil) and (path.Count > 0) then
-    begin
-      Result := TBRA_UnitMovementAction.Create(Self, path);
-      Exit
-    end;
-    Exit(nil);
-  end;
-
-  if FUnitSkills[0].CanUse(0, Self, player) then
-  begin
-    Result := FUnitSkills[0].DoAction(0, Self, player);
-    Exit;
-  end;
-
-  if Room.Distance(player.RoomPos, RoomPos) > 1 then
-  begin
-    path := FindPath(player.RoomPos, player);
-    if (path <> nil) and (path.Count > 0) then
-    begin
-      Result := TBRA_UnitMovementAction.Create(Self, path);
-    end;
   end;
 end;
 
