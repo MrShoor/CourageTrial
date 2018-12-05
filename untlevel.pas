@@ -1,6 +1,6 @@
 ﻿unit untLevel;
 
-{$Define DEBUGBOTS}
+//{$Define DEBUGBOTS}
 
 {$IfDef FPC}
   {$mode objfpc}{$H+}
@@ -400,6 +400,7 @@ type
 
     function FindPath(const ATarget: TVec2i): IRoomPath; overload;
     function FindPath(const ATarget: TVec2i; ATargetUnit: TRoomUnit): IRoomPath; overload;
+    function FindPath(const ATarget: TVec2i; const AFilter: IRoomCellFilter): IRoomPath; overload;
 
     function IsDead(): Boolean;
 
@@ -412,13 +413,15 @@ type
     property ViewAngle: Single read FViewAngle write FViewAngle;
     property ViewRange: Single read FViewRange write FViewRange;
     property ViewWholeRange: Single read FViewWholeRange write FViewWholeRange;
-    function InViewField(const APt: TVec2i): Boolean;
+    function InViewField(const AUnitDir: Integer; const APt: TVec2i): Boolean; overload;
+    function InViewField(const APt: TVec2i): Boolean; overload;
     function InViewRange(const APt: TVec2i): Boolean;
     function CanSee(const APos: TVec2i): Boolean; overload;
     function CanSee(const AOtherUnit: TRoomUnit): Boolean; overload;
     function GetShootPoints(): IVec2iArr;
     function GetObservablePointSet(const AInSet, AExSet: IVec2iSet): IVec2iSet;
-    function GetMovePointsWeighted(AMaxDepth: Integer): IVec2iWeightedSet;
+    function GetMovePointsWeighted(AMaxDepth: Integer): IVec2iWeightedSet; overload;
+    function GetMovePointsWeighted(AMaxDepth: Integer; const AFilter: IRoomCellFilter): IVec2iWeightedSet; overload;
     function GetMovePoints(AMaxDepth: Integer): IVec2iSet;
     function GetVisible(): Boolean; override;
 
@@ -763,10 +766,11 @@ type
   TBRA_UnitTurnAction = class (TBRA_Action)
   private
     RoomUnit: TRoomUnit;
-    Target: TVec2i;
+    NewDir: Integer;
   public
     function ProcessAction: Boolean; override;
     constructor Create(const AUnit: TRoomUnit; const ATargetPt: TVec2i);
+    constructor Create(const AUnit: TRoomUnit; const ANewDir: Integer);
   end;
 
   { TBRA_Shoot }
@@ -1786,14 +1790,12 @@ end;
 { TBRA_UnitTurnAction }
 
 function TBRA_UnitTurnAction.ProcessAction: Boolean;
-var newDir: Integer;
 begin
   if RoomUnit.AP > 0 then
   begin
-    newDir := RoomUnit.Room.Direction(RoomUnit.RoomPos, Target);
-    if newDir <> RoomUnit.RoomDir then
+    if NewDir <> RoomUnit.RoomDir then
       RoomUnit.AP := RoomUnit.AP - 1;
-    RoomUnit.RoomDir := newDir;
+    RoomUnit.RoomDir := NewDir;
   end;
   Result := False;
 end;
@@ -1801,7 +1803,13 @@ end;
 constructor TBRA_UnitTurnAction.Create(const AUnit: TRoomUnit; const ATargetPt: TVec2i);
 begin
   RoomUnit := AUnit;
-  Target := ATargetPt;
+  NewDir := RoomUnit.Room.Direction(RoomUnit.RoomPos, ATargetPt);
+end;
+
+constructor TBRA_UnitTurnAction.Create(const AUnit: TRoomUnit; const ANewDir: Integer);
+begin
+  RoomUnit := AUnit;
+  NewDir := ANewDir;
 end;
 
 { TTileUtils }
@@ -2451,12 +2459,21 @@ begin
   Result := pf.FindPath(RoomPos, ATarget, Infinity, False);
 end;
 
+function TRoomUnit.FindPath(const ATarget: TVec2i; const AFilter: IRoomCellFilter): IRoomPath;
+var graph: IRoomMapGraph;
+    pf: IRoomMapPF;
+begin
+  graph := TRoomMapGraph_CustomFilter.Create(Room, AFilter);
+  pf := TRoomMapPF.Create(graph);
+  Result := pf.FindPath(RoomPos, ATarget, Infinity, False);
+end;
+
 function TRoomUnit.IsDead(): Boolean;
 begin
   Result := HP <= 0;
 end;
 
-function TRoomUnit.InViewField(const APt: TVec2i): Boolean;
+function TRoomUnit.InViewField(const AUnitDir: Integer; const APt: TVec2i): Boolean;
 var v0, vView, vDir: TVec3;
 begin
   if APt = RoomPos then Exit(True);
@@ -2464,10 +2481,15 @@ begin
   vDir := Room.UI.TilePosToWorldPos(APt) - v0;
   if LenSqr(vDir) <= ViewWholeRange*ViewWholeRange then Exit(True);
   if LenSqr(vDir) > ViewRange*ViewRange then Exit(False);
-  vView := Room.UI.TilePosToWorldPos(RotateTileCoord(Vec(1,0), RoomDir) + RoomPos) - v0;
+  vView := Room.UI.TilePosToWorldPos(RotateTileCoord(Vec(1,0), AUnitDir) + RoomPos) - v0;
   vDir := normalize(vDir);
   vView := normalize(vView);
   Result := dot(vDir, vView) >= Cos(ViewAngle);
+end;
+
+function TRoomUnit.InViewField(const APt: TVec2i): Boolean;
+begin
+  Result := InViewField(RoomDir, APt);
 end;
 
 function TRoomUnit.InViewRange(const APt: TVec2i): Boolean;
@@ -2503,6 +2525,7 @@ var
     inShadow: Boolean;
 begin
   Result := TVec2iSet.Create;
+  Result.Add(RoomPos);
 
   //get all cells for check
   nonvisited_set := TVec2iSet.Create();
@@ -2548,6 +2571,11 @@ begin
 end;
 
 function TRoomUnit.GetMovePointsWeighted(AMaxDepth: Integer): IVec2iWeightedSet;
+begin
+  Result := GetMovePointsWeighted(AMaxDepth, TRoomCellFilter_ExcludeUnits.Create(Room));
+end;
+
+function TRoomUnit.GetMovePointsWeighted(AMaxDepth: Integer; const AFilter: IRoomCellFilter): IVec2iWeightedSet;
 var graph: IRoomMapNonWeightedGraph;
     iterator: IRoomMapBFS;
     pt: TVec2i;
@@ -2555,7 +2583,7 @@ var graph: IRoomMapNonWeightedGraph;
 begin
   Result := TVec2iWeightedSet.Create();
 
-  graph := TRoomMapGraph_CustomFilter.Create(Room, TRoomCellFilter_ExcludeUnits.Create(Room));
+  graph := TRoomMapGraph_CustomFilter.Create(Room, AFilter);
   iterator := TRoomMapBFS.Create(graph);
   iterator.Reset(RoomPos);
   while iterator.Next(pt, depth) do
@@ -3989,10 +4017,10 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string; const ADoors: TD
     {$IfDef DEBUGBOTS}
     bot := TBotArcher1.Create(FMap);
     {$Else}
-    if Random(2) = 0 then
+    //if Random(2) = 0 then
       bot := TBotArcher1.Create(FMap);
-    else
-      bot := TBotMutant1.Create(FMap);
+    //else
+      //bot := TBotMutant1.Create(FMap);
     {$EndIf}
     bot.LoadModels();
     bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
