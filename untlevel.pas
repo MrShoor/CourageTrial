@@ -1,6 +1,6 @@
 ﻿unit untLevel;
 
-//{$Define DEBUGBOTS}
+{$Define DEBUGBOTS}
 
 {$IfDef FPC}
   {$mode objfpc}{$H+}
@@ -419,6 +419,7 @@ type
     function CanSee(const APos: TVec2i): Boolean; overload;
     function CanSee(const AOtherUnit: TRoomUnit): Boolean; overload;
     function GetShootPoints(): IVec2iArr;
+    function GetShootPointsSet(): IVec2iSet;
     function GetObservablePointSet(const AInSet, AExSet: IVec2iSet): IVec2iSet;
     function GetMovePointsWeighted(AMaxDepth: Integer): IVec2iWeightedSet; overload;
     function GetMovePointsWeighted(AMaxDepth: Integer; const AFilter: IRoomCellFilter): IVec2iWeightedSet; overload;
@@ -2514,6 +2515,11 @@ begin
   Result := Room.GetShootPoints(RoomPos, ViewRange, nil);
 end;
 
+function TRoomUnit.GetShootPointsSet(): IVec2iSet;
+begin
+  Result := Room.GetShootPointsSet(RoomPos, ViewRange, nil);
+end;
+
 function TRoomUnit.GetObservablePointSet(const AInSet, AExSet: IVec2iSet): IVec2iSet;
 var
     nonvisited_list: IVec2iArr;
@@ -3569,7 +3575,7 @@ var
   bow: IUnitItem;
   axe: IUnitItem;
 begin
-  MaxAP := 10;
+  MaxAP := 30;
   MaxHP := 100;
   HP := MaxHP;
   AP := MaxAP;
