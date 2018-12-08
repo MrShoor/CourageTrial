@@ -31,6 +31,8 @@ type
   TRoomMapPF  = {$IfDef FPC}specialize{$EndIf} TAStar<TVec2i>;
   IRoomMapBFS = {$IfDef FPC}specialize{$EndIf} IBFS_Iterator<TVec2i>;
   TRoomMapBFS = {$IfDef FPC}specialize{$EndIf} TBFS_Iterator<TVec2i>;
+  IRoomMapFloodFill = {$IfDef FPC}specialize{$EndIf} IFloodFill_Iterator<TVec2i>;
+  TRoomMapFloodFill = {$IfDef FPC}specialize{$EndIf} TFloodFill_Iterator<TVec2i>;
   IRoomPath = {$IfDef FPC}specialize{$EndIf} IArray<TVec2i>;
   TRoomPath = {$IfDef FPC}specialize{$EndIf} TArray<TVec2i>;
   IRoomPathArr = {$IfDef FPC}specialize{$EndIf} IArray<IRoomPath>;

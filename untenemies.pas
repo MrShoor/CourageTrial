@@ -191,8 +191,7 @@ type
     function Behaviour_DefaultNothing(): IBRA_Action;
     function Behaviour_DefaultPatrol(): IBRA_Action;
     function Behaviour_DefaultRetreat(ARunAwayCount, AScaryCount: Integer): IBRA_Action;
-    function Behaviour_RangedEnemySearch(ATryCount: Integer): IBRA_Action;
-    function Behaviour_MeleeEnemySearch(ATryCount: Integer): IBRA_Action;
+    function Behaviour_EnemySearch(ATryCount: Integer): IBRA_Action;
   public
     property BState: TBotState read FBState;
 
@@ -213,15 +212,6 @@ type
   { TBotMutant1 }
 
   TBotMutant1 = class (TBot)
-  private type
-    TComparer_OptimalRouteForCheck = class(TInterfacedObject, IComparer)
-    private
-      FRoom: TRoomMap;
-      FCheckPts: IVec2iArr;
-    public
-      function Compare(const Left, Right): Integer;
-      constructor Create(const ARoom: TRoomMap; const ACheckPts: IVec2iArr);
-    end;
   private
     FAnim: IavAnimationController;
   protected
@@ -349,18 +339,6 @@ end;
 constructor TBot.TMoveFilter.Create(const ABot: TBot; const ATarget: TRoomUnit);
 begin
   FBot := ABot;
-end;
-
-{ TBotMutant1.TComparer_OptimalRouteForCheck }
-
-function TBotMutant1.TComparer_OptimalRouteForCheck.Compare(const Left, Right): Integer;
-begin
-
-end;
-
-constructor TBotMutant1.TComparer_OptimalRouteForCheck.Create(const ARoom: TRoomMap; const ACheckPts: IVec2iArr);
-begin
-
 end;
 
 { TBotArcher1.TComparer_OptimalRouteForCheck }
@@ -934,7 +912,7 @@ begin
           end;
         end;
       end;
-    bsLostEnemy: Result := Behaviour_RangedEnemySearch(10);
+    bsLostEnemy: Result := Behaviour_EnemySearch(10);
     bsRetreat: Result := Behaviour_DefaultRetreat(1, 2);
     bsPatrol: Result := Behaviour_DefaultPatrol();
   end;
@@ -1197,7 +1175,7 @@ begin
   iterator.Reset(Result);
   while iterator.Next(pt, depth) do
   begin
-    if depth > 10 then Break;
+    if depth > 6 then Break;
     if not FEmptyCells.Contains(pt) then
       Result.Add(pt);
   end;
@@ -1346,9 +1324,6 @@ begin
 end;
 
 procedure TBot.BehaviourCheck_Retreat(AHPLimit: Integer; var ARetreatLimits: Integer);
-var hidePts: IVec4iArr;
-    comparer: IComparer;
-    i: Integer;
 begin
   if FBState = bsSeeEnemy then
     if HP < AHPLimit then
@@ -1479,7 +1454,7 @@ begin
   end;
 end;
 
-function TBot.Behaviour_RangedEnemySearch(ATryCount: Integer): IBRA_Action;
+function TBot.Behaviour_EnemySearch(ATryCount: Integer): IBRA_Action;
 var
   NewCheckCount, BestDir: Integer;
 begin
@@ -1514,98 +1489,6 @@ begin
 
   //find new route for check
   FBS_LostEnemy.OptimalRoute := FindOptimalRouteForCheck(FBS_LostEnemy.CheckPt);
-
-  //no checkroute, go to another state
-  if FBS_LostEnemy.OptimalRoute = nil then
-  begin
-    LogAction('  No route for check. Go to another mode.');
-    SetBSState(bsNothing);
-    Result := DoAction();
-    Exit;
-  end;
-
-  //move with optimal route
-  if (FBS_LostEnemy.OptimalRoute.Count > 0) then
-  begin
-    LogAction('  Checking for lost enemy with optimal route.');
-    Result := Action_MoveWithRoute(FBS_LostEnemy.OptimalRoute);
-    Exit;
-  end;
-
-  //tryagain
-  Result := DoAction();
-end;
-
-function TBot.Behaviour_MeleeEnemySearch(ATryCount: Integer): IBRA_Action;
-var
-  newEnemy: TRoomUnit;
-  newPts: IVec2iArr;
-  i: Integer;
-  worldPt: TVec3;
-begin
-  //go to another state
-  if FBS_LostEnemy.Step >= ATryCount then
-  begin
-    LogAction('  Cant find enemy. Go to another mode.');
-
-    SetBSState(bsNothing);
-    Result := DoAction();
-    Exit;
-  end;
-
-  //try find enemy
-  newEnemy := FindEnemy();
-  if newEnemy <> nil then
-  begin
-    LogAction('  I see enemy!');
-    SetBSState(bsSeeEnemy);
-    FBS_SeeEnemy.SetState(newEnemy);
-    Result := DoAction();
-    Exit;
-  end;
-
-  //turn on last enemy point
-  if not InViewField(FBS_LostEnemy.LastPt) and CanSeeFromThisPoint(FBS_LostEnemy.LastPt) then
-  begin
-    LogAction('  Turn on lost enemy.');
-    Result := TBRA_UnitTurnAction.Create(Self, FBS_LostEnemy.LastPt);
-    Exit;
-  end
-  else
-  begin
-    if FBS_LostEnemy.CheckPt.Count = 0 then
-    begin
-      FBS_LostEnemy.CheckPt.Add(FBS_LostEnemy.LastPt);
-    end;
-  end;
-
-  //update check points
-  //newPts := GetHiddenNeighbours(FBS_LostEnemy.CheckPt);
-  //for i := 0 to FBS_LostEnemy.CheckPt.Count - 1 do
-  //  if not CanSee(FBS_LostEnemy.CheckPt[i]) then
-  //    newPts.Add(FBS_LostEnemy.CheckPt[i]);
-
-  //no points for check, go to another state
-  if newPts.Count = 0 then
-  begin
-    SetBSState(bsNothing);
-    Result := DoAction();
-    Exit;
-  end;
-
-  //evaluate estimated enemy position
-  //worldPt := Vec(0,0,0);
-  //for i := 0 to newPts.Count - 1 do
-  //  worldPt := worldPt + Room.UI.TilePosToWorldPos(newPts[i]);
-  //worldPt := worldPt / newPts.Count;
-  //FBS_LostEnemy.LastPt := Room.UI.GetTileAtCoords(Vec(worldPt.x, worldPt.z));
-  //FBS_LostEnemy.CheckPt := newPts;
-  //FBS_LostEnemy.OptimalRoute := nil;
-  Inc(FBS_LostEnemy.Step);
-
-  //find new route for check
-  if FBS_LostEnemy.OptimalRoute = nil then
-    FBS_LostEnemy.OptimalRoute := FindOptimalRouteForCheck(FBS_LostEnemy.CheckPt);
 
   //no checkroute, go to another state
   if FBS_LostEnemy.OptimalRoute = nil then
@@ -1673,91 +1556,120 @@ end;
 { TBotMutant1 }
 
 function TBotMutant1.FindOptimalRouteForCheck(const ACheckPts: IVec2iSet): IRoomPath;
-//var movePtsWeighted: IVec2iWeightMap;
-//    movePts: IVec2iSet;
-//    shootPts: IVec2iSet;
-//    pt: TVec2i;
-//    checkPtsWeighted: IVec2iWeightedSet;
-//    pWeight: PInteger;
-//    weight : Integer;
-//    i: Integer;
-//
-//    ptsList: IVec4iArr;
-//    //cmp: IComparer;
 
-var graph: IRoomMapNonWeightedGraph;
-    iterator: IRoomMapBFS;
-    checkPtsSet: IVec2iSet;
-    pt: TVec2i;
-    depth, i: Integer;
-begin
-  Result := nil;
-  Exit;
-  if AP < 4 then Exit;
-
-  //checkPtsSet := TVec2iSet.Create();
-  //for i := 0 to ACheckPts.Count - 1 do
-  //  checkPtsSet.Add(ACheckPts[i]);
-
-  graph := TRoomMapGraph_CustomFilter.Create(Room, TRoomCellFilter_ExcludeUnits.Create(Room));
-  iterator := TRoomMapBFS.Create(graph);
-  iterator.Reset(RoomPos);
-  while iterator.Next(pt, depth) do
+  function GetClusterCenter(const AGraph: IRoomMapNonWeightedGraph; const ACluster: IVec2iArr; out ACenter: TVec2i): Boolean;
+  var clusterMap: IVec2iWeightMap;
+      border: IVec2iArr;
+      pt: TVec2i;
+      depth, maxDepth, n, i, j: Integer;
+      iterator: IRoomMapBFS;
+      pWeight: PInteger;
   begin
-    if checkPtsSet.Contains(pt) then
+    Result := False;
+    if ACluster = nil then Exit;
+    if ACluster.Count = 0 then Exit;
+
+    clusterMap := TVec2iWeightMap.Create;
+    for i := 0 to ACluster.Count - 1 do
+      clusterMap.AddOrSet(ACluster[i], 0);
+    border := TVec2iArr.Create;
+
+    for i := 0 to ACluster.Count - 1 do
     begin
-      Result := FindPath(pt);
-      if Result <> nil then
+      for j := 0 to AGraph.MaxNeighbourCount(ACluster[i]) - 1 do
+        if AGraph.GetNeighbour(j, ACluster[i], pt) then
+          if not clusterMap.Contains(pt) then
+          begin
+            border.Add(pt);
+            Break;
+          end;
+    end;
+
+    if border.Count = 0 then Exit;
+
+    for i := 0 to border.Count - 1 do
+      clusterMap.Delete(border[i]);
+
+    if clusterMap.Count = 0 then
+    begin
+      pt := border[0];
+      Result := True;
+    end;
+
+    n := 0;
+    iterator := TRoomMapBFS.Create(AGraph);
+    iterator.Reset(border);
+    while iterator.Next(pt, depth) do
+    begin
+      if clusterMap.TryGetPValue(pt, pWeight) then
       begin
-        Result.Add(pt);
-        Exit;
+        pWeight^ := depth;
+        Inc(n);
+        if n = clusterMap.Count then Break;
       end;
     end;
-  end;
 
-  {
-  movePtsWeighted := GetMovePointsWeighted(AP - 3);
-  movePts := TVec2iSet.Create();
-  movePts.Capacity := NextPow2(movePtsWeighted.Count);
-  movePtsWeighted.Reset;
-  while movePtsWeighted.NextKey(pt) do
-    movePts.Add(pt);
-
-  checkPtsWeighted := TVec2iWeightedSet.Create;
-  for i := 0 to ACheckPts.Count - 1 do
-  begin
-    shootPts := Room.GetShootPointsSet(ACheckPts[i], max(3, ViewRange-3), movePts);
-    shootPts.Reset;
-    while shootPts.Next(pt) do
+    maxDepth := -1;
+    clusterMap.Reset;
+    while clusterMap.Next(pt, depth) do
     begin
-      Assert(movePtsWeighted.Contains(pt));
-
-      if not checkPtsWeighted.TryGetPValue(pt, Pointer(pWeight)) then
-        checkPtsWeighted.Add(pt, 0)
-      else
-        Inc(pWeight^);
+      if depth > maxDepth then
+      begin
+        maxDepth := depth;
+        ACenter := pt;
+      end;
     end;
+    Result := maxDepth >= 0;
   end;
 
-  ptsList := TVec4iArr.Create();
-  ptsList.Capacity := checkPtsWeighted.Count;
-  checkPtsWeighted.Reset;
-  while checkPtsWeighted.Next(pt, weight) do
-    ptsList.Add(Vec(pt.x, pt.y, weight, movePtsWeighted[pt]));
+var graph: IRoomMapNonWeightedGraph;
+    iterator: IRoomMapFloodFill;
+    clusters: array of IVec2iArr;
+    clusterNum, i: Integer;
+    pt: TVec2i;
+begin
+  Result := nil;
+  clusters := nil;
+  if ACheckPts = nil then Exit;
+  if ACheckPts.Count = 0 then Exit;
 
-  //cmp := TComparer_OptimalRouteForCheck.Create(Room, FBS_LostEnemy.CheckPt);
-  //ptsList.Sort(cmp);
-
-  for i := 0 to ptsList.Count - 1 do
+  graph := TRoomMapGraph_CustomFilter.Create(Room, TMoveFilter.Create(Self, nil));
+  iterator := TRoomMapFloodFill.Create(graph);
+  iterator.Reset(ACheckPts);
+  while iterator.Next(pt, clusterNum) do
   begin
-    Result := FindPath(ptsList[i].xy);
+    if Length(clusters) < clusterNum + 1 then
+      SetLength(clusters, clusterNum + 1);
+    if clusters[clusterNum] = nil then
+      clusters[clusterNum] := TVec2iArr.Create;
+    clusters[clusterNum].Add(pt);
+  end;
+
+  Assert(Length(clusters) > 0);
+  Assert(clusters[0].Count > 0);
+
+  repeat
+    clusterNum := 0;
+    for i := 0 to Length(clusters) - 1 do
+      if clusters[i].Count > clusters[clusterNum].Count then
+        clusterNum := i;
+
+    if GetClusterCenter(graph, clusters[clusterNum], pt) then
+      Result := FindPath(pt)
+    else
+      Result := nil;
     if Result <> nil then
     begin
-      Result.Add(ptsList[i].xy);
+      Result.Add(pt);
       Exit;
+    end
+    else
+    begin
+      clusters[clusterNum] := clusters[Length(clusters) - 1];
+      SetLength(clusters, Length(clusters) - 1);
+      if Length(clusters) = 0 then Exit;
     end;
-  end;
-  }
+  until False;
 end;
 
 procedure TBotMutant1.UpdateStep;
@@ -1801,8 +1713,7 @@ begin
 end;
 
 function TBotMutant1.DoAction(): IBRA_Action;
-var player: TRoomUnit;
-    path: IRoomPath;
+var path: IRoomPath;
 begin
   if AP = 0 then Exit(nil);
 
@@ -1827,7 +1738,7 @@ begin
         end;
 
       end;
-    bsLostEnemy: Result := Behaviour_MeleeEnemySearch(5);
+    bsLostEnemy: Result := Behaviour_EnemySearch(5);
     bsRetreat: Result := Behaviour_DefaultRetreat(1, 2);
     bsPatrol: Result := Behaviour_DefaultPatrol();
   end;
