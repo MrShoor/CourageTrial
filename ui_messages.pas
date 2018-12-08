@@ -29,6 +29,7 @@ type
     procedure AfterRegister; override;
     procedure DoValidate; override;
   public
+    function Font(): TFontStyle;
     procedure AddMessage(const AStr: string);
   end;
 
@@ -69,13 +70,17 @@ begin
   end;
 end;
 
+function TavmMessages.Font(): TFontStyle;
+begin
+  Result := Canvas.Font;
+end;
+
 procedure TavmMessages.AddMessage(const AStr: string);
 var newMsg: TRoomMessage;
 begin
   newMsg.str := AStr;
 
-  Canvas.Font.Name := 'Arial';
-  Canvas.Font.Size := 20;
+  Canvas.Font.Size := 24;
   Canvas.Font.Style:= [];
 
   with Canvas.TextBuilder do

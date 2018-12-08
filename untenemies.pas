@@ -22,6 +22,24 @@ type
   TVec4iArr = {$IfDef FPC}specialize{$EndIf}TArray<TVec4i>;
 
   TBotState = (bsNothing, bsSeeEnemy, bsLostEnemy, bsRetreat, bsPatrol);
+  TBot = class;
+
+  THidePointParams = record
+    moveWeight     : Integer;
+    shootDist      : Integer;
+    enemyMoveWeight: Integer;
+  end;
+  PHidePointParams = ^THidePointParams;
+  IHidePointMap = {$IfDef FPC}specialize{$EndIf} IHashMap<TVec2i, THidePointParams>;
+  THidePointMap = {$IfDef FPC}specialize{$EndIf} THashMap<TVec2i, THidePointParams>;
+
+  THidePoint = record
+    pt: TVec2i;
+    params: THidePointParams;
+  end;
+  PHidePoint = ^THidePoint;
+  IHidePointArr = {$IfDef FPC}specialize{$EndIf} IArray<THidePoint>;
+  THidePointArr = {$IfDef FPC}specialize{$EndIf} TArray<THidePoint>;
 
   { TbsDesc }
 
@@ -33,10 +51,16 @@ type
   { TbsDesc_SeeEnemy }
 
   TbsDesc_SeeEnemy = class (TbsDesc)
+  strict private
+    FPointsForHide_Cache: IHidePointArr;
+  public
     Enemy: TRoomUnit;
     OptimalRoute: IRoomPath;
-    procedure SetState(const AEnemy: TRoomUnit);
+    function GetHidePoints(const ABot: TBot): IHidePointArr;
+    procedure SetState(const AEnemy: TRoomUnit); overload;
     procedure ClearState(); override;
+
+    procedure NewTurn(); override;
   end;
 
   { TbsDesc_LostEnemy }
@@ -100,8 +124,13 @@ type
     end;
 
     THidePtsComparer = class(TInterfacedObject, IComparer)
+    private
+      FOptEnemyDistance: Integer;
+      FMaxMoveDistance: Integer;
+      FMinEnemyDistance: Integer;
     public
       function Compare(const Left, Right): Integer;
+      constructor Create(const AOptimalEnemyDistance: Integer; const AMaxMoveDistance, AMinEnemyDistance: Integer);
     end;
 
     TMoveFilter = class(TInterfacedObject, IRoomCellFilter)
@@ -142,7 +171,8 @@ type
     function GetPossibleEnemyPoints(const AStartPoint: TVec2i): IVec2iSet; overload;
     function GetPossibleEnemyPoints(const AOldEnemyPoints: IVec2iSet): IVec2iSet; overload;
     function GetBestDirectionForCheck(const ACheckPoints: IVec2iSet; out ANewPointsCount: Integer): Integer;
-    function GetPointsForHide(const AShootPoints: IVec2iSet): IVec4iArr; //z - move weight, w - distance from shoot pts
+    function GetPointsForHide(const AEnemy: TRoomUnit): IHidePointArr; overload;
+    function GetPointsForHide(const AShootPoints: IVec2iSet; const AEnemyPt: TVec2i): IHidePointArr; overload;
   protected
     FBState: TBotState;
     FBS_SeeEnemy : TbsDesc_SeeEnemy;
@@ -251,12 +281,52 @@ var gvBotID: Integer = 0;
 { TBot.THidePtsComparer }
 
 function TBot.THidePtsComparer.Compare(const Left, Right): Integer;
-var L: TVec4i absolute Left;
-    R: TVec4i absolute Right;
+var L: THidePoint absolute Left;
+    R: THidePoint absolute Right;
+    Ld, Rd: Integer;
 begin
-  Result := L.z - R.z;
+  if L.params.moveWeight <= FMaxMoveDistance then
+    Ld := 0
+  else
+    Ld := 1;
+  if R.params.moveWeight <= FMaxMoveDistance then
+    Rd := 0
+  else
+    Rd := 1;
+
+  Result := Ld - Rd;
   if Result = 0 then
-    Result := L.w - R.w;
+  begin
+    if L.params.enemyMoveWeight > FMinEnemyDistance then
+      Ld := 0
+    else
+      Ld := 1;
+    if R.params.enemyMoveWeight > FMinEnemyDistance then
+      Rd := 0
+    else
+      Rd := 1;
+    Result := Ld - Rd;
+    if Result = 0 then
+    begin
+      Result := L.params.shootDist - R.params.shootDist;
+      if Result = 0 then
+      begin
+        Result := L.params.moveWeight - R.params.moveWeight;
+        if Result = 0 then
+        begin
+          Result := abs(L.params.enemyMoveWeight - FOptEnemyDistance) - abs(R.params.enemyMoveWeight - FOptEnemyDistance);
+        end;
+      end;
+    end;
+  end;
+end;
+
+constructor TBot.THidePtsComparer.Create(const AOptimalEnemyDistance: Integer;
+  const AMaxMoveDistance, AMinEnemyDistance: Integer);
+begin
+  FOptEnemyDistance := AOptimalEnemyDistance;
+  FMaxMoveDistance := AMaxMoveDistance;
+  FMinEnemyDistance := AMinEnemyDistance;
 end;
 
 { TBot.TMoveFilter }
@@ -271,7 +341,8 @@ begin
   if obj = FTarget then Exit(True);
   if obj is TRoomUnit then
       if FBot.IsEnemy(TRoomUnit(obj)) then
-        Exit(True);
+        if not FBot.CanSee(TRoomUnit(obj)) then
+          Exit(True);
   Result := False;
 end;
 
@@ -524,6 +595,13 @@ end;
 
 { TbsDesc_SeeEnemy }
 
+function TbsDesc_SeeEnemy.GetHidePoints(const ABot: TBot): IHidePointArr;
+begin
+  if FPointsForHide_Cache = nil then
+    FPointsForHide_Cache := ABot.GetPointsForHide(Enemy);
+  Result := FPointsForHide_Cache;
+end;
+
 procedure TbsDesc_SeeEnemy.SetState(const AEnemy: TRoomUnit);
 begin
   ClearState();
@@ -533,6 +611,13 @@ end;
 procedure TbsDesc_SeeEnemy.ClearState();
 begin
   Enemy := nil;
+  OptimalRoute := nil;
+  FPointsForHide_Cache := nil;
+end;
+
+procedure TbsDesc_SeeEnemy.NewTurn();
+begin
+  FPointsForHide_Cache := nil;
   OptimalRoute := nil;
 end;
 
@@ -717,11 +802,59 @@ function TBotArcher1.DoAction(): IBRA_Action;
     Result := TRoomPath.Create();
   end;
 
+  function GetOptimalHidePosition(const ASkillForUse: IUnitSkill): IRoomPath;
+  const
+    cBestDistance = 8;
+  var hidePts: IHidePointArr;
+      cmp: IComparer;
+      moveDist, i: Integer;
+      minEnemyDist: Integer;
+  begin
+    moveDist := AP;
+    if ASkillForUse <> nil then
+      moveDist := moveDist - ASkillForUse.Cost;
+    minEnemyDist := 4;
+    Result := nil;
+    hidePts := FBS_SeeEnemy.GetHidePoints(Self);
+    cmp := THidePtsComparer.Create(cBestDistance, moveDist, minEnemyDist);
+    hidePts.Sort(cmp);
+
+    for i := 0 to hidePts.Count - 1 do
+    begin
+      if hidePts[i].params.moveWeight > moveDist then Exit;
+      if hidePts[i].params.enemyMoveWeight <= minEnemyDist then Exit;
+      Result := FindPath(hidePts[i].pt, TMoveFilter.Create(Self, nil));
+      if Result <> nil then
+      begin
+        Result.Add(hidePts[i].pt);
+        Exit;
+      end;
+    end;
+  end;
+
+  function GetBestSkillForUse(const AEnemy: TRoomUnit): IUnitSkill;
+  begin
+    Result := FUnitSkills[0];
+    if AP < Result.Cost then Result := nil;
+    if Result <> nil then
+      if not Result.CanUse(Self, AEnemy) then Result := nil;
+  end;
+
+  function DoShootFirst(const ACurrentPos, ABestPos, AEnemyPos: TVec2i): Boolean;
+  var
+      currentWorldPos: TVec3;
+      bestWorldPos: TVec3;
+  begin
+    if ACurrentPos = ABestPos then Exit(True);
+    currentWorldPos := Room.UI.TilePosToWorldPos(ACurrentPos - AEnemyPos);
+    bestWorldPos := Room.UI.TilePosToWorldPos(ABestPos - AEnemyPos);
+    Result := LenSqr(currentWorldPos) <= LenSqr(bestWorldPos);
+  end;
+
 var
-  availPts: Integer;
+  skill: IUnitSkill;
 begin
   if AP = 0 then Exit(nil);
-  //BehaviourCheck_Retreat(40, FRetreatLimits);
 
   LogAction('DoAction AP = ' + IntToStr(AP));
 
@@ -729,54 +862,75 @@ begin
     bsNothing: Result := Behaviour_DefaultNothing();
     bsSeeEnemy:
       begin
-        if (FBS_SeeEnemy.OptimalRoute = nil) or (FBS_SeeEnemy.OptimalRoute.Count = 0) then
-          FBS_SeeEnemy.OptimalRoute := GetOptimalRangePosition(FBS_SeeEnemy.Enemy.RoomPos);
+        if not InViewField(FBS_SeeEnemy.Enemy.RoomPos) then
+        begin
+          LogAction('  Dont see enemy. Turn on.');
+          Result := TBRA_UnitTurnAction.Create(Self, FBS_SeeEnemy.Enemy.RoomPos);
+          Exit;
+        end;
+
+        skill := GetBestSkillForUse(FBS_SeeEnemy.Enemy);
+
         if FBS_SeeEnemy.OptimalRoute = nil then
         begin
-          LogAction('  Cant find optimal route');
-          SetBSState(bsRetreat);
-          FBS_Retreat.SetState(Self, FBS_SeeEnemy.Enemy.GetShootPoints(), 0);
-          FBS_Retreat.SetEnemyPt(FBS_SeeEnemy.Enemy.RoomPos);
+          FBS_SeeEnemy.OptimalRoute := GetOptimalHidePosition(skill);
+          if FBS_SeeEnemy.OptimalRoute <> nil then LogAction('  Optimal route for hiding found. Len: ' + IntToStr(FBS_SeeEnemy.OptimalRoute.Count));
+
+          if FBS_SeeEnemy.OptimalRoute = nil then
+          begin
+            FBS_SeeEnemy.OptimalRoute := GetOptimalRangePosition(FBS_SeeEnemy.Enemy.RoomPos);
+            if FBS_SeeEnemy.OptimalRoute <> nil then LogAction('  Optimal route for range position found. Len: ' + IntToStr(FBS_SeeEnemy.OptimalRoute.Count));
+          end;
+        end;
+
+        if skill = nil then
+          skill := GetBestSkillForUse(FBS_SeeEnemy.Enemy);
+
+        if FBS_SeeEnemy.OptimalRoute = nil then
+        begin
+          LogAction('  Cant find optimal route. Just attack');
+          if skill = nil then
+          begin
+            LogAction('      But no skill for use');
+            Result := nil;
+            Exit;
+          end;
+          Result := skill.DoAction(Self, FBS_SeeEnemy.Enemy);
+          Exit;
+        end;
+
+        if skill = nil then
+        begin
+          LogAction('  Not skill for use. Just move');
+          if FBS_SeeEnemy.OptimalRoute.Count = 0 then
+          begin
+            LogAction('      But at optimal point');
+            Result := nil;
+            Exit;
+          end;
+          Result := Action_MoveWithRoute(FBS_SeeEnemy.OptimalRoute);
+          Exit;
+        end;
+
+        if FBS_SeeEnemy.OptimalRoute.Count > AP - skill.Cost then
+        begin
+          LogAction('  Not enought points for skill. Just move');
+          Result := Action_MoveWithRoute(FBS_SeeEnemy.OptimalRoute);
+          Exit;
         end
         else
         begin
-          if not InViewField(FBS_SeeEnemy.Enemy.RoomPos) then
+          if (FBS_SeeEnemy.OptimalRoute.Count = 0) or DoShootFirst(RoomPos, FBS_SeeEnemy.OptimalRoute.Last, FBS_SeeEnemy.Enemy.RoomPos) then
           begin
-            LogAction('  Dont see enemy. Turn on.');
-            Result := TBRA_UnitTurnAction.Create(Self, FBS_SeeEnemy.Enemy.RoomPos);
+            LogAction('  Shoot!');
+            Result := skill.DoAction(Self, FBS_SeeEnemy.Enemy);
             Exit;
-          end;
-
-          availPts := AP - FBS_SeeEnemy.OptimalRoute.Count;
-          if (FEquippedItem[esBothHands] <> nil) and (availPts > FUnitSkills[0].Cost) then
-          begin
-            if (FBS_SeeEnemy.OptimalRoute.Count = 0) or
-               (FRoom.Distance(RoomPos, FBS_SeeEnemy.Enemy.RoomPos) < FRoom.Distance(FBS_SeeEnemy.OptimalRoute.Last, FBS_SeeEnemy.Enemy.RoomPos)) then
-            begin
-              LogAction('  Time to attack.');
-              Result := FUnitSkills[0].DoAction(0, Self, FBS_SeeEnemy.Enemy);
-              Exit;
-            end
-            else
-            begin
-              LogAction('  Move to safety distance 1.');
-              Result := Action_MoveWithRoute(FBS_SeeEnemy.OptimalRoute);
-              Exit;
-            end;
           end
           else
           begin
-            if FBS_SeeEnemy.OptimalRoute.Count = 0 then
-            begin
-              LogAction('  No optimal route.');
-              Exit(nil);
-            end
-            else
-            begin
-              LogAction('  Move to safety distance 2.');
-              Result := Action_MoveWithRoute(FBS_SeeEnemy.OptimalRoute);
-              Exit;
-            end;
+            LogAction('  Move to optimal position');
+            Result := Action_MoveWithRoute(FBS_SeeEnemy.OptimalRoute);
+            Exit;
           end;
         end;
       end;
@@ -1081,14 +1235,24 @@ begin
   end;
 end;
 
-function TBot.GetPointsForHide(const AShootPoints: IVec2iSet): IVec4iArr;
+function TBot.GetPointsForHide(const AEnemy: TRoomUnit): IHidePointArr;
+begin
+  Result := GetPointsForHide(AEnemy.GetShootPointsSet(), AEnemy.RoomPos);
+end;
+
+function TBot.GetPointsForHide(const AShootPoints: IVec2iSet; const AEnemyPt: TVec2i): IHidePointArr;
 var graph: IRoomMapNonWeightedGraph;
     iterator: IRoomMapBFS;
     pt: TVec2i;
-    depth, i: Integer;
-    hidept: TVec4i;
+    depth, n: Integer;
+    hidePt: TVec2i;
+    hideParams: THidePointParams;
+    phideParams: PHidePointParams;
+    hideMap: IHidePointMap;
+    hidePoint: THidePoint;
 begin
-  Result := TVec4iArr.Create();
+  Result := THidePointArr.Create();
+  hideMap := THidePointMap.Create();
 
   graph := TRoomMapGraph_CustomFilter.Create(Room, TMoveFilter.Create(Self, nil));
   iterator := TRoomMapBFS.Create(graph);
@@ -1097,24 +1261,47 @@ begin
   begin
     if depth > AP then Break;
     if AShootPoints.Contains(pt) then Continue;
-    hidept.xy := pt;
-    hidept.z := depth;
-    hidept.w := 0;
-    Result.Add(hidept);
+    hideParams.enemyMoveWeight := 0;
+    hideParams.moveWeight := depth;
+    hideParams.shootDist := 0;
+    hideMap.Add(pt, hideParams);
   end;
 
-  for i := 0 to Result.Count - 1 do
+  graph := TRoomMapGraph_CustomFilter.Create(Room, TRoomCellFilter_ExcludeUnits.Create(Room));
+  hideMap.Reset;
+  while hideMap.Next(hidePt, hideParams) do
   begin
     iterator := TRoomMapBFS.Create(graph);
-    iterator.Reset(Result[i].xy);
+    iterator.Reset(hidePt);
     while iterator.Next(pt, depth) do
     begin
       if AShootPoints.Contains(pt) then
       begin
-        Result[i] := Vec(Result[i].xyz, depth);
+        PHidePointParams(hideMap.GetPItem(hidePt))^.shootDist := depth;
         Break;
       end;
     end;
+  end;
+
+  n := 0;
+  iterator := TRoomMapBFS.Create(graph);
+  iterator.Reset(AEnemyPt);
+  while iterator.Next(pt, depth) do
+  begin
+    if hideMap.TryGetPValue(pt, phideParams) then
+    begin
+      phideParams^.enemyMoveWeight := depth;
+      Inc(n);
+      if n = hideMap.Count then Break;
+    end;
+  end;
+
+  hideMap.Reset;
+  while hideMap.Next(hidePt, hideParams) do
+  begin
+    hidePoint.pt := hidePt;
+    hidePoint.params := hideParams;
+    Result.Add(hidePoint);
   end;
 end;
 
@@ -1171,14 +1358,6 @@ begin
         Dec(ARetreatLimits);
         SetBSState(bsRetreat);
         FBS_Retreat.SetState(Self, FBS_SeeEnemy.Enemy.GetShootPoints(), 0);
-
-        hidePts := GetPointsForHide(FBS_SeeEnemy.Enemy.GetShootPointsSet());
-        comparer := THidePtsComparer.Create;
-        hidePts.Sort(comparer);
-        gvDebugPoints := TVec2iArr.Create();
-        for i := 0 to hidePts.Count - 1 do
-          gvDebugPoints.Add(hidePts[i].xy);
-
         FBS_Retreat.SetEnemyPt(FBS_SeeEnemy.Enemy.RoomPos);
       end;
     end;
@@ -1452,6 +1631,12 @@ end;
 procedure TBot.NewTurn();
 begin
   FEmptyCells := GetObservablePointSet(nil, nil);
+
+  FBS_SeeEnemy.NewTurn();
+  FBS_LostEnemy.NewTurn();
+  FBS_Retreat.NewTurn();
+  FBS_Patrol.NewTurn();
+
   BehaviourCheck_Retreat(40, FRetreatLimits);
   if FBState = bsLostEnemy then
     FBS_LostEnemy.CheckPt := GetPossibleEnemyPoints(FBS_LostEnemy.CheckPt)
@@ -1625,9 +1810,9 @@ begin
     bsNothing: Result := Behaviour_DefaultNothing();
     bsSeeEnemy:
       begin
-        if FUnitSkills[0].CanUse(0, Self, FBS_SeeEnemy.Enemy) then
+        if FUnitSkills[0].CanUse(Self, FBS_SeeEnemy.Enemy) then
         begin
-          Result := FUnitSkills[0].DoAction(0, Self, FBS_SeeEnemy.Enemy);
+          Result := FUnitSkills[0].DoAction(Self, FBS_SeeEnemy.Enemy);
           Exit;
         end;
 

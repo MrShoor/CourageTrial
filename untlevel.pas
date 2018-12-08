@@ -105,8 +105,8 @@ type
     function SampleDamage(AOwner, ATarget: TRoomUnit): Integer;
     function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean;
 
-    function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
-    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean;
+    function DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action;
+    function CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean;
   end;
   IUnitSkillArr = {$IfDef FPC}specialize{$EndIf}IArray<IUnitSkill>;
   TUnitSkillArr = {$IfDef FPC}specialize{$EndIf}TArray<IUnitSkill>;
@@ -3575,7 +3575,7 @@ var
   bow: IUnitItem;
   axe: IUnitItem;
 begin
-  MaxAP := 30;
+  MaxAP := {$IfDef DEBUGBOTS}30{$Else}10{$EndIf};
   MaxHP := 100;
   HP := MaxHP;
   AP := MaxAP;
@@ -3799,7 +3799,7 @@ begin
 
     if (obj is TRoomUnit) and (FPlayer <> obj) and (FPlayer.ActiveSkill <> nil) then
     begin
-      new_action := FPlayer.ActiveSkill.DoAction(0, FPlayer, obj as TRoomUnit);
+      new_action := FPlayer.ActiveSkill.DoAction(FPlayer, obj as TRoomUnit);
     end;
 
     if (obj is TRoomInteractiveObject) then
@@ -4021,7 +4021,7 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string; const ADoors: TD
   var bot: TBot;
   begin
     {$IfDef DEBUGBOTS}
-    bot := TBotArcher1.Create(FMap);
+    bot := TBotMutant1.Create(FMap);
     {$Else}
     //if Random(2) = 0 then
       bot := TBotArcher1.Create(FMap);

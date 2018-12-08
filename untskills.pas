@@ -40,8 +40,8 @@ type
     function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; virtual; abstract;
     function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean; virtual; abstract;
 
-    function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; virtual; abstract;
-    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; virtual;
+    function DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action; virtual; abstract;
+    function CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; virtual;
   public
     constructor Create(const AItem: IUnitItem; const AIndex: Integer);
   end;
@@ -67,8 +67,8 @@ type
     function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; override;
     function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean; override;
 
-    function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; override;
-    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
+    function DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action; override;
+    function CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
   end;
 
   { TSkill_Shoot }
@@ -96,8 +96,8 @@ type
     function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; override;
     function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean; override;
 
-    function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; override;
-    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
+    function DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action; override;
+    function CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
   end;
 
   { TSkill_AxeAttack }
@@ -124,8 +124,8 @@ type
     function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; override;
     function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean; override;
 
-    function DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action; override;
-    function CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
+    function DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action; override;
+    function CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
   end;
 
 implementation
@@ -217,18 +217,19 @@ begin
   Result := Random <= Accuracy.x;
 end;
 
-function TSkill_AxeAttack.DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
+function TSkill_AxeAttack.DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action;
 begin
   Result := nil;
-  if not CanUse(ASkillIndex, AOwner, ATarget) then Exit;
+  if not CanUse(AOwner, ATarget) then Exit;
   AOwner.AP := AOwner.AP - Cost;
   AOwner.Room.AddMessage(AOwner.Name + ' наносит рубящий удар');
   Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Self, 2000, 866);
 end;
 
-function TSkill_AxeAttack.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
+function TSkill_AxeAttack.CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
 begin
-  Result := inherited CanUse(ASkillIndex, AOwner, ATarget, AReservedPoints);
+  if AOwner.Room.Distance(AOwner.RoomPos, ATarget.RoomPos) > 1 then Exit(False);
+  Result := inherited CanUse(AOwner, ATarget, AReservedPoints);
   if not Result then Exit;
   Result := False;
   if AOwner.AP - AReservedPoints < Cost then Exit;
@@ -332,13 +333,13 @@ begin
   Result := Random < Lerp(Accuracy.x, Accuracy.y, RangeT(AOwner, ATarget));
 end;
 
-function TSkill_Shoot.DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
+function TSkill_Shoot.DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action;
 var
   bullet: TRoomBullet;
 begin
   Result := nil;
 
-  if not CanUse(ASkillIndex, AOwner, ATarget) then Exit;
+  if not CanUse(AOwner, ATarget) then Exit;
   AOwner.AP := AOwner.AP - Cost;
 
   AOwner.Room.AddMessage(AOwner.Name + ' стреляет');
@@ -354,9 +355,9 @@ begin
   Result := TBRA_Shoot.Create(AOwner, [bullet], Self, 1150, 1.37);
 end;
 
-function TSkill_Shoot.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
+function TSkill_Shoot.CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
 begin
-  Result := inherited CanUse(ASkillIndex, AOwner, ATarget, AReservedPoints);
+  Result := inherited CanUse(AOwner, ATarget, AReservedPoints);
   if not Result then Exit;
 
   Result := False;
@@ -383,7 +384,7 @@ begin
   Result := ikUnknown;
 end;
 
-function TUnitSkill.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
+function TUnitSkill.CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
 begin
   Result := UseReady(AOwner);
 end;
@@ -462,18 +463,18 @@ begin
   Result := True;
 end;
 
-function TSkill_Kick.DoAction(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit): IBRA_Action;
+function TSkill_Kick.DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action;
 begin
   Result := nil;
-  if not CanUse(ASkillIndex, AOwner, ATarget) then Exit;
+  if not CanUse(AOwner, ATarget) then Exit;
   AOwner.AP := AOwner.AP - Cost;
   AOwner.Room.AddMessage(AOwner.Name + ' наносит удар');
   Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Self, 1000, 300);
 end;
 
-function TSkill_Kick.CanUse(ASkillIndex: Integer; AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
+function TSkill_Kick.CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
 begin
-  Result := inherited CanUse(ASkillIndex, AOwner, ATarget, AReservedPoints);
+  Result := inherited CanUse(AOwner, ATarget, AReservedPoints);
   if not Result then Exit;
 
   Result := False;
