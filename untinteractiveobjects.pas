@@ -306,6 +306,7 @@ begin
 
   FInventory.Push(TAxe.Create, 0);
   FInventory.Push(TArcherBow.Create, 0);
+  FInventory.Push(THealBottle.Create, 0);
 end;
 
 procedure TRoomChest.SetAnimation(const AName: string);

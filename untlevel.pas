@@ -1,6 +1,6 @@
 ﻿unit untLevel;
 
-{$Define DEBUGBOTS}
+//{$Define DEBUGBOTS}
 
 {$IfDef FPC}
   {$mode objfpc}{$H+}
@@ -4025,10 +4025,10 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string; const ADoors: TD
     {$IfDef DEBUGBOTS}
     bot := TBotMutant1.Create(FMap);
     {$Else}
-    //if Random(2) = 0 then
-      bot := TBotArcher1.Create(FMap);
-    //else
-      //bot := TBotMutant1.Create(FMap);
+    if Random(2) = 0 then
+      bot := TBotArcher1.Create(FMap)
+    else
+      bot := TBotMutant1.Create(FMap);
     {$EndIf}
     bot.LoadModels();
     bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
