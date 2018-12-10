@@ -1,6 +1,6 @@
 ﻿unit untLevel;
 
-{$Define DEBUGBOTS}
+//{$Define DEBUGBOTS}
 
 {$IfDef FPC}
   {$mode objfpc}{$H+}
@@ -3704,6 +3704,7 @@ begin
 
   Inventory().Push(TScroll_ResonantArmor.Create, 0);
 
+  Inventory().Push(THealBottle.Create, 0);
   Inventory().Push(THealBottle.Create, 0);
 
   SetLength(FAnim, FModels.Count);

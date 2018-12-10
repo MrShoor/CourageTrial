@@ -262,8 +262,12 @@ type
   private
     FAnim : IavAnimationController;
     FLight: IavPointLight;
+    procedure BuildLight();
   protected
     procedure UpdateStep; override;
+
+    procedure Notify_PlayerLeave; override;
+    procedure Notify_PlayerEnter; override;
 
     procedure OnDead(); override;
     procedure OnRessurect(); override;
@@ -289,6 +293,15 @@ var gvBotID: Integer = 0;
 
 { TBotWisp }
 
+procedure TBotWisp.BuildLight();
+begin
+  FLight := World.Renderer.CreatePointLight();
+  FLight.Color := Vec(1,1,1)*15;
+  FLight.Radius := 5;
+  FLight.CastShadows := st128;
+  FLight.Auto_ShadowRenderType := True;
+end;
+
 procedure TBotWisp.UpdateStep;
 var p: TVec3;
 begin
@@ -307,6 +320,18 @@ begin
   end;
 end;
 
+procedure TBotWisp.Notify_PlayerLeave;
+begin
+  inherited Notify_PlayerLeave;
+  FLight := nil;
+end;
+
+procedure TBotWisp.Notify_PlayerEnter;
+begin
+  inherited Notify_PlayerEnter;
+  BuildLight();
+end;
+
 procedure TBotWisp.OnDead();
 begin
   inherited OnDead();
@@ -316,11 +341,7 @@ end;
 procedure TBotWisp.OnRessurect();
 begin
   inherited OnRessurect();
-  FLight := World.Renderer.CreatePointLight();
-  FLight.Color := Vec(1,1,1)*15;
-  FLight.Radius := 5;
-  FLight.CastShadows := st128;
-  FLight.Auto_ShadowRenderType := True;
+  BuildLight();
 end;
 
 function TBotWisp.FindOptimalRouteForCheck(const ACheckPts: IVec2iSet): IRoomPath;
@@ -369,8 +390,6 @@ begin
   SetAnimation([]);
 
   FRetreatLimits := 5;
-
-  OnRessurect();
 
   Preview96_128 := 'ui\units\wisp.png';
 end;

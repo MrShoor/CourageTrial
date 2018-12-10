@@ -260,7 +260,7 @@ end;
 
 function TSkill_AbsoluteSight.SampleBuffChance(AOwner, ATarget: TRoomUnit): IUnitBuff;
 begin
-  Result := TBuff_AbsoluteSight.Create(AOwner, 10);
+  Result := TBuff_AbsoluteSight.Create(AOwner, 4);
 end;
 
 function TSkill_AbsoluteSight.DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action;
