@@ -131,6 +131,8 @@ type
     function Owner : TRoomUnit;
     function AtUnit: TRoomUnit;
 
+    procedure ProcessDamage(var ADmg: Integer; AFromUnit: TRoomUnit);
+
     procedure SetUnit(const AUnit: TRoomUnit);
     function DoStep: Boolean;
   end;
@@ -156,6 +158,8 @@ type
 
     function Consume(AUnit: TRoomUnit): IBRA_Action;
 
+    procedure ProcessDamage(ADmg: Integer; AFromUnit: TRoomUnit);
+
     property Equipped: Boolean read GetEquipped write SetEquipped;
   end;
   IUnitItemArr = {$IfDef FPC}specialize{$EndIf}IArray<IUnitItem>;
@@ -166,6 +170,7 @@ type
     function StateID: Integer;
     function Items  : IUnitItemArr;
     function Pop(const AIndex: Integer): IUnitItem;
+    function Pop(const AItem: IUnitItem): Boolean;
     function Push(const AItem: IUnitItem; const AIndex: Integer): Integer;
     procedure BumpStateID;
   end;
@@ -329,12 +334,15 @@ type
     function Owner  : TRoomObject;
     function StateID: Integer; virtual;
     function Items  : IUnitItemArr; virtual;
-    function Pop(const AIndex: Integer): IUnitItem; virtual;
+    function Pop(const AIndex: Integer): IUnitItem; virtual; overload;
+    function Pop(const AItem: IUnitItem): Boolean; overload;
     function Push(const AItem: IUnitItem; const AIndex: Integer): Integer; virtual;
     procedure BumpStateID;
   public
     constructor Create(const AOwner: TRoomObject);
   end;
+
+  TRoomUnitAnimateState = (asStand, asWalk, asDeath);
 
   { TRoomUnit }
 
@@ -355,6 +363,8 @@ type
     FViewAngle: Single;
     FViewRange: Single;
     FViewWholeRange: Single;
+
+    FAnimateState: TRoomUnitAnimateState;
 
     procedure SetAP(const AValue: Integer);
     procedure SetHP(const AValue: Integer);
@@ -406,7 +416,7 @@ type
 
     procedure LoadModels(); virtual;
 
-    procedure SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean); virtual;
+    procedure SetAnimation(const ANameSequence: array of string); virtual;
     function  GetUnitMoveSpeed: Single; virtual;
 
     function FindPath(const ATarget: TVec2i): IRoomPath; overload;
@@ -441,6 +451,8 @@ type
     procedure ApplyBuff(ABuff: IUnitBuff); virtual;
     procedure DealDamage(ADmg: Integer; AFromUnit: TRoomUnit); virtual;
     procedure InstantKill(const AMessage: string); virtual;
+
+    property AnimateState: TRoomUnitAnimateState read FAnimateState write FAnimateState;
   end;
   TRoomUnitArr = {$IfDef FPC}specialize{$EndIf} TArray<TRoomObject>;
   IRoomUnitArr = {$IfDef FPC}specialize{$EndIf} IArray<TRoomObject>;
@@ -717,7 +729,7 @@ type
   public
     property ActiveSkill: IUnitSkill read GetActiveSkill write SetActiveSkill;
 
-    procedure SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean); override;
+    procedure SetAnimation(const ANameSequence: array of string); override;
     function  GetUnitMoveSpeed: Single; override;
 
     procedure LoadModels(); override;
@@ -1028,7 +1040,8 @@ begin
   if FMovePathWeight >= 1 then
     if not MoveToNextCell then
     begin
-      FRoomUnit.SetAnimation(['Idle0'], True);
+      FRoomUnit.AnimateState := asStand;
+      FRoomUnit.SetAnimation([]);
       FRoomUnit.RegisterAtRoom();
       Exit(False);
     end;
@@ -1056,7 +1069,8 @@ begin
   if (FMovePath <> nil) and (FRoomUnit <> nil) then
   begin
     FRoomUnit.RoomDir := FRoomUnit.Room.Direction(FRoomUnit.RoomPos, FMovePath[0]);
-    FRoomUnit.SetAnimation(['Walk'], True);
+    FRoomUnit.AnimateState := asWalk;
+    FRoomUnit.SetAnimation([]);
   end;
 end;
 
@@ -1181,6 +1195,14 @@ begin
   Result := FInventory[AIndex];
   FInventory.Delete(AIndex);
   Inc(FStateID);
+end;
+
+function TInventory.Pop(const AItem: IUnitItem): Boolean;
+var n: Integer;
+begin
+  n := FInventory.IndexOf(AItem);
+  Result := n >= 0;
+  if Result then Pop(n);
 end;
 
 function TInventory.Push(const AItem: IUnitItem; const AIndex: Integer): Integer;
@@ -1650,10 +1672,6 @@ function TBRA_Shoot.ProcessAction: Boolean;
     if ABltInfo^.hit <> nil then
     begin
       ABltInfo^.hit.DealDamage(FSkill.SampleDamage(FRoomUint, ABltInfo^.hit), ABltInfo^.bullet.Owner);
-      if ABltInfo^.hit.HP <= 0 then
-        ABltInfo^.hit.SetAnimation(['React0', 'Death0'], False)
-      else
-        ABltInfo^.hit.SetAnimation(['React0', 'Idle0'], True);
     end;
     FreeAndNil(ABltInfo^.bullet);
   end;
@@ -1702,7 +1720,7 @@ begin
   Assert(Length(ABullets) > 0);
   Assert(ASkill <> nil);
 
-  AUnit.SetAnimation([ASkill.Animation, 'Idle0'], True);
+  AUnit.SetAnimation([ASkill.Animation]);
 
   FRoomUint := AUnit;
   FSkill := ASkill;
@@ -2002,10 +2020,6 @@ begin
   FDamage := ADamage;
 
   FRoomUnit.DealDamage(FDamage, AFromUnit);
-  if FRoomUnit.HP <= 0 then
-    FRoomUnit.SetAnimation(['React0', 'Death0'], False)
-  else
-    FRoomUnit.SetAnimation(['React0', 'Idle0'], True);
 end;
 
 { TBRA_UnitDefaultAttack }
@@ -2043,7 +2057,7 @@ begin
   FActionTime := FRoomUnit.World.GameTime + ADurationTime;
   FDamageStartTime := FRoomUnit.World.GameTime + ADamageStartTime;
 
-  FRoomUnit.SetAnimation([FSkill.Animation, 'Idle0'], True);
+  FRoomUnit.SetAnimation([FSkill.Animation]);
   FRoomUnit.RoomDir := FRoomUnit.Room.Direction(FRoomUnit.RoomPos, FTarget.RoomPos);
 end;
 
@@ -2092,7 +2106,8 @@ begin
   if MovePathWeight >= 1 then
     if not MoveToNextCell then
     begin
-      RoomUnit.SetAnimation(['Idle0'], True);
+      RoomUnit.AnimateState := asStand;
+      RoomUnit.SetAnimation([]);
 
       if RoomUnit is TPlayer then
         if RoomUnit.Room.RoomFloor.DoorsOpened then
@@ -2123,7 +2138,8 @@ begin
   if (MovePath <> nil) and (RoomUnit <> nil) and (RoomUnit.AP > 0) then
   begin
     RoomUnit.RoomDir := RoomUnit.Room.Direction(RoomUnit.RoomPos, MovePath[0]);
-    RoomUnit.SetAnimation(['Walk'], True);
+    RoomUnit.AnimateState := asWalk;
+    RoomUnit.SetAnimation([]);
   end;
 end;
 
@@ -2367,20 +2383,33 @@ end;
 
 procedure TRoomUnit.OnDead();
 begin
-
+  FAnimateState := asDeath;
 end;
 
 procedure TRoomUnit.OnRessurect();
 begin
-
+  FAnimateState := asStand;
 end;
 
 function TRoomUnit.AddAnimationPrefix(const ANameSequence: array of string): TStringArray;
 var i: Integer;
 begin
-  SetLength(Result, Length(ANameSequence));
+  if FAnimateState = asDeath then
+  begin
+    SetLength(Result, 1);
+    Result[0] := FAnimationPrefix + 'Death0';
+    Exit;
+  end;
+
+  SetLength(Result, Length(ANameSequence) + 1);
   for i := 0 to Length(ANameSequence) - 1 do
     Result[i] := FAnimationPrefix + ANameSequence[i];
+  case FAnimateState of
+    asStand: Result[High(Result)] := FAnimationPrefix + 'Idle0';
+    asWalk : Result[High(Result)] := FAnimationPrefix + 'Walk';
+  else
+    Result[High(Result)] := FAnimationPrefix + 'Idle0';
+  end;
 end;
 
 procedure TRoomUnit.Notify_PlayerLeave;
@@ -2473,7 +2502,7 @@ begin
   FViewRange := 10;
 end;
 
-procedure TRoomUnit.SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean);
+procedure TRoomUnit.SetAnimation(const ANameSequence: array of string);
 begin
 
 end;
@@ -2689,7 +2718,11 @@ end;
 procedure TRoomUnit.DealDamage(ADmg: Integer; AFromUnit: TRoomUnit);
 var msg: TbFlyOutMessage;
     s: string;
+    i: Integer;
 begin
+  for i := 0 to FBuffs.Count - 1 do
+    FBuffs[i].ProcessDamage(ADmg, AFromUnit);
+
   HP := HP - ADmg;
 
   msg := TbFlyOutMessage.Create(World);
@@ -2697,16 +2730,22 @@ begin
 
   s := Name + ' получает ' + IntToStr(ADmg) + ' урона';
   if IsDead() then
-    Room.AddMessage(s + ' и умирает')
+  begin
+    Room.AddMessage(s + ' и умирает');
+    SetAnimation([]);
+  end
   else
+  begin
     Room.AddMessage(s);
+    SetAnimation(['React0']);
+  end;
 end;
 
 procedure TRoomUnit.InstantKill(const AMessage: string);
 begin
   HP := 0;
   Room.AddMessage(AMessage);
-  SetAnimation(['Death0'], False);
+  SetAnimation([]);
 end;
 
 procedure TRoomUnit.SetAP(const AValue: Integer);
@@ -3605,13 +3644,13 @@ begin
     FAnim[i].SetTime(World.GameTime);
 end;
 
-procedure TPlayer.SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean);
+procedure TPlayer.SetAnimation(const ANameSequence: array of string);
 var
   i: Integer;
 begin
-  inherited SetAnimation(ANameSequence, ALoopedLast);
+  inherited SetAnimation(ANameSequence);
   for i := 0 to Length(FAnim) - 1 do
-    FAnim[i].AnimationSequence_StartAndStopOther(AddAnimationPrefix(ANameSequence), ALoopedLast);
+    FAnim[i].AnimationSequence_StartAndStopOther(AddAnimationPrefix(ANameSequence), FAnimateState<>asDeath);
 end;
 
 function TPlayer.GetUnitMoveSpeed: Single;
@@ -3663,12 +3702,14 @@ begin
   axe := TAxe.Create;
   Inventory().Push(axe, 0);
 
+  Inventory().Push(TScroll_ResonantArmor.Create, 0);
+
   Inventory().Push(THealBottle.Create, 0);
 
   SetLength(FAnim, FModels.Count);
   for i := 0 to FModels.Count - 1 do
     FAnim[i] := Create_IavAnimationController(FModels[i].Mesh.Pose, World.GameTime);
-  SetAnimation(['Idle0'], True);
+  SetAnimation([]);
   SubscribeForUpdateStep;
 
   Preview96_128 := 'ui\units\player.png';
@@ -3922,6 +3963,9 @@ begin
 
   AutoOpenDoors();
   AutoCloseDoors();
+
+  if TRoomUnit(FUnits[FActiveUnit]).IsDead() then
+    EndTurn();
 
   UI.SetPlayerActiveSkill(FPlayer.ActiveSkill);
   UI.UpdateStep(IsPlayerTurn);

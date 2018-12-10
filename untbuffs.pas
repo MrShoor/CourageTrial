@@ -31,6 +31,8 @@ type
     function Owner : TRoomUnit;
     function AtUnit: TRoomUnit;
 
+    procedure ProcessDamage(var ADmg: Integer; AFromUnit: TRoomUnit); virtual;
+
     procedure SetUnit(const AUnit: TRoomUnit);
     function DoStep: Boolean; virtual;
   public
@@ -64,7 +66,67 @@ type
     function DoStep: Boolean; override;
   end;
 
+  { TBuff_ResonantArmor }
+
+  TBuff_ResonantArmor = class(TUnitBuff)
+  private
+  protected
+    function ID  : TUnitBuffID; override;
+    function Name: string; override;
+    function Desc: string; override;
+    function Ico : string; override;
+
+    procedure ProcessDamage(var ADmg: Integer; AFromUnit: TRoomUnit); override;
+
+    function Kind: TUnitBuffKind; override;
+    function DoStep: Boolean; override;
+  end;
+
 implementation
+
+{ TBuff_ResonantArmor }
+
+function TBuff_ResonantArmor.ID: TUnitBuffID;
+begin
+  Result := bidUnknown;
+end;
+
+function TBuff_ResonantArmor.Name: string;
+begin
+  Result := 'Резонирующая броня';
+end;
+
+function TBuff_ResonantArmor.Desc: string;
+begin
+  Result := '50% урона перенаправляется во врага';
+end;
+
+function TBuff_ResonantArmor.Ico: string;
+begin
+  Result := 'resonant_armor.png';
+end;
+
+procedure TBuff_ResonantArmor.ProcessDamage(var ADmg: Integer; AFromUnit: TRoomUnit);
+var mirroredDmg: Integer;
+begin
+  mirroredDmg := ADmg div 2;
+  if mirroredDmg > 0 then
+  begin
+    ADmg := ADmg - mirroredDmg;
+    if AFromUnit <> nil then
+      AFromUnit.DealDamage(mirroredDmg, nil);
+  end;
+end;
+
+function TBuff_ResonantArmor.Kind: TUnitBuffKind;
+begin
+  Result := bkPowerUp;
+end;
+
+function TBuff_ResonantArmor.DoStep: Boolean;
+begin
+  Result:=inherited DoStep;
+end;
 
 { TBuff_AbsoluteSight }
 
@@ -161,6 +223,11 @@ begin
     Result := TRoomUnit(FAt.Obj);
     if Result = nil then FAt := nil;
   end;
+end;
+
+procedure TUnitBuff.ProcessDamage(var ADmg: Integer; AFromUnit: TRoomUnit);
+begin
+
 end;
 
 procedure TUnitBuff.SetUnit(const AUnit: TRoomUnit);

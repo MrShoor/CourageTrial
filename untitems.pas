@@ -17,6 +17,8 @@ type
   protected
     FEquipped: Boolean;
     FSkills: array of IUnitSkill;
+
+    function CheckConsume(AUnit: TRoomUnit): Boolean;
   public
     function  GetEquipped: Boolean;
     procedure SetEquipped(const AValue: Boolean);
@@ -34,6 +36,8 @@ type
     function Skill(ASkillIndex: Integer): IUnitSkill; virtual;
 
     function Consume(AUnit: TRoomUnit): IBRA_Action; virtual;
+
+    procedure ProcessDamage(ADmg: Integer; AFromUnit: TRoomUnit); virtual;
 
     constructor Create; virtual;
   end;
@@ -82,15 +86,29 @@ type
     constructor Create; override;
   end;
 
+  { TScroll_ResonantArmor }
+
+  TScroll_ResonantArmor = class(TUnitItem)
+  private
+  public
+    function Name  : string;          override;
+    function Kind  : TUnitItemKind;   override;
+    function Slot  : TRoomUnitEqSlot; override;
+    function Model : string;          override;
+    function Ico48 : string;          override;
+
+    function ExtraDesc: string; override;
+
+    function Consume(AUnit: TRoomUnit): IBRA_Action; override;
+    constructor Create; override;
+  end;
+
 implementation
 
 uses
-  Math;
+  Math, untBuffs;
 
 type
-
-  { TBRA_DrinkPotion }
-
   TBRA_DrinkPotion = class(TBRA_Action)
   private
     FUnit: TRoomUnit;
@@ -99,6 +117,76 @@ type
     function ProcessAction: Boolean; override;
     constructor Create(AUnit: TRoomUnit; const AItem: IUnitItem);
   end;
+
+  TBRA_UseBuffScroll = class(TBRA_Action)
+  private
+    FUnit: TRoomUnit;
+    FStopTime: Int64;
+  public
+    function ProcessAction: Boolean; override;
+    constructor Create(AUnit: TRoomUnit; const AItem: IUnitItem; const ABuff: IUnitBuff);
+  end;
+
+{ TBRA_UseBuffScroll }
+
+function TBRA_UseBuffScroll.ProcessAction: Boolean;
+begin
+  Result := FUnit.World.GameTime < FStopTime;
+end;
+
+constructor TBRA_UseBuffScroll.Create(AUnit: TRoomUnit; const AItem: IUnitItem; const ABuff: IUnitBuff);
+begin
+  FUnit := AUnit;
+  FUnit.AP := FUnit.AP - 1;
+  FUnit.Inventory().Pop(AItem);
+  FUnit.SetAnimation(['SelfCast']);
+  FUnit.ApplyBuff(ABuff);
+  FStopTime := FUnit.World.GameTime + 1500;
+end;
+
+
+{ TScroll_ResonantArmor }
+
+function TScroll_ResonantArmor.Name: string;
+begin
+  Result := 'Свиток резонирующей брони';
+end;
+
+function TScroll_ResonantArmor.Kind: TUnitItemKind;
+begin
+  Result := ikConsumable;
+end;
+
+function TScroll_ResonantArmor.Slot: TRoomUnitEqSlot;
+begin
+  Result := esNone;
+end;
+
+function TScroll_ResonantArmor.Model: string;
+begin
+  Result := 'Scroll';
+end;
+
+function TScroll_ResonantArmor.Ico48: string;
+begin
+  Result := 'scroll_resonant_armor.png';
+end;
+
+function TScroll_ResonantArmor.ExtraDesc: string;
+begin
+  Result := 'Перенаправляет 50% урона обратно во врага';
+end;
+
+function TScroll_ResonantArmor.Consume(AUnit: TRoomUnit): IBRA_Action;
+begin
+  if not CheckConsume(AUnit) then Exit(nil);
+  Result := TBRA_UseBuffScroll.Create(AUnit, Self, TBuff_ResonantArmor.Create(AUnit, 8));
+end;
+
+constructor TScroll_ResonantArmor.Create;
+begin
+  inherited Create;
+end;
 
 { TBRA_DrinkPotion }
 
@@ -113,7 +201,7 @@ constructor TBRA_DrinkPotion.Create(AUnit: TRoomUnit; const AItem: IUnitItem);
 begin
   FUnit := AUnit;
   FUnit.TemporaryEquip(esLeftHand, AItem.Model);
-  FUnit.SetAnimation(['Drink', 'Idle0'], True);
+  FUnit.SetAnimation(['Drink']);
   FStopTime := FUnit.World.GameTime + 1000;
 end;
 
@@ -150,23 +238,14 @@ begin
 end;
 
 function THealBottle.Consume(AUnit: TRoomUnit): IBRA_Action;
-var
-  n: Integer;
 begin
-  n := AUnit.Inventory().Items.IndexOf(Self);
-  if n < 0 then Exit(nil);
-
-  if AUnit.AP < 1 then
-  begin
-    AUnit.Room.AddMessage('Требуется 1 очко действий.');
-    Exit(nil);
-  end;
+  if not CheckConsume(AUnit) then Exit(nil);
   AUnit.AP := AUnit.AP - 1;
   Result := TBRA_DrinkPotion.Create(AUnit, Self);
   if Result <> nil then
   begin
     AUnit.HP := Min(AUnit.HP + FHealEff, AUnit.MaxHP);
-    AUnit.Inventory().Pop(n);
+    AUnit.Inventory().Pop(self);
   end;
 end;
 
@@ -210,6 +289,21 @@ end;
 
 { TUnitItem }
 
+function TUnitItem.CheckConsume(AUnit: TRoomUnit): Boolean;
+var
+  n: Integer;
+begin
+  n := AUnit.Inventory().Items.IndexOf(Self);
+  if n < 0 then Exit(False);
+
+  if AUnit.AP < 1 then
+  begin
+    AUnit.Room.AddMessage('Требуется 1 очко действий.');
+    Exit(False);
+  end;
+  Result := True;
+end;
+
 function TUnitItem.GetEquipped: Boolean;
 begin
   Result := FEquipped;
@@ -244,6 +338,11 @@ end;
 function TUnitItem.Consume(AUnit: TRoomUnit): IBRA_Action;
 begin
   Result := nil;
+end;
+
+procedure TUnitItem.ProcessDamage(ADmg: Integer; AFromUnit: TRoomUnit);
+begin
+
 end;
 
 constructor TUnitItem.Create;

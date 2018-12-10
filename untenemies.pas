@@ -231,7 +231,7 @@ type
 
     procedure UpdateStep; override;
   public
-    procedure SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean); override;
+    procedure SetAnimation(const ANameSequence: array of string); override;
     function  GetUnitMoveSpeed: Single; override;
 
     procedure LoadModels(); override;
@@ -248,7 +248,7 @@ type
     function FindOptimalRouteForCheck(const ACheckPts: IVec2iSet): IRoomPath; override;
     procedure UpdateStep; override;
   public
-    procedure SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean); override;
+    procedure SetAnimation(const ANameSequence: array of string); override;
     function  GetUnitMoveSpeed: Single; override;
 
     procedure LoadModels(); override;
@@ -270,7 +270,7 @@ type
 
     function FindOptimalRouteForCheck(const ACheckPts: IVec2iSet): IRoomPath; override;
   public
-    procedure SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean); override;
+    procedure SetAnimation(const ANameSequence: array of string); override;
     function  GetUnitMoveSpeed: Single; override;
 
     procedure LoadModels(); override;
@@ -328,11 +328,11 @@ begin
   Result := FindOptimalRouteForCheck_Ranged(ACheckPts);
 end;
 
-procedure TBotWisp.SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean);
+procedure TBotWisp.SetAnimation(const ANameSequence: array of string);
 begin
-  inherited SetAnimation(ANameSequence, ALoopedLast);
+  inherited SetAnimation(ANameSequence);
   if FAnim <> nil then
-    FAnim.AnimationSequence_StartAndStopOther(AddAnimationPrefix(ANameSequence), ALoopedLast);
+    FAnim.AnimationSequence_StartAndStopOther(AddAnimationPrefix(ANameSequence), AnimateState <> asDeath);
 end;
 
 function TBotWisp.GetUnitMoveSpeed: Single;
@@ -366,7 +366,7 @@ begin
   FAnimationPrefix := 'Wsp_';
 
   FAnim := Create_IavAnimationController(FEmissive[0].Mesh.Pose, World.GameTime);
-  SetAnimation(['Idle0'], True);
+  SetAnimation([]);
 
   FRetreatLimits := 5;
 
@@ -836,12 +836,12 @@ begin
     FAnim[i].SetTime(World.GameTime);
 end;
 
-procedure TBotArcher1.SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean);
+procedure TBotArcher1.SetAnimation(const ANameSequence: array of string);
 var i: Integer;
 begin
-  inherited SetAnimation(ANameSequence, ALoopedLast);
+  inherited SetAnimation(ANameSequence);
   for i := 0 to Length(FAnim) - 1 do
-    FAnim[i].AnimationSequence_StartAndStopOther(AddAnimationPrefix(ANameSequence), ALoopedLast);
+    FAnim[i].AnimationSequence_StartAndStopOther(AddAnimationPrefix(ANameSequence), AnimateState <> asDeath);
 end;
 
 function TBotArcher1.GetUnitMoveSpeed: Single;
@@ -882,7 +882,7 @@ begin
   SetLength(FAnim, FModels.Count);
   for i := 0 to FModels.Count - 1 do
     FAnim[i] := Create_IavAnimationController(FModels[i].Mesh.Pose, World.GameTime);
-  SetAnimation(['Idle0'], True);
+  SetAnimation([]);
 
   FRetreatLimits := 5;
 
@@ -1898,10 +1898,10 @@ begin
   FAnim.SetTime(World.GameTime);
 end;
 
-procedure TBotMutant1.SetAnimation(const ANameSequence: array of string; const ALoopedLast: Boolean);
+procedure TBotMutant1.SetAnimation(const ANameSequence: array of string);
 begin
-  inherited SetAnimation(ANameSequence, ALoopedLast);
-  FAnim.AnimationSequence_StartAndStopOther(AddAnimationPrefix(ANameSequence), ALoopedLast);
+  inherited SetAnimation(ANameSequence);
+  FAnim.AnimationSequence_StartAndStopOther(AddAnimationPrefix(ANameSequence), AnimateState<>asDeath);
 end;
 
 function TBotMutant1.GetUnitMoveSpeed: Single;
@@ -1927,7 +1927,7 @@ begin
   AddModel('Mutant1', mtDefault);
   FAnim := Create_IavAnimationController(FModels[0].Mesh.Pose, World.GameTime);
 
-  SetAnimation(['Idle0'], True);
+  SetAnimation([]);
 
   Preview96_128 := 'ui\units\mutant1.png';
 

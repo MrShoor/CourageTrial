@@ -129,7 +129,8 @@ begin
   Canvas.Font.Style := [gsBold];
   tb := Canvas.TextBuilder;
   tb.Align := laCenter;
-  tb.WriteLn(FItem.Name);
+  tb.WriteWrapped(FItem.Name);
+  tb.WriteWrappedEnd(Size.x - cTextXSpace*2, True);
 
   FNameText := tb.Finish();
   FNameText.BoundsX := Vec(cTextXSpace, Size.x - cTextXSpace);
@@ -171,7 +172,7 @@ end;
 procedure TavmItemHint.AfterRegister;
 begin
   inherited AfterRegister;
-  Size := Vec(280, 100);
+  Size := Vec(340, 100);
 end;
 
 procedure TavmItemHint.DoValidate;
