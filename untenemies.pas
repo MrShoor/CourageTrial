@@ -372,7 +372,7 @@ begin
 
   OnRessurect();
 
-  Preview96_128 := 'ui\units\archer.png';
+  Preview96_128 := 'ui\units\wisp.png';
 end;
 
 function TBotWisp.DoAction(): IBRA_Action;

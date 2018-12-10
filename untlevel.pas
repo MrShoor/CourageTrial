@@ -4072,10 +4072,11 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string; const ADoors: TD
 
     bot := TBotWisp.Create(FMap);
     {$Else}
-    if Random(2) = 0 then
-      bot := TBotArcher1.Create(FMap)
-    else
-      bot := TBotMutant1.Create(FMap);
+    case Random(13123123) mod 3 of
+       0: bot := TBotArcher1.Create(FMap);
+       1: bot := TBotMutant1.Create(FMap);
+       2: bot := TBotWisp.Create(FMap);
+    end;
     {$EndIf}
     bot.LoadModels();
     bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
