@@ -37,8 +37,11 @@ type
     function Req_WeaponType: TUnitItemKind; virtual;
 
     function Animation: string; virtual; abstract;
+    function IsAttackSkill: Boolean; virtual; abstract;
+    function IsBuffSkill: Boolean; virtual; abstract;
     function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; virtual; abstract;
     function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean; virtual; abstract;
+    function SampleBuffChance(AOwner, ATarget: TRoomUnit): IUnitBuff; virtual; abstract;
 
     function DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action; virtual; abstract;
     function CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; virtual;
@@ -64,8 +67,11 @@ type
     function Accuracy    : TVec2; override;
 
     function Animation: string; override;
+    function IsAttackSkill: Boolean; override;
+    function IsBuffSkill: Boolean; override;
     function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; override;
     function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean; override;
+    function SampleBuffChance(AOwner, ATarget: TRoomUnit): IUnitBuff; override;
 
     function DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action; override;
     function CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
@@ -93,8 +99,11 @@ type
     function Req_WeaponType: TUnitItemKind; override;
 
     function Animation: string; override;
+    function IsAttackSkill: Boolean; override;
+    function IsBuffSkill: Boolean; override;
     function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; override;
     function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean; override;
+    function SampleBuffChance(AOwner, ATarget: TRoomUnit): IUnitBuff; override;
 
     function DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action; override;
     function CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
@@ -121,8 +130,42 @@ type
     function Req_WeaponType: TUnitItemKind; override;
 
     function Animation: string; override;
+    function IsAttackSkill: Boolean; override;
+    function IsBuffSkill: Boolean; override;
     function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; override;
     function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean; override;
+    function SampleBuffChance(AOwner, ATarget: TRoomUnit): IUnitBuff; override;
+
+    function DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action; override;
+    function CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
+  end;
+
+  { TSkill_AbsoluteSight }
+
+  TSkill_AbsoluteSight = class(TUnitSkill)
+  private
+  public
+    function WearedOnly: Boolean; override;
+    function UseReady(AUnit: TRoomUnit): Boolean; override;
+
+    function Name: string; override;
+    function Desc: string; override;
+    function Ico : string; override;
+
+    function Cost        : Integer; override;
+    function Range       : Single; override;
+    function Damage      : TVec2i; override;
+    function DamageScale : Single; override;
+    function Accuracy    : TVec2; override;
+
+    function Req_WeaponType: TUnitItemKind; override;
+
+    function Animation: string; override;
+    function IsAttackSkill: Boolean; override;
+    function IsBuffSkill: Boolean; override;
+    function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; override;
+    function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean; override;
+    function SampleBuffChance(AOwner, ATarget: TRoomUnit): IUnitBuff; override;
 
     function DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action; override;
     function CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
@@ -131,7 +174,113 @@ type
 implementation
 
 uses
-  Math;
+  Math, untBuffs;
+
+{ TSkill_AbsoluteSight }
+
+function TSkill_AbsoluteSight.WearedOnly: Boolean;
+begin
+  Result := False;
+end;
+
+function TSkill_AbsoluteSight.UseReady(AUnit: TRoomUnit): Boolean;
+begin
+  Result := True;
+end;
+
+function TSkill_AbsoluteSight.Name: string;
+begin
+  Result := 'Абсолютное наблюдение';
+end;
+
+function TSkill_AbsoluteSight.Desc: string;
+begin
+  Result := 'Позволяет видеть врага где угодно';
+end;
+
+function TSkill_AbsoluteSight.Ico: string;
+begin
+  Result := 'abs_sight.png';
+end;
+
+function TSkill_AbsoluteSight.Cost: Integer;
+begin
+  Result := 5;
+end;
+
+function TSkill_AbsoluteSight.Range: Single;
+begin
+  Result := 16;
+end;
+
+function TSkill_AbsoluteSight.Damage: TVec2i;
+begin
+  Result := Vec(0,0);
+end;
+
+function TSkill_AbsoluteSight.DamageScale: Single;
+begin
+  Result := 0;
+end;
+
+function TSkill_AbsoluteSight.Accuracy: TVec2;
+begin
+  Result := Vec(1,1);
+end;
+
+function TSkill_AbsoluteSight.Req_WeaponType: TUnitItemKind;
+begin
+  Result := inherited Req_WeaponType;
+end;
+
+function TSkill_AbsoluteSight.Animation: string;
+begin
+  Result := 'DirectCast';
+end;
+
+function TSkill_AbsoluteSight.IsAttackSkill: Boolean;
+begin
+  Result := False;
+end;
+
+function TSkill_AbsoluteSight.IsBuffSkill: Boolean;
+begin
+  Result := True;
+end;
+
+function TSkill_AbsoluteSight.SampleDamage(AOwner, ATarget: TRoomUnit): Integer;
+begin
+  Result := 0;
+end;
+
+function TSkill_AbsoluteSight.SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean;
+begin
+  Result := True;
+end;
+
+function TSkill_AbsoluteSight.SampleBuffChance(AOwner, ATarget: TRoomUnit): IUnitBuff;
+begin
+  Result := TBuff_AbsoluteSight.Create(AOwner, 10);
+end;
+
+function TSkill_AbsoluteSight.DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action;
+begin
+  Result := nil;
+  if not CanUse(AOwner, ATarget) then Exit;
+  AOwner.AP := AOwner.AP - Cost;
+  AOwner.Room.AddMessage(AOwner.Name + ' использует ' + Name);
+  Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Self, 1290, 660);
+end;
+
+function TSkill_AbsoluteSight.CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
+begin
+  if AOwner.Room.Distance(AOwner.RoomPos, ATarget.RoomPos) > Range then Exit(False);
+  Result := inherited CanUse(AOwner, ATarget, AReservedPoints);
+  if not Result then Exit;
+  Result := False;
+  if AOwner.AP - AReservedPoints < Cost then Exit;
+  Result := True;
+end;
 
 { TSkill_AxeAttack }
 
@@ -200,6 +349,16 @@ begin
   Result := 'Axe0_Attack0';
 end;
 
+function TSkill_AxeAttack.IsAttackSkill: Boolean;
+begin
+  Result := True;
+end;
+
+function TSkill_AxeAttack.IsBuffSkill: Boolean;
+begin
+  Result := False;
+end;
+
 function TSkill_AxeAttack.SampleDamage(AOwner, ATarget: TRoomUnit): Integer;
 var itm: IUnitItem;
     dmg: TVec2;
@@ -215,6 +374,11 @@ end;
 function TSkill_AxeAttack.SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean;
 begin
   Result := Random <= Accuracy.x;
+end;
+
+function TSkill_AxeAttack.SampleBuffChance(AOwner, ATarget: TRoomUnit): IUnitBuff;
+begin
+  Result := nil;
 end;
 
 function TSkill_AxeAttack.DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action;
@@ -314,6 +478,16 @@ begin
   Result := 'Archer_Bow_Attack0';
 end;
 
+function TSkill_Shoot.IsAttackSkill: Boolean;
+begin
+  Result := True;
+end;
+
+function TSkill_Shoot.IsBuffSkill: Boolean;
+begin
+  Result := False;
+end;
+
 function TSkill_Shoot.SampleDamage(AOwner, ATarget: TRoomUnit): Integer;
 var t: Single;
     itm: IUnitItem;
@@ -331,6 +505,11 @@ end;
 function TSkill_Shoot.SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean;
 begin
   Result := Random < Lerp(Accuracy.x, Accuracy.y, RangeT(AOwner, ATarget));
+end;
+
+function TSkill_Shoot.SampleBuffChance(AOwner, ATarget: TRoomUnit): IUnitBuff;
+begin
+  Result := nil;
 end;
 
 function TSkill_Shoot.DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action;
@@ -453,6 +632,16 @@ begin
   Result := 'Kick0';
 end;
 
+function TSkill_Kick.IsAttackSkill: Boolean;
+begin
+  Result := True;
+end;
+
+function TSkill_Kick.IsBuffSkill: Boolean;
+begin
+  Result := False;
+end;
+
 function TSkill_Kick.SampleDamage(AOwner, ATarget: TRoomUnit): Integer;
 begin
   Result := RandomRange(Damage.x, Damage.y+1);
@@ -461,6 +650,11 @@ end;
 function TSkill_Kick.SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean;
 begin
   Result := True;
+end;
+
+function TSkill_Kick.SampleBuffChance(AOwner, ATarget: TRoomUnit): IUnitBuff;
+begin
+  Result := nil;
 end;
 
 function TSkill_Kick.DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action;

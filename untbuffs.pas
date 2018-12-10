@@ -20,6 +20,7 @@ type
     FAt      : IWeakRef;
     FDuration: Integer;
   protected
+    function ID  : TUnitBuffID; virtual;
     function Name: string; virtual; abstract;
     function Desc: string; virtual; abstract;
     function Ico : string; virtual; abstract;
@@ -49,7 +50,53 @@ type
     function DoStep: Boolean; override;
   end;
 
+  { TBuff_AbsoluteSight }
+
+  TBuff_AbsoluteSight = class(TUnitBuff)
+  private
+  protected
+    function ID  : TUnitBuffID; override;
+    function Name: string; override;
+    function Desc: string; override;
+    function Ico : string; override;
+
+    function Kind: TUnitBuffKind; override;
+    function DoStep: Boolean; override;
+  end;
+
 implementation
+
+{ TBuff_AbsoluteSight }
+
+function TBuff_AbsoluteSight.ID: TUnitBuffID;
+begin
+  Result := bidAbsoluteSight;
+end;
+
+function TBuff_AbsoluteSight.Name: string;
+begin
+  Result := 'Абсолютное наблюдение';
+end;
+
+function TBuff_AbsoluteSight.Desc: string;
+begin
+  Result := 'Вас все видят';
+end;
+
+function TBuff_AbsoluteSight.Ico: string;
+begin
+  Result := 'abs_sight.png';
+end;
+
+function TBuff_AbsoluteSight.Kind: TUnitBuffKind;
+begin
+  Result := bkDebuff;
+end;
+
+function TBuff_AbsoluteSight.DoStep: Boolean;
+begin
+  Result:=inherited DoStep;
+end;
 
 { TBuff_Stun }
 
@@ -85,6 +132,11 @@ begin
 end;
 
 { TUnitBuff }
+
+function TUnitBuff.ID: TUnitBuffID;
+begin
+  Result := bidUnknown;
+end;
 
 function TUnitBuff.Duration: Integer;
 begin

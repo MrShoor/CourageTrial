@@ -1,6 +1,6 @@
 ﻿unit untLevel;
 
-//{$Define DEBUGBOTS}
+{$Define DEBUGBOTS}
 
 {$IfDef FPC}
   {$mode objfpc}{$H+}
@@ -84,6 +84,7 @@ const
 
 type
   IUnitItem = interface;
+  IUnitBuff = interface;
 
   IUnitSkill = interface
     function Item: IUnitItem;
@@ -104,8 +105,11 @@ type
     function Req_WeaponType: TUnitItemKind;
 
     function Animation: string;
+    function IsAttackSkill: Boolean;
+    function IsBuffSkill: Boolean;
     function SampleDamage(AOwner, ATarget: TRoomUnit): Integer;
     function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean;
+    function SampleBuffChance(AOwner, ATarget: TRoomUnit): IUnitBuff;
 
     function DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action;
     function CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean;
@@ -114,7 +118,9 @@ type
   TUnitSkillArr = {$IfDef FPC}specialize{$EndIf}TArray<IUnitSkill>;
 
   TUnitBuffKind = (bkPowerUp, bkStun, bkBleed, bkPoison, bkDebuff);
+  TUnitBuffID = (bidUnknown, bidAbsoluteSight);
   IUnitBuff = interface
+    function ID  : TUnitBuffID;
     function Name: string;
     function Desc: string;
     function Ico : string;
@@ -370,6 +376,8 @@ type
 
     FSlots10: IUnitSkillArr;
     procedure OnRegisterRoomObject(const ANewObject: TRoomObject); virtual;
+    procedure OnDead(); virtual;
+    procedure OnRessurect(); virtual;
 
     function AddAnimationPrefix(const ANameSequence: array of string): TStringArray;
   protected
@@ -377,6 +385,7 @@ type
     procedure Notify_PlayerEnter; override;
 
     procedure AfterRegister; override;
+    function InAbsoluteSight: Boolean;
   public
     procedure WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType); override;
   public
@@ -415,9 +424,10 @@ type
     property ViewAngle: Single read FViewAngle write FViewAngle;
     property ViewRange: Single read FViewRange write FViewRange;
     property ViewWholeRange: Single read FViewWholeRange write FViewWholeRange;
-    function InViewField(const AUnitDir: Integer; const APt: TVec2i): Boolean; overload;
+    function InViewField(const AUnitPos: TVec2i; const AUnitDir: Integer; const APt: TVec2i): Boolean; overload;
     function InViewField(const APt: TVec2i): Boolean; overload;
     function InViewRange(const APt: TVec2i): Boolean;
+    function CanSeeFromPos(const AFromPos: TVec2i; const APos: TVec2i): Boolean; overload;
     function CanSee(const APos: TVec2i): Boolean; overload;
     function CanSee(const AOtherUnit: TRoomUnit): Boolean; overload;
     function GetShootPoints(): IVec2iArr;
@@ -912,6 +922,7 @@ type
     procedure AttachPlayer(const APlayer: TPlayer; const ADoorIdx: Integer);
     procedure AttachPlayer(const APlayer: TPlayer; const ARoomPos: TVec2i; ARoomDir: Integer);
     procedure TryLeaveRoom(const AUnit: TRoomUnit; const ADoorIdx: Integer);
+    function Units: IRoomUnitArr;
 
     procedure SaveRoomMap(const AStream: TStream);
     procedure LoadRoomMap(const AStream: TStream);
@@ -2000,12 +2011,20 @@ end;
 { TBRA_UnitDefaultAttack }
 
 function TBRA_UnitDefaultAttack.ProcessAction: Boolean;
+var buff: IUnitBuff;
 begin
   if FRoomUnit.World.GameTime > FDamageStartTime then
   begin
     FDamageStartTime := HUGE;
-    if FSkill.SampleHitChance(FRoomUnit, FTarget) then
-      FTarget.Room.AddAction(TBRA_MakeDamage.Create(FTarget, FRoomUnit, FSkill.SampleDamage(FRoomUnit, FTarget) ));
+    if FSkill.IsAttackSkill then
+      if FSkill.SampleHitChance(FRoomUnit, FTarget) then
+        FTarget.Room.AddAction(TBRA_MakeDamage.Create(FTarget, FRoomUnit, FSkill.SampleDamage(FRoomUnit, FTarget) ));
+    if FSkill.IsBuffSkill then
+    begin
+      buff := FSkill.SampleBuffChance(FRoomUnit, FTarget);
+      if buff <> nil then
+        FTarget.ApplyBuff(buff);
+    end;
   end;
 
   Result := FRoomUnit.World.GameTime < FActionTime;
@@ -2346,6 +2365,16 @@ begin
 
 end;
 
+procedure TRoomUnit.OnDead();
+begin
+
+end;
+
+procedure TRoomUnit.OnRessurect();
+begin
+
+end;
+
 function TRoomUnit.AddAnimationPrefix(const ANameSequence: array of string): TStringArray;
 var i: Integer;
 begin
@@ -2381,6 +2410,16 @@ begin
 
   if FBuffs = nil then
     FBuffs := TUnitBuffsArr.Create();
+end;
+
+function TRoomUnit.InAbsoluteSight: Boolean;
+var
+  i: Integer;
+begin
+  Result := False;
+  if FBuffs = nil then Exit;
+  for i := 0 to FBuffs.Count - 1 do
+    if FBuffs[i].ID = bidAbsoluteSight then Exit(True);
 end;
 
 procedure TRoomUnit.WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType);
@@ -2476,15 +2515,15 @@ begin
   Result := HP <= 0;
 end;
 
-function TRoomUnit.InViewField(const AUnitDir: Integer; const APt: TVec2i): Boolean;
+function TRoomUnit.InViewField(const AUnitPos: TVec2i; const AUnitDir: Integer; const APt: TVec2i): Boolean;
 var v0, vView, vDir: TVec3;
 begin
-  if APt = RoomPos then Exit(True);
-  v0 := Room.UI.TilePosToWorldPos(RoomPos);
+  if APt = AUnitPos then Exit(True);
+  v0 := Room.UI.TilePosToWorldPos(AUnitPos);
   vDir := Room.UI.TilePosToWorldPos(APt) - v0;
   if LenSqr(vDir) <= ViewWholeRange*ViewWholeRange then Exit(True);
   if LenSqr(vDir) > ViewRange*ViewRange then Exit(False);
-  vView := Room.UI.TilePosToWorldPos(RotateTileCoord(Vec(1,0), AUnitDir) + RoomPos) - v0;
+  vView := Room.UI.TilePosToWorldPos(RotateTileCoord(Vec(1,0), AUnitDir) + AUnitPos) - v0;
   vDir := normalize(vDir);
   vView := normalize(vView);
   Result := dot(vDir, vView) >= Cos(ViewAngle);
@@ -2492,12 +2531,18 @@ end;
 
 function TRoomUnit.InViewField(const APt: TVec2i): Boolean;
 begin
-  Result := InViewField(RoomDir, APt);
+  Result := InViewField(RoomPos, RoomDir, APt);
 end;
 
 function TRoomUnit.InViewRange(const APt: TVec2i): Boolean;
 begin
   Result := LenSqr(Room.UI.TilePosToWorldPos(RoomPos) - Room.UI.TilePosToWorldPos(APt)) <= FViewRange*FViewRange;
+end;
+
+function TRoomUnit.CanSeeFromPos(const AFromPos: TVec2i; const APos: TVec2i): Boolean;
+begin
+  if not InViewField(APos) then Exit(False);
+  Result := Room.RayCastBoolean(RoomPos, APos);
 end;
 
 function TRoomUnit.CanSee(const APos: TVec2i): Boolean;
@@ -2508,6 +2553,7 @@ end;
 
 function TRoomUnit.CanSee(const AOtherUnit: TRoomUnit): Boolean;
 begin
+  if AOtherUnit.InAbsoluteSight then Exit(True);
   if not InViewField(AOtherUnit.RoomPos) then Exit(False);
   Result := Room.RayCastBoolean(RoomPos, AOtherUnit.RoomPos);
 end;
@@ -2678,11 +2724,13 @@ begin
     begin
       FRoom.RemoveObject(Self);
       FRoom.RegInventoryObject(self);
+      OnDead();
     end;
     if (FHP <= 0) and (AValue > 0) then
     begin
       FRoom.PutObject(Self);
       FRoom.UnRegInventoryObject(self);
+      OnRessurect();
     end;
   end;
   FHP := AValue;
@@ -3598,6 +3646,7 @@ begin
   FUnitSkills.Add(TSkill_Kick.Create(nil, 0));
   FUnitSkills.Add(TSkill_Shoot.Create(nil, 0));
   FUnitSkills.Add(TSkill_AxeAttack.Create(nil, 0));
+  FUnitSkills.Add(TSkill_AbsoluteSight.Create(nil, 0));
 
   FSlots10[0] := FUnitSkills[0];
   FSlots10[1] := FUnitSkills[1];
@@ -3615,13 +3664,6 @@ begin
   Inventory().Push(axe, 0);
 
   Inventory().Push(THealBottle.Create, 0);
-
-  //AddModel('Gop_Body', mtDefault);
-  //AddModel('Gop_Bottoms', mtDefault);
-  //AddModel('Gop_Hair', mtDefault);
-  //AddModel('Gop_Hats', mtDefault);
-  //AddModel('Gop_Shoes', mtDefault);
-  //AddModel('Gop_Tops', mtDefault);
 
   SetLength(FAnim, FModels.Count);
   for i := 0 to FModels.Count - 1 do
@@ -4023,7 +4065,12 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string; const ADoors: TD
   var bot: TBot;
   begin
     {$IfDef DEBUGBOTS}
-    bot := TBotMutant1.Create(FMap);
+    //bot := TBotMutant1.Create(FMap);
+    //bot.LoadModels();
+    //bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
+    //FUnits.Add(bot);
+
+    bot := TBotWisp.Create(FMap);
     {$Else}
     if Random(2) = 0 then
       bot := TBotArcher1.Create(FMap)
@@ -4216,6 +4263,11 @@ end;
 procedure TBattleRoom.TryLeaveRoom(const AUnit: TRoomUnit; const ADoorIdx: Integer);
 begin
   FTryLeaveIndex := ADoorIdx;
+end;
+
+function TBattleRoom.Units: IRoomUnitArr;
+begin
+  Result := FUnits;
 end;
 
 {$IfDef FPC}
