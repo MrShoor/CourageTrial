@@ -1385,7 +1385,8 @@ begin
         if Room.InEditMode then
           idx := 1
         else
-          idx := WeightedRandom([5, 50, 2, 1, 1]);
+          //idx := WeightedRandom([5, 50, 2, 1, 1]);
+          idx := WeightedRandom([0, 50, 0, 0, 0]);
         hex[idx].Add(Vec(i,j));
       end;
     end;
