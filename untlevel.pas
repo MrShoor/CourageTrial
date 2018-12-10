@@ -398,6 +398,7 @@ type
     function InAbsoluteSight: Boolean;
   public
     procedure WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType); override;
+    procedure WriteDepthOverrideModels(const ACollection: IavModelInstanceArr; const ADepthOverride: IOverrideColorArr); override;
   public
     property Preview96_128: string read FPreview96_128 write SetPreview96_128;
 
@@ -2497,6 +2498,24 @@ begin
   end;
 end;
 
+procedure TRoomUnit.WriteDepthOverrideModels(const ACollection: IavModelInstanceArr; const ADepthOverride: IOverrideColorArr);
+var overrideColor: TVec3;
+    start, i: Integer;
+begin
+  if IsDead() then Exit;
+  if Self is TPlayer then
+    overrideColor := Vec(0,0,1)
+  else
+    overrideColor := Vec(1,0,0);
+
+  start := ACollection.Count;
+  WriteModels(ACollection, mtDefault);
+  WriteModels(ACollection, mtEmissive);
+
+  for i := start to ACollection.Count - 1 do
+    ADepthOverride.Add(overrideColor);
+end;
+
 procedure TRoomUnit.LoadModels();
 begin
   FViewAngle := Pi / 3;
@@ -3706,7 +3725,7 @@ begin
   Inventory().Push(TScroll_ResonantArmor.Create, 0);
 
   Inventory().Push(THealBottle.Create, 0);
-  Inventory().Push(THealBottle.Create, 0);
+  Inventory().Push(THealBottle2.Create, 0);
 
   SetLength(FAnim, FModels.Count);
   for i := 0 to FModels.Count - 1 do

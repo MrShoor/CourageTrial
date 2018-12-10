@@ -86,6 +86,14 @@ type
     constructor Create; override;
   end;
 
+  { THealBottle2 }
+
+  THealBottle2 = class(THealBottle)
+  public
+    function Ico48 : string; override;
+    constructor Create; override;
+  end;
+
   { TScroll_ResonantArmor }
 
   TScroll_ResonantArmor = class(TUnitItem)
@@ -126,6 +134,19 @@ type
     function ProcessAction: Boolean; override;
     constructor Create(AUnit: TRoomUnit; const AItem: IUnitItem; const ABuff: IUnitBuff);
   end;
+
+{ THealBottle2 }
+
+function THealBottle2.Ico48: string;
+begin
+  Result := 'potion_hp2.png';
+end;
+
+constructor THealBottle2.Create;
+begin
+  inherited Create;
+  FHealEff := 50;
+end;
 
 { TBRA_UseBuffScroll }
 
