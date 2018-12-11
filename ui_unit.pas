@@ -66,8 +66,6 @@ type
 
 implementation
 
-uses Math;
-
 { TavmUnitIco }
 
 procedure TavmUnitIco.DoValidate;
