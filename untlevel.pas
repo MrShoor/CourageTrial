@@ -74,6 +74,15 @@ type
   TRoomObject = class;
   TRoomUnit = class;
 
+  TRoomObjectArr = {$IfDef FPC}specialize{$EndIf} TArray<TRoomObject>;
+  IRoomObjectArr = {$IfDef FPC}specialize{$EndIf} IArray<TRoomObject>;
+  TRoomObjectSet = {$IfDef FPC}specialize{$EndIf} THashSet<TRoomObject>;
+  IRoomObjectSet = {$IfDef FPC}specialize{$EndIf} IHashSet<TRoomObject>;
+  TRoomUnitArr = {$IfDef FPC}specialize{$EndIf} TArray<TRoomUnit>;
+  IRoomUnitArr = {$IfDef FPC}specialize{$EndIf} IArray<TRoomUnit>;
+  TRoomUnitSet = {$IfDef FPC}specialize{$EndIf} THashSet<TRoomUnit>;
+  IRoomUnitSet = {$IfDef FPC}specialize{$EndIf} IHashSet<TRoomUnit>;
+
   TOnLeaveBattleRoom = procedure (const ABattleRoom: TBattleRoom; const ADoorIdx: Integer) of object;
 
   TRoomUnitEqSlot = (esNone, esLeftHand, esRightHand, esBothHands);
@@ -184,6 +193,9 @@ type
     procedure AdjustCameraToPlayer();
     procedure SetCameraBounds(const ABounds: TRectF);
 
+    procedure InvalidateEnemiesBar;
+    procedure SetEnemiesList(const AEnemies: IRoomUnitArr);
+
     procedure AddMessage(const AMsg: string);
 
     procedure UpdateStep(const AIsPlayerTurn: Boolean);
@@ -240,11 +252,6 @@ type
 
     destructor Destroy; override;
   end;
-  TRoomObjectArr = {$IfDef FPC}specialize{$EndIf} TArray<TRoomObject>;
-  IRoomObjectArr = {$IfDef FPC}specialize{$EndIf} IArray<TRoomObject>;
-  TRoomObjectSet = {$IfDef FPC}specialize{$EndIf} THashSet<TRoomObject>;
-  IRoomObjectSet = {$IfDef FPC}specialize{$EndIf} IHashSet<TRoomObject>;
-
   TRoomObjectClass = class of TRoomObject;
 
   { TRoomDoor }
@@ -457,10 +464,6 @@ type
 
     property AnimateState: TRoomUnitAnimateState read FAnimateState write FAnimateState;
   end;
-  TRoomUnitArr = {$IfDef FPC}specialize{$EndIf} TArray<TRoomObject>;
-  IRoomUnitArr = {$IfDef FPC}specialize{$EndIf} IArray<TRoomObject>;
-  TRoomUnitSet = {$IfDef FPC}specialize{$EndIf} THashSet<TRoomObject>;
-  IRoomUnitSet = {$IfDef FPC}specialize{$EndIf} IHashSet<TRoomObject>;
 
   {$ScopedEnums On}
   {$Z4} //this enum must be 4 bytes for directly passing to shaders
@@ -896,6 +899,8 @@ type
     function IsMouseOnUI: Boolean;
     procedure AutoOpenDoors;
     procedure AutoCloseDoors;
+
+    procedure UpdateUnitsAtUI;
   protected
     procedure AfterRegister; override;
     function World: TbWorld;
@@ -2388,11 +2393,13 @@ end;
 procedure TRoomUnit.OnDead();
 begin
   FAnimateState := asDeath;
+  Room.BattleRoom.UI.InvalidateEnemiesBar;
 end;
 
 procedure TRoomUnit.OnRessurect();
 begin
   FAnimateState := asStand;
+  Room.BattleRoom.UI.InvalidateEnemiesBar;
 end;
 
 function TRoomUnit.AddAnimationPrefix(const ANameSequence: array of string): TStringArray;
@@ -3725,6 +3732,9 @@ begin
   Inventory().Push(axe, 0);
 
   Inventory().Push(TScroll_ResonantArmor.Create, 0);
+  Inventory().Push(TScroll_ResonantArmor.Create, 0);
+  Inventory().Push(TScroll_ResonantArmor.Create, 0);
+  Inventory().Push(TScroll_ResonantArmor.Create, 0);
 
   Inventory().Push(THealBottle.Create, 0);
   Inventory().Push(THealBottle2.Create, 0);
@@ -3815,6 +3825,17 @@ begin
           FMap.RoomFloor.FDoors[i].Opened := False;
       end;
   end;
+end;
+
+procedure TBattleRoom.UpdateUnitsAtUI;
+var enemies: IRoomUnitArr;
+    i: Integer;
+begin
+  enemies := TRoomUnitArr.Create();
+  for i := 0 to FUnits.Count - 1 do
+    if not (FUnits[i] is TPlayer) then
+      enemies.Add(FUnits[i]);
+  FUI.SetEnemiesList(enemies);
 end;
 
 procedure TBattleRoom.AfterRegister;
@@ -4291,6 +4312,7 @@ begin
     FUnits.Insert(0, FPlayer);
     FActiveUnit := FUnits.Count - 1;
     FMap.CurrentPlayer := FPlayer;
+    UpdateUnitsAtUI();
     EndTurn();
     AddAction(TBRA_ComingIn.Create(FPlayer, ADoorIdx));
     FTryLeaveIndex := -1;
@@ -4324,6 +4346,7 @@ begin
     FUnits.Insert(0, FPlayer);
     FActiveUnit := FUnits.Count - 1;
     FMap.CurrentPlayer := FPlayer;
+    UpdateUnitsAtUI();
     EndTurn();
   end;
 end;

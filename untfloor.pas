@@ -13,7 +13,7 @@ uses
   avCanvas,
   avContnrsDefaults,
   avPathFinder,
-  ui_unit, ui_inventory, ui_skills, ui_gamecamera, ui_messages;
+  ui_unit, ui_inventory, ui_skills, ui_gamecamera, ui_messages, ui_enemies;
 
 type
   TFloorMap = class;
@@ -25,6 +25,7 @@ type
   private
     FRootControl    : TavmCameraControl;
     FUnitMenu       : TavmCustomControl;
+    FEnemiesBar     : TavmEnemiesBar;
     FPlayerInventory: TavmCustomControl;
     FPlayerSkills   : TavmCustomControl;
     FOtherInventory : TavmCustomControl;
@@ -40,6 +41,9 @@ type
 
     procedure AdjustCameraToPlayer();
     procedure SetCameraBounds(const ABounds: TRectF);
+
+    procedure InvalidateEnemiesBar;
+    procedure SetEnemiesList(const AEnemies: IRoomUnitArr);
 
     procedure AddMessage(const AMsg: string);
     procedure UpdateStep(const AIsPlayerTurn: Boolean);
@@ -186,8 +190,9 @@ end;
 
 procedure TGameUI.SetActiveUnit(const ARoomUnit: TRoomUnit);
 begin
-  (FUnitMenu as TavmUnitMenu).RoomUnit := ARoomUnit;
-  (FUnitMenu as TavmUnitMenu).SkillSlots.ActiveSkill := nil;
+  FEnemiesBar.SetHighlighedEnemy(ARoomUnit);
+  if ARoomUnit is TPlayer then
+    (FUnitMenu as TavmUnitMenu).RoomUnit := ARoomUnit;
 end;
 
 procedure TGameUI.AddMessage(const AMsg: string);
@@ -214,6 +219,16 @@ end;
 procedure TGameUI.SetCameraBounds(const ABounds: TRectF);
 begin
   FRootControl.FloorBoundingRect := ABounds;
+end;
+
+procedure TGameUI.InvalidateEnemiesBar;
+begin
+  FEnemiesBar.Invalidate;
+end;
+
+procedure TGameUI.SetEnemiesList(const AEnemies: IRoomUnitArr);
+begin
+  FEnemiesBar.SetEnemies(AEnemies);
 end;
 
 procedure TGameUI.AlignControls;
@@ -307,6 +322,8 @@ begin
   menu.OnEndTurnClick := {$IfDef FPC}@{$EndIf}DoOnEndTurnBtnClick;
   menu.OnAdjustToUnit := {$IfDef FPC}@{$EndIf}DoOnAdjustCameraToUnit;
   FUnitMenu := menu;
+
+  FEnemiesBar := TavmEnemiesBar.Create(FRootControl);
 
   inv_ui := TavmInventory.Create(FRootControl);
   FPlayerInventory := inv_ui;

@@ -115,7 +115,7 @@
         <PackageName Value="LCL"/>
       </Item4>
     </RequiredPackages>
-    <Units Count="19">
+    <Units Count="21">
       <Unit0>
         <Filename Value="CT.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -206,6 +206,15 @@
         <Filename Value="ui_buffs.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit18>
+      <Unit19>
+        <Filename Value="untbuffs.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="untBuffs"/>
+      </Unit19>
+      <Unit20>
+        <Filename Value="ui_enemies.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit20>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
