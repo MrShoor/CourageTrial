@@ -458,8 +458,6 @@ procedure TavmInventory.DoValidate;
       if AEquipped then
         Canvas.AddSprite(cellRB - Vec(16,16), cellRB, ExeRelativeFileName('ui\items\equipped.png'));
     end;
-
-    Canvas.AddRectangle(ACellPos, cellRB);
   end;
 
 var
@@ -486,6 +484,18 @@ begin
       itemSprite := GetCellSpriteInfo(i, j, itemEquipped);
       DrawItemSprite(cellPos, itemSprite, itemEquipped);
 
+      cellPos.x := cellPos.x + cCellSize + cCellBorderSize;
+    end;
+    cellPos.y := cellPos.y + cCellSize + cCellBorderSize;
+  end;
+
+  cellPos.y := cCellBorderSize;
+  for j := 0 to FGridHeight - 1 do
+  begin
+    cellPos.x := cCellBorderSize;
+    for i := 0 to FGridWidth - 1 do
+    begin
+      Canvas.AddRectangle(cellPos, cellPos + Vec(cCellSize, cCellSize));
       cellPos.x := cellPos.x + cCellSize + cCellBorderSize;
     end;
     cellPos.y := cellPos.y + cCellSize + cCellBorderSize;

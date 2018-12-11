@@ -106,7 +106,11 @@ begin
         Canvas.AddSprite(rct.min, rct.max, 'ui\units\skull.png');
       end;
     end;
+  end;
 
+  for i := 0 to EnemiesCount - 1 do
+  begin
+    rct := ItemRect(i);
     if i = FHighlightedIdx then
     begin
       Canvas.Pen.Color := Vec(1, 215/255, 0, 1);

@@ -766,8 +766,6 @@ procedure TavmSkills.DoValidate;
         Canvas.Brush.Color := Vec(0.3,0.3,0.3,0.3);
       Canvas.AddSprite(ACellPos, cellRB, ASpriteFile);
     end;
-
-    Canvas.AddRectangle(ACellPos, cellRB);
   end;
 
 var
@@ -806,6 +804,18 @@ begin
       itemSprite := GetCellSpriteInfo(i, j, skillReady);
       DrawItemSprite(cellPos, itemSprite, skillReady);
 
+      cellPos.x := cellPos.x + cCellSize + cCellBorderSize;
+    end;
+    cellPos.y := cellPos.y + cCellSize + cCellBorderSize;
+  end;
+
+  cellPos.y := cCellBorderSize;
+  for j := 0 to FGridHeight - 1 do
+  begin
+    cellPos.x := cCellBorderSize;
+    for i := 0 to FGridWidth - 1 do
+    begin
+      Canvas.AddRectangle(cellPos, cellPos + Vec(cCellSize, cCellSize));
       cellPos.x := cellPos.x + cCellSize + cCellBorderSize;
     end;
     cellPos.y := cellPos.y + cCellSize + cCellBorderSize;
