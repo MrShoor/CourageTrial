@@ -27,6 +27,8 @@ type
     FHighlightedIdx: Integer;
     function IndexOf(const AEnemy: TRoomUnit): Integer;
     function ItemRect(const AEnemyIndex: Integer): TRectF;
+    procedure GetUnitHP(const AEnemyIndex: Integer; out ACurrentHP, AMaxHP: Integer);
+    function HPBarRect(const AEnemyIndex: Integer; const ACurrentHpOnly: Boolean): TRectF;
     procedure AdjustSize;
   protected
     procedure AfterRegister; override;
@@ -41,6 +43,8 @@ type
   end;
 
 implementation
+
+uses Math;
 
 { TavmEnemiesBar }
 
@@ -58,6 +62,37 @@ begin
   Result.min.x := AEnemyIndex * (cPicSizeX + cBorderSize) + cBorderSize;
   Result.min.y := cBorderSize;
   Result.max := Result.min + Vec(cPicSizeX, cPicSizeY);
+end;
+
+procedure TavmEnemiesBar.GetUnitHP(const AEnemyIndex: Integer; out ACurrentHP,
+  AMaxHP: Integer);
+var
+  unt: TRoomUnit;
+begin
+  unt := Enemy(AEnemyIndex);
+  if unt = nil then
+  begin
+    ACurrentHP := 0;
+    AMaxHP := 0;
+  end
+  else
+  begin
+    ACurrentHP := Clamp(unt.HP, 0, unt.MaxHP);
+    AMaxHP := unt.MaxHP;
+  end;
+end;
+
+function TavmEnemiesBar.HPBarRect(const AEnemyIndex: Integer; const ACurrentHpOnly: Boolean): TRectF;
+var hp, hpmax: Integer;
+begin
+  Result := ItemRect(AEnemyIndex);
+  Result.Top := Result.Bottom + cBorderSize;
+  Result.Bottom := Result.Top + 16;
+  if ACurrentHpOnly then
+  begin
+    GetUnitHP(AEnemyIndex, hp, hpmax);
+    Result.Right := Lerp(Result.Left, Result.Right, hp / max(1, hpmax));
+  end;
 end;
 
 procedure TavmEnemiesBar.AdjustSize;
@@ -82,10 +117,14 @@ procedure TavmEnemiesBar.DoValidate;
 var i: Integer;
     unt: TRoomUnit;
     rct: TRectF;
+    hp, hpmax: Integer;
+    tb: ITextBuilder;
+    tl: ITextLines;
 begin
   inherited DoValidate;
   Canvas.Clear;
 
+  //portraits
   for i := 0 to EnemiesCount - 1 do
   begin
     unt := Enemy(i);
@@ -108,6 +147,49 @@ begin
     end;
   end;
 
+  //hp bars
+  for i := 0 to EnemiesCount - 1 do
+  begin
+    Canvas.Brush.Color := Vec(0.125, 0.125, 0.125, 1);
+    rct := HPBarRect(i, False);
+    Canvas.AddFill(rct.min, rct.max);
+
+    Canvas.Brush.Color := Vec(1, 0, 0, 1);
+    rct := HPBarRect(i, True);
+    Canvas.AddFill(rct.min, rct.max);
+  end;
+
+  //hp bar text
+  Canvas.Font.Size := 16;
+  for i := 0 to EnemiesCount - 1 do
+  begin
+    rct := HPBarRect(i, False);
+    GetUnitHP(i, hp, hpmax);
+    if hpmax > 0 then
+    begin
+      tb := Canvas.TextBuilder;
+      tb.Align := laCenter;
+      tb.Write(IntToStr(hp));
+      tb.Write('/');
+      tb.Write(IntToStr(hpmax));
+      tl := tb.Finish();
+      tl.BoundsX := Vec(rct.min.x, rct.max.x);
+      tl.BoundsY := Vec(rct.min.y, rct.max.y);
+      tl.VAlign := 0.5;
+      Canvas.AddText(tl);
+    end;
+  end;
+
+  //hp bar outlines
+  Canvas.Pen.Color := Vec(0, 0, 0, 1);
+  Canvas.Pen.Width := 1;
+  for i := 0 to EnemiesCount - 1 do
+  begin
+    rct := HPBarRect(i, False);
+    Canvas.AddRectangle(rct.min, rct.max);
+  end;
+
+  //portraits outlines
   for i := 0 to EnemiesCount - 1 do
   begin
     rct := ItemRect(i);

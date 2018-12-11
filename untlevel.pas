@@ -2802,6 +2802,11 @@ begin
     end;
   end;
   FHP := AValue;
+
+  if Room <> nil then
+    if Room.BattleRoom <> nil then
+      if Room.BattleRoom.UI <> nil then
+        Room.BattleRoom.UI.InvalidateEnemiesBar;
 end;
 
 { TRoomObject }
