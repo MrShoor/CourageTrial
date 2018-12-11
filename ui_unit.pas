@@ -8,7 +8,7 @@ unit ui_unit;
 interface
 
 uses
-  Classes, SysUtils, avMiniControls, avCanvas, untLevel, mutils, ui_skills;
+  Classes, SysUtils, avMiniControls, avBase, avCanvas, untLevel, mutils, ui_skills;
 
 type
 
@@ -21,6 +21,15 @@ type
   public
   end;
 
+  { TavmUnitIco }
+
+  TavmUnitIco = class(TavmCustomButton)
+  protected
+    procedure DoValidate; override;
+  public
+    constructor Create(AParent: TavObject); override;
+  end;
+
   { TavmUnitMenu }
 
   TavmUnitMenu = class(TavmCustomControl)
@@ -31,10 +40,13 @@ type
     FLastAP: Integer;
 
     FEndTurnBtn: TavmUnitBtn;
+    FUnitIco : TavmUnitIco;
 
     FSkillSlots: TavmSkills;
 
+    function GetOnAdjustToUnit: TNotifyEvent;
     function GetOnEndTurnClick: TNotifyEvent;
+    procedure SetOnAdjustToUnit(const AValue: TNotifyEvent);
     procedure SetOnEndTurnClick(const AValue: TNotifyEvent);
     procedure SetRoomUnit(const AValue: TRoomUnit);
   protected
@@ -45,11 +57,30 @@ type
     property SkillSlots: TavmSkills read FSkillSlots;
     property RoomUnit: TRoomUnit read FRoomUnit write SetRoomUnit;
     property OnEndTurnClick: TNotifyEvent read GetOnEndTurnClick write SetOnEndTurnClick;
+    property OnAdjustToUnit: TNotifyEvent read GetOnAdjustToUnit write SetOnAdjustToUnit;
   end;
 
 implementation
 
 uses Math;
+
+{ TavmUnitIco }
+
+procedure TavmUnitIco.DoValidate;
+begin
+  inherited DoValidate;
+  if Text <> '' then
+    Canvas.AddSprite(Vec(0, 0), Size, Text);
+  Canvas.Pen.Color := Vec(0,0,0,1);
+  Canvas.Pen.Width := 4;
+  Canvas.AddRectangle(Vec(0, 0), Size);
+end;
+
+constructor TavmUnitIco.Create(AParent: TavObject);
+begin
+  inherited Create(AParent);
+  Size := Vec(96, 128);
+end;
 
 { TavmUnitBtn }
 
@@ -91,6 +122,16 @@ begin
   Result := FEndTurnBtn.OnClick;
 end;
 
+function TavmUnitMenu.GetOnAdjustToUnit: TNotifyEvent;
+begin
+  Result := FUnitIco.OnClick;
+end;
+
+procedure TavmUnitMenu.SetOnAdjustToUnit(const AValue: TNotifyEvent);
+begin
+  FUnitIco.OnClick := AValue;
+end;
+
 procedure TavmUnitMenu.SetOnEndTurnClick(const AValue: TNotifyEvent);
 begin
   FEndTurnBtn.OnClick := AValue;
@@ -101,6 +142,10 @@ begin
   if FRoomUnit = AValue then Exit;
   FRoomUnit := AValue;
   FSkillSlots.Skills := TSkillSlots10Adapter.Create(AValue);
+  if FRoomUnit = nil then
+    FUnitIco.Text := ''
+  else
+    FUnitIco.Text := FRoomUnit.Preview96_128;
   Invalidate;
 end;
 
@@ -193,12 +238,12 @@ begin
   end;
 
   //
-  lt := Vec(32, Size.y*0.5 - 64);
-  rb := lt + Vec(96, 128);
-  Canvas.AddSprite(lt, rb, RoomUnit.Preview96_128);
-  Canvas.Pen.Color := Vec(0,0,0,1);
-  Canvas.Pen.Width := 4;
-  Canvas.AddRectangle(lt, rb);
+  //lt := Vec(32, Size.y*0.5 - 64);
+  //rb := lt + Vec(96, 128);
+  //Canvas.AddSprite(lt, rb, RoomUnit.Preview96_128);
+  //Canvas.Pen.Color := Vec(0,0,0,1);
+  //Canvas.Pen.Width := 4;
+  //Canvas.AddRectangle(lt, rb);
 end;
 
 procedure TavmUnitMenu.AfterRegister;
@@ -211,6 +256,10 @@ begin
   FEndTurnBtn.Pos := Vec((Size.x + cHPBarWidth)*0.5 + 30, 20);
   FEndTurnBtn.Size := Vec(250, 40);
   FEndTurnBtn.Text := 'End turn';
+
+  FUnitIco := TavmUnitIco.Create(Self);
+  FUnitIco.Origin := Vec(0, 0);
+  FUnitIco.Pos := Vec(32, Size.y*0.5 - 64);
 
   FSkillSlots := TavmSkills.Create(Self);
   FSkillSlots.GridWidth := 10;

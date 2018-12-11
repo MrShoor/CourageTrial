@@ -23,7 +23,7 @@ type
 
   TGameUI = class(TavMainRenderChild, IGameUI)
   private
-    FRootControl    : TavmBaseControl;
+    FRootControl    : TavmCameraControl;
     FUnitMenu       : TavmCustomControl;
     FPlayerInventory: TavmCustomControl;
     FPlayerSkills   : TavmCustomControl;
@@ -38,11 +38,15 @@ type
     procedure SetPlayerActiveSkill(const ASkill: IUnitSkill);
     procedure SetOtherInventory(const AInventory: IInventory);
 
+    procedure AdjustCameraToPlayer();
+    procedure SetCameraBounds(const ABounds: TRectF);
+
     procedure AddMessage(const AMsg: string);
     procedure UpdateStep(const AIsPlayerTurn: Boolean);
   private
     procedure AlignControls;
     procedure DoOnEndTurnBtnClick(ASender: TObject);
+    procedure DoOnAdjustCameraToUnit(ASender: TObject);
   private
     function QueryInterface({$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;out obj) : HRes;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
     function _AddRef : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
@@ -103,6 +107,7 @@ type
     procedure SetCurrentRoom(const ARoomCoord: TVec2i);
 
     procedure ShowAllRooms();
+    procedure UpdateBoundsAtVisibleRooms;
   protected
     procedure AfterRegister; override;
   public
@@ -201,6 +206,16 @@ begin
     TavmUnitMenu(FUnitMenu).SkillSlots.ActiveSkill := nil;
 end;
 
+procedure TGameUI.AdjustCameraToPlayer();
+begin
+  DoOnAdjustCameraToUnit(nil);
+end;
+
+procedure TGameUI.SetCameraBounds(const ABounds: TRectF);
+begin
+  FRootControl.FloorBoundingRect := ABounds;
+end;
+
 procedure TGameUI.AlignControls;
 begin
   if FPlayerSkills <> nil then
@@ -212,6 +227,14 @@ end;
 procedure TGameUI.DoOnEndTurnBtnClick(ASender: TObject);
 begin
   if Assigned(FOnEndTurnBtnClick) then FOnEndTurnBtnClick(Self);
+end;
+
+procedure TGameUI.DoOnAdjustCameraToUnit(ASender: TObject);
+var unt: TRoomUnit;
+begin
+  unt := TavmUnitMenu(FUnitMenu).RoomUnit;
+  if unt = nil then Exit;
+  FRootControl.LookAt(unt.Room.UI.TilePosToWorldPos(unt.RoomPos), True);
 end;
 
 function TGameUI.QueryInterface({$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;out obj) : HRes;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
@@ -282,6 +305,7 @@ begin
 
   menu := TavmUnitMenu.Create(FRootControl);
   menu.OnEndTurnClick := {$IfDef FPC}@{$EndIf}DoOnEndTurnBtnClick;
+  menu.OnAdjustToUnit := {$IfDef FPC}@{$EndIf}DoOnAdjustCameraToUnit;
   FUnitMenu := menu;
 
   inv_ui := TavmInventory.Create(FRootControl);
@@ -377,6 +401,7 @@ begin
     pRoom^.room := broom;
   end;
   Result := pRoom^.room;
+  UpdateBoundsAtVisibleRooms;
 end;
 
 function TFloorMap.GetRoomDoors(const ARoomCoord: TVec2i): TDoors;
@@ -423,6 +448,8 @@ begin
   if FPlayer = nil then CreatePlayer;
   FUI.SetPlayer(FPlayer);
   FCurrentRoom.AttachPlayer(FPlayer, Vec(0,0), 0);
+
+  FUI.AdjustCameraToPlayer();
 end;
 
 procedure TFloorMap.ShowAllRooms();
@@ -431,6 +458,27 @@ begin
   FRooms.Reset;
   while FRooms.NextKey(roomCoords) do
     ObtainBattleRoom(roomCoords);
+end;
+
+procedure TFloorMap.UpdateBoundsAtVisibleRooms;
+var crd: TVec2i;
+    broomAdapt: TBattleRoomAdapter;
+    broom: TBattleRoom;
+    box: TAABB;
+begin
+  box := EmptyAABB;
+  FRooms.Reset;
+  while FRooms.Next(crd, broomAdapt) do
+  begin
+    if broomAdapt.room <> nil then
+      broom := broomAdapt.room
+    else
+      broom := broomAdapt.dummy;
+    if broom <> nil then
+      box := box + AABB(broom.WorldPos - Vec(21, 2, 21), broom.WorldPos + Vec(21, 5, 21));
+  end;
+  if not box.IsEmpty then
+    FUI.SetCameraBounds(RectF(Vec(box.min.x, box.min.z), Vec(box.max.x, box.max.z)));
 end;
 
 procedure TFloorMap.AfterRegister;
@@ -471,6 +519,7 @@ begin
   //FRooms.Add(Vec(6, 0), empty);
 
   SetCurrentRoom(Vec(0, 0));
+
   ShowAllRooms();
 end;
 

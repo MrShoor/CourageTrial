@@ -181,6 +181,8 @@ type
     procedure SetActiveUnit(const ARoomUnit: TRoomUnit);
     procedure SetPlayerActiveSkill(const ASkill: IUnitSkill);
     procedure SetOtherInventory(const AInventory: IInventory);
+    procedure AdjustCameraToPlayer();
+    procedure SetCameraBounds(const ABounds: TRectF);
 
     procedure AddMessage(const AMsg: string);
 

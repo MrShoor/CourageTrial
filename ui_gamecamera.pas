@@ -29,6 +29,18 @@ type
     FHoldPt: TVec3;
     FYPlane: Single;
 
+    FFloorBoundingRect: TRectF;
+
+    FSmoothPlaying: Boolean;
+    FTargetPos    : TVec3;
+    FTargetYaw    : Single;
+    FTargetPitch  : Single;
+    FTargetDist   : Single;
+
+    procedure StopPlaying(const AAtEnd: Boolean = False);
+    procedure PlayAt(const ATargetPos: TVec3; ATargetYaw, ATargetPitch, ATargetDist: Single);
+
+    procedure SetFloorBoundingRect(const AValue: TRectF);
     procedure UpdateCameraPosition;
   protected
     procedure AfterRegister; override;
@@ -39,12 +51,16 @@ type
     procedure Notify_MouseWheel(const APt: TVec2; AWheelShift: Integer; AShifts: TShifts); override;
     procedure Notify_MouseDown(ABtn: Integer; const APt: TVec2; AShifts: TShifts); override;
     procedure Notify_MouseUp(ABtn: Integer; const APt: TVec2; AShifts: TShifts); override;
+
+    procedure OnUPS; override;
   public
     property YPlane: Single read FYPlane write FYPlane;
     property RotateSens: Single read FRotateSens write FRotateSens;
     property WheelSens : Single read FWheelSens  write FWheelSens;
 
-    procedure LookAt(const APt: TVec3); overload;
+    property FloorBoundingRect: TRectF read FFloorBoundingRect write SetFloorBoundingRect;
+
+    procedure LookAt(const APt: TVec3; ASmooth: Boolean = False); overload;
     procedure LookAt(const APt, AViewDir: TVec3); overload;
   end;
 
@@ -57,17 +73,57 @@ uses
 
 procedure TavmCameraControl.UpdateCameraPosition;
 var viewDir: TVec3;
+    pt: TVec2;
 begin
+  if not FFloorBoundingRect.IsEmpty then
+  begin
+    pt.x := Clamp(Main.Camera.At.x, FFloorBoundingRect.min.x, FFloorBoundingRect.max.x);
+    pt.y := Clamp(Main.Camera.At.z, FFloorBoundingRect.min.y, FFloorBoundingRect.max.y);
+    Main.Camera.At := Vec(pt.x, FYPlane, pt.y);
+  end;
+
   viewDir := Quat(Vec(0,0,-1), FPitch) * Vec(FDist,0,0);
   viewDir := Quat(Vec(0,-1,0), FYaw) * viewDir;
   Main.Camera.Eye := Main.Camera.At + viewDir;
+end;
+
+procedure TavmCameraControl.StopPlaying(const AAtEnd: Boolean);
+begin
+  if not FSmoothPlaying then Exit;
+  FSmoothPlaying := False;
+  UPSUnSubscribe;
+
+  if AAtEnd then
+  begin
+    FDist := FTargetDist;
+    FYaw := FTargetYaw;
+    FPitch := FTargetPitch;
+    Main.Camera.At := FTargetPos;
+    UpdateCameraPosition;
+  end;
+end;
+
+procedure TavmCameraControl.PlayAt(const ATargetPos: TVec3; ATargetYaw, ATargetPitch, ATargetDist: Single);
+begin
+  FTargetDist := ATargetDist;
+  FTargetPos := ATargetPos;
+  FTargetPitch := ATargetPitch;
+  FTargetYaw := ATargetYaw;
+  FSmoothPlaying := True;
+  UPSSubscribe;
+end;
+
+procedure TavmCameraControl.SetFloorBoundingRect(const AValue: TRectF);
+begin
+  if FFloorBoundingRect = AValue then Exit;
+  FFloorBoundingRect := AValue;
 end;
 
 procedure TavmCameraControl.AfterRegister;
 begin
   inherited AfterRegister;
   //FYPlane := 1;
-  FYPlane := 0;
+  FYPlane := 0.7;
   FDragPlane := Plane(0, 1, 0, -FYPlane);
   FRotateSens := 0.005;
   FWheelSens := 1/1.15;
@@ -103,14 +159,16 @@ begin
         if Intersect(FDragPlane, Main.Cursor.Ray, IntPt) then
         begin
           Main.Camera.At := Main.Camera.At - (IntPt - FHoldPt);
+          StopPlaying;
           UpdateCameraPosition;
         end;
     end
     else
     begin
       FYaw := FYaw + delta.x * FRotateSens;
-      //FPitch := Clamp(FPitch + delta.y * FRotateSens, 0.1*Pi, 0.49*Pi);
-      FPitch := Clamp(FPitch + delta.y * FRotateSens, -0.49*Pi, 0.49*Pi);
+      FPitch := Clamp(FPitch + delta.y * FRotateSens, 0.1*Pi, 0.49*Pi);
+      //FPitch := Clamp(FPitch + delta.y * FRotateSens, -0.49*Pi, 0.49*Pi);
+      StopPlaying;
       UpdateCameraPosition;
     end;
   end;
@@ -121,6 +179,7 @@ begin
   inherited Notify_MouseWheel(APt, AWheelShift, AShifts);
   FDist := FDist * Power(FWheelSens, AWheelShift);
   FDist := Clamp(FDist, 1, 150);
+  StopPlaying;
   UpdateCameraPosition;
 end;
 
@@ -137,18 +196,48 @@ begin
   inherited Notify_MouseUp(ABtn, APt, AShifts);
 end;
 
-procedure TavmCameraControl.LookAt(const APt: TVec3);
+procedure TavmCameraControl.OnUPS;
+const cSpeed = 0.07;
 begin
-  Main.Camera.At := Vec(APt.x, FYPlane, APt.z);
-  FDist := 5;
-  UpdateCameraPosition;
+  if FSmoothPlaying then
+  begin
+    FDist := Lerp(FDist, FTargetDist, cSpeed);
+    FYaw := Lerp(FYaw, FTargetYaw, cSpeed);
+    FPitch := Lerp(FPitch, FTargetPitch, cSpeed);
+    Main.Camera.At := Lerp(Main.Camera.At, FTargetPos, cSpeed);
+    if (abs(FDist - FTargetDist) < 0.001) and
+       (abs(FYaw - FTargetYaw) < 0.005) and
+       (abs(FPitch - FTargetPitch) < 0.005) and
+       (LenSqr(Main.Camera.At - FTargetPos) < 0.0001) then
+    begin
+      StopPlaying(True);
+    end
+    else
+      UpdateCameraPosition;
+  end;
+end;
+
+procedure TavmCameraControl.LookAt(const APt: TVec3; ASmooth: Boolean);
+begin
+  StopPlaying;
+  if ASmooth then
+  begin
+    PlayAt(Vec(APt.x, FYPlane, APt.z), FYaw, FPitch, 7.5);
+  end
+  else
+  begin
+    Main.Camera.At := Vec(APt.x, FYPlane, APt.z);
+    FDist := 5;
+    UpdateCameraPosition;
+  end;
 end;
 
 procedure TavmCameraControl.LookAt(const APt, AViewDir: TVec3);
 begin
+  StopPlaying;
   Main.Camera.At := Vec(APt.x, FYPlane, APt.z);
   FYaw  := -arctan2(-AViewDir.z, -AViewDir.x);
-  FDist := 5;
+  FDist := 7.5;
   UpdateCameraPosition;
 end;
 
