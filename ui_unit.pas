@@ -8,7 +8,7 @@ unit ui_unit;
 interface
 
 uses
-  Classes, SysUtils, avMiniControls, avBase, avCanvas, untLevel, mutils, ui_skills;
+  Classes, SysUtils, avMiniControls, avBase, avCanvas, untLevel, mutils, ui_skills, ui_buffs;
 
 type
 
@@ -33,8 +33,11 @@ type
   { TavmUnitMenu }
 
   TavmUnitMenu = class(TavmCustomControl)
-  private const
-    cHPBarWidth = 530;
+  const
+    cHPBarWidth = 536;
+    cHPBarTop = 84;
+    cAPBarTop = 53;
+    cSkillSlotsTop = 154;
   private
     FRoomUnit: TRoomUnit;
     FLastAP: Integer;
@@ -43,6 +46,7 @@ type
     FUnitIco : TavmUnitIco;
 
     FSkillSlots: TavmSkills;
+    FBuffsBar: TavmUnitBuffs;
 
     function GetOnAdjustToUnit: TNotifyEvent;
     function GetOnEndTurnClick: TNotifyEvent;
@@ -69,10 +73,11 @@ uses Math;
 procedure TavmUnitIco.DoValidate;
 begin
   inherited DoValidate;
+  Canvas.Clear;
   if Text <> '' then
     Canvas.AddSprite(Vec(0, 0), Size, Text);
   Canvas.Pen.Color := Vec(0,0,0,1);
-  Canvas.Pen.Width := 4;
+  Canvas.Pen.Width := 1;
   Canvas.AddRectangle(Vec(0, 0), Size);
 end;
 
@@ -143,17 +148,19 @@ begin
   FRoomUnit := AValue;
   FSkillSlots.Skills := TSkillSlots10Adapter.Create(AValue);
   if FRoomUnit = nil then
-    FUnitIco.Text := ''
+  begin
+    FUnitIco.Text := '';
+    FBuffsBar.Buffs := nil;
+  end
   else
+  begin
     FUnitIco.Text := FRoomUnit.Preview96_128;
+    FBuffsBar.Buffs := FRoomUnit.AllBuffs();
+  end;
   Invalidate;
 end;
 
 procedure TavmUnitMenu.DoValidate;
-
-const
-  cBuffCellSize = 48;
-  cBuffSpacing = 5;
 
   procedure BuildHPText(const lt, rb: TVec2);
   var text: ITextLines;
@@ -174,8 +181,6 @@ var lt, rb, elsize: TVec2;
     cellpos: TVec2;
     cellname: string;
     i: Integer;
-
-    buffs: IUnitBuffsArr;
 begin
   inherited DoValidate;
   Canvas.Clear;
@@ -186,14 +191,14 @@ begin
   //hp bar
     //background
   elsize := Vec(cHPBarWidth, 64);
-  lt := Vec((Size.x - elsize.x)*0.5, 0);
+  lt := Vec((Size.x - elsize.x)*0.5, cHPBarTop);
   rb := lt + elsize;
   Canvas.Brush.Color := Vec(0.3,0.3,0.3,0.3);
   Canvas.AddFill(lt, rb);
   Canvas.AddRectangle(lt, rb);
     //hp
   elsize := Vec(cHPBarWidth - 60, 24);
-  lt := Vec((Size.x - elsize.x)*0.5, 24);
+  lt := Vec((Size.x - elsize.x)*0.5, cHPBarTop + 24);
   rb.x := Lerp(lt.x, lt.x + elsize.x, clamp(RoomUnit.HP / RoomUnit.MaxHP, 0.0, 1.0));
   rb.y := lt.y + elsize.y;
   Canvas.Brush.Color := Vec(1,0,0,1);
@@ -214,58 +219,41 @@ begin
   elsize := Vec((RoomUnit.MaxAP - 1.0)*26.0, 26);
   for i := 0 to RoomUnit.MaxAP - 1 do
   begin
-    cellpos.y := -elsize.y*0.5;
+    cellpos.y := cAPBarTop;
     cellpos.x := Lerp((Size.x - elsize.x)*0.5, (Size.x + elsize.x)*0.5, i / (RoomUnit.MaxAP - 1));
     if i < RoomUnit.AP then
       cellname := 'ui\greencell.png'
     else
       cellname := 'ui\emptycell.png';
-    Canvas.AddSprite(cellpos - Vec(13, 13), cellpos + Vec(13, 13), cellname);
+    Canvas.AddSprite(cellpos - Vec(13, 0), cellpos + Vec(13, 26), cellname);
   end;
   FLastAP := RoomUnit.AP;
-
-  //Buffs bar
-  buffs := RoomUnit.AllBuffs();
-  for i := 0 to buffs.Count - 1 do
-  begin
-    cellpos.y := -35 - cBuffCellSize div 2;
-    cellpos.x := (size.x - (buffs.Count * cBuffCellSize + (buffs.Count - 1) * cBuffSpacing)) * 0.5;
-    cellpos.x := cellpos.x + (i+0.5) * cBuffCellSize + Max(i - 1, 0) * cBuffSpacing;
-
-    cellpos.x := cellpos.x - cBuffCellSize div 2;
-    cellpos.y := cellpos.y - cBuffCellSize div 2;
-    Canvas.AddSprite(cellpos, cellpos + Vec(cBuffCellSize, cBuffCellSize), 'ui\buffs\' + buffs[i].Ico);
-  end;
-
-  //
-  //lt := Vec(32, Size.y*0.5 - 64);
-  //rb := lt + Vec(96, 128);
-  //Canvas.AddSprite(lt, rb, RoomUnit.Preview96_128);
-  //Canvas.Pen.Color := Vec(0,0,0,1);
-  //Canvas.Pen.Width := 4;
-  //Canvas.AddRectangle(lt, rb);
 end;
 
 procedure TavmUnitMenu.AfterRegister;
 begin
   inherited AfterRegister;
   Origin := Vec(0.5, 1.0);
-  Size := Vec(1100, 200);
+  Size := Vec(740, 223);
 
   FEndTurnBtn := TavmUnitBtn.Create(Self);
-  FEndTurnBtn.Pos := Vec((Size.x + cHPBarWidth)*0.5 + 30, 20);
-  FEndTurnBtn.Size := Vec(250, 40);
-  FEndTurnBtn.Text := 'End turn';
+  FEndTurnBtn.Size := Vec(96, 64);
+  FEndTurnBtn.Pos := Vec(Size.x - FEndTurnBtn.Size.x, cHPBarTop);
+  FEndTurnBtn.Text := 'Конец хода';
 
   FUnitIco := TavmUnitIco.Create(Self);
   FUnitIco.Origin := Vec(0, 0);
-  FUnitIco.Pos := Vec(32, Size.y*0.5 - 64);
+  FUnitIco.Pos := Vec(0, cHPBarTop);
 
   FSkillSlots := TavmSkills.Create(Self);
   FSkillSlots.GridWidth := 10;
   FSkillSlots.GridHeight := 1;
   FSkillSlots.Origin := Vec(0.5, 0);
   FSkillSlots.HintDirection := Vec(0, -1.5);
+
+  FBuffsBar := TavmUnitBuffs.Create(Self);
+  FBuffsBar.Origin := Vec(0.5, 0.0);
+  FBuffsBar.Pos := Vec(Size.x * 0.5, 0);
 end;
 
 procedure TavmUnitMenu.DrawControl(const AMat: TMat3);
@@ -274,7 +262,7 @@ begin
   if FLastAP <> RoomUnit.AP then Invalidate;
 
   Pos := Vec(Main.WindowSize.x * 0.5, Main.WindowSize.y);
-  FSkillSlots.Pos := Vec(Size.x*0.5, 100);
+  FSkillSlots.Pos := Vec(Size.x*0.5, cSkillSlotsTop);
   inherited DrawControl(AMat);
 end;
 

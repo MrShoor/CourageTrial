@@ -11,7 +11,7 @@ uses
   Forms, untMain, untLevel, untEnemies, untGraphics, ui_unit, untObstacles,
   untItems, ui_inventory, ui_gamecamera, untWayPoint, untSkills, ui_skills,
   ui_scroll, untInteractiveObjects, ui_messages, untbuffs, untRoomObstacles,
-  untFloor
+  untFloor, ui_buffs
   { you can add units after this };
 
 {$R *.res}
