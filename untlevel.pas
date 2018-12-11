@@ -4195,11 +4195,11 @@ begin
   FMap := TRoomMap.Create(Self);
   FMap.SetDoorsRadius(doors, cRoomRadius);
 
-  FEmptyLight := World.Renderer.CreatePointLight();
-  FEmptyLight.Pos := Vec(0, 10, 0);
-  FEmptyLight.Radius := 50;
-  FEmptyLight.Color := Vec(1,1,1);
-  FEmptyLight.CastShadows := st1024;
+  //FEmptyLight := World.Renderer.CreatePointLight();
+  //FEmptyLight.Pos := Vec(0, 10, 0);
+  //FEmptyLight.Radius := 50;
+  //FEmptyLight.Color := Vec(1,1,1);
+  //FEmptyLight.CastShadows := st1024;
 end;
 
 {$IfDef FPC}
