@@ -35,16 +35,23 @@ type
     FInventoryBtn   : TavmWndCheckButton;
     FSkillsBtn      : TavmWndCheckButton;
 
+    FOtherInventory_TakeAllBtn: TavmOtherInventoryBtn;
+    FOtherInventory_CloseBtn  : TavmOtherInventoryBtn;
+
     FOnEndTurnBtnClick: TNotifyEvent;
+
+    FOtherInventoryCloseCallback: TNotifyEvent;
 
     procedure InventoryBtnCheck(ASender: TObject);
     procedure SkillsBtnCheck(ASender: TObject);
+    procedure OnOtherInventoryBtnTakeAll(ASender: TObject);
+    procedure OnOtherInventoryBtnClose(ASender: TObject);
   private
     function IsMouseOnUI: Boolean;
 
     procedure SetActiveUnit(const ARoomUnit: TRoomUnit);
     procedure SetPlayerActiveSkill(const ASkill: IUnitSkill);
-    procedure SetOtherInventory(const AInventory: IInventory);
+    procedure SetOtherInventory(const AInventory: IInventory; ACloseCallback: TNotifyEvent);
 
     procedure AdjustCameraToPlayer();
     procedure SetCameraBounds(const ABounds: TRectF);
@@ -184,6 +191,26 @@ begin
   FPlayerSkills.Visible := FSkillsBtn.Checked;
 end;
 
+procedure TGameUI.OnOtherInventoryBtnTakeAll(ASender: TObject);
+var otherInv: IInventory;
+    thisInv : IInventory;
+begin
+  thisInv := TavmInventory(FPlayerInventory).Inventory;
+  otherInv := TavmInventory(FOtherInventory).Inventory;
+  if otherInv = nil then Exit;
+  if thisInv = nil then Exit;
+  while otherInv.Items.Count > 0 do
+   thisInv.Push(otherInv.Pop(0), thisInv.Items.Count - 1);
+  TavmInventory(FPlayerInventory).UpdateScroll;
+  TavmInventory(FOtherInventory).UpdateScroll;
+end;
+
+procedure TGameUI.OnOtherInventoryBtnClose(ASender: TObject);
+begin
+  if Assigned(FOtherInventoryCloseCallback) then
+    FOtherInventoryCloseCallback(nil);
+end;
+
 function TGameUI.IsMouseOnUI: Boolean;
 var curpt: TVec2;
     hit: TavmBaseControl;
@@ -194,10 +221,13 @@ begin
   Result := (hit <> nil) and (hit <> FRootControl);
 end;
 
-procedure TGameUI.SetOtherInventory(const AInventory: IInventory);
+procedure TGameUI.SetOtherInventory(const AInventory: IInventory; ACloseCallback: TNotifyEvent);
 begin
   (FOtherInventory as TavmInventory).Inventory := AInventory;
   FOtherInventory.Visible := (FOtherInventory as TavmInventory).Inventory <> nil;
+  FOtherInventory_TakeAllBtn.Visible := FOtherInventory.Visible;
+  FOtherInventory_CloseBtn.Visible := FOtherInventory.Visible;
+  FOtherInventoryCloseCallback := ACloseCallback;
 end;
 
 procedure TGameUI.SetPlayerActiveSkill(const ASkill: IUnitSkill);
@@ -252,7 +282,7 @@ procedure TGameUI.AlignControls;
 begin
   if FPlayerSkills <> nil then
   begin
-    FPlayerSkills.Pos := Vec(Main.WindowSize.x - 10, 80);
+    FPlayerSkills.Pos := Vec(Main.WindowSize.x - 10, 100);
     if FSkillsBtn <> nil then
       FSkillsBtn.Pos := Vec(FPlayerSkills.Pos.x - Round(FPlayerSkills.Size.x) div 2, 5);
   end;
@@ -347,18 +377,29 @@ begin
   FEnemiesBar := TavmEnemiesBar.Create(FRootControl);
 
   inv_ui := TavmInventory.Create(FRootControl);
-  inv_ui.Pos := Vec(inv_ui.Pos.x, 80);
+  inv_ui.Pos := Vec(inv_ui.Pos.x, 100);
   FPlayerInventory := inv_ui;
 
   skills_ui := TavmSkills.Create(FRootControl);
-  skills_ui.Pos := Vec(30, 80);
+  skills_ui.Pos := Vec(30, 100);
   skills_ui.HintDirection := Vec(-0.7, 0.7);
   FPlayerSkills := skills_ui;
 
   inv_ui := TavmInventory.Create(FRootControl);
-  inv_ui.Pos := Vec(FPlayerInventory.Pos.x + 400, FPlayerInventory.Pos.y);
+  inv_ui.Pos := Vec(FPlayerInventory.Pos.x + 430, FPlayerInventory.Pos.y);
   inv_ui.Visible := False;
   FOtherInventory := inv_ui;
+
+  FOtherInventory_TakeAllBtn := TavmOtherInventoryBtn.Create(FRootControl);
+  FOtherInventory_TakeAllBtn.Text := 'Взять всё';
+  FOtherInventory_TakeAllBtn.Pos := Vec(FOtherInventory.Pos.x, FOtherInventory.Pos.y + FOtherInventory.Size.y);
+  FOtherInventory_TakeAllBtn.OnClick := {$IfDef FPC}@{$EndIf}OnOtherInventoryBtnTakeAll;
+
+  FOtherInventory_CloseBtn   := TavmOtherInventoryBtn.Create(FRootControl);
+  FOtherInventory_CloseBtn.Text := 'Закрыть';
+  FOtherInventory_CloseBtn.Origin := Vec(1, 0);
+  FOtherInventory_CloseBtn.Pos := Vec(FOtherInventory.Pos.x + FOtherInventory.Size.x, FOtherInventory.Pos.y + FOtherInventory.Size.y);
+  FOtherInventory_CloseBtn.OnClick := {$IfDef FPC}@{$EndIf}OnOtherInventoryBtnClose;
 
   FInventoryBtn := TavmWndCheckButton.Create(FRootControl);
   FInventoryBtn.Origin := Vec(0.5, 0);

@@ -747,6 +747,8 @@ procedure TavmSkills.DoValidate;
 
   function GetCellSpriteInfo(x,y: Integer; out AUseReady: Boolean): string; overload;
   begin
+    if FScroll <> nil then
+      y := y + FScroll.ViewportPos;
     Result := GetCellSpriteInfo(y * GridWidth + x, AUseReady);
   end;
 

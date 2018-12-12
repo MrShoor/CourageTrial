@@ -58,7 +58,6 @@ type
     procedure SetGridWidth(const AValue: Integer);
     procedure SetInventory(const AValue: IInventory);
     procedure UpdateSize;
-    procedure UpdateScroll;
     procedure ScrollEvent(ASender: TObject);
   private
     function ItemRect(CellX, CellY: Integer): TRectF; overload;
@@ -73,6 +72,7 @@ type
     procedure Notify_DragMove (ABtn: Integer; const APt: TVec2; AShifts: TShifts); override;
     procedure Notify_DragStop (ABtn: Integer; const APt: TVec2; AShifts: TShifts); override;
     procedure Notify_MouseDblClick(ABtn: Integer; const APt: TVec2; AShifts: TShifts); override;
+    procedure Notify_MouseWheel(const APt: TVec2; AWheelShift: Integer; AShifts: TShifts); override;
   protected
     procedure DoValidate; override;
     procedure AfterRegister; override;
@@ -90,6 +90,7 @@ type
     procedure SetDropTarget(const AValue: TavmInventory);
     property  DropTarget: TavmInventory read FDropTarget write SetDropTarget;
   public
+    procedure UpdateScroll;
     procedure DropItem(const AFrom: IInventory; const AIndex: Integer);
     procedure SetDropPoint(const APt: TVec2);
     property DropPosition: Integer read FDropPosition write SetDropPosition;
@@ -231,6 +232,7 @@ begin
   end;
   FScroll.Range := (FInventory.Items.Count + GridWidth - 1) div GridWidth;
   FScroll.ViewportWidth := GridHeight;
+  Invalidate;
 end;
 
 procedure TavmInventory.ScrollEvent(ASender: TObject);
@@ -249,7 +251,7 @@ function TavmInventory.ItemRect(AIndex: Integer): TRectF;
 var x, y: Integer;
 begin
   x := AIndex mod GridWidth;
-  y := AIndex div GridWidth + FScroll.ViewportPos;
+  y := AIndex div GridWidth - FScroll.ViewportPos;
   Result := ItemRect(x, y);
 end;
 
@@ -342,6 +344,7 @@ begin
     DropTarget.DropItem(Inventory, FDraggedItem);
   FDraggedItem := -1;
   DropTarget := nil;
+  UpdateScroll;
   Invalidate;
 end;
 
@@ -379,6 +382,12 @@ begin
       end;
   end;
   Invalidate;
+end;
+
+procedure TavmInventory.Notify_MouseWheel(const APt: TVec2; AWheelShift: Integer; AShifts: TShifts);
+begin
+  inherited Notify_MouseWheel(APt, AWheelShift, AShifts);
+  FScroll.Scroll(-AWheelShift);
 end;
 
 procedure TavmInventory.SetGridWidth(const AValue: Integer);
@@ -439,7 +448,7 @@ procedure TavmInventory.DoValidate;
 
   function GetCellSpriteInfo(x,y: Integer; out AEquipped: Boolean): string; overload;
   begin
-    Result := GetCellSpriteInfo(y * GridWidth + x, AEquipped);
+    Result := GetCellSpriteInfo((y + FScroll.ViewportPos) * GridWidth + x, AEquipped);
   end;
 
   procedure DrawItemSprite(const ACellPos: TVec2; const ASpriteFile: string; AEquipped: Boolean);
@@ -531,7 +540,7 @@ begin
 
   Origin := Vec(0,0);
   Pos := Vec(10, 10);
-  GridWidth := 5;
+  GridWidth := 7;
   GridHeight := 5;
 
   FHint := TavmItemHint.Create(Self);
@@ -576,6 +585,7 @@ begin
     Dec(FDropPosition);
 
   FInventory.Push(item, FDropPosition);
+  UpdateScroll;
 end;
 
 procedure TavmInventory.SetDropPoint(const APt: TVec2);

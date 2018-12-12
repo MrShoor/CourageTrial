@@ -189,7 +189,7 @@ type
 
     procedure SetActiveUnit(const ARoomUnit: TRoomUnit);
     procedure SetPlayerActiveSkill(const ASkill: IUnitSkill);
-    procedure SetOtherInventory(const AInventory: IInventory);
+    procedure SetOtherInventory(const AInventory: IInventory; ACloseCallback: TNotifyEvent);
     procedure AdjustCameraToPlayer();
     procedure SetCameraBounds(const ABounds: TRectF);
 
@@ -3727,6 +3727,11 @@ begin
   bow := TArcherBow.Create;
   Inventory().Push(bow, 0);
 
+  for i := 0 to 30 do
+    Inventory().Push(TArcherBow.Create, 0);
+  for i := 0 to 30 do
+    Inventory().Push(TAxe.Create, 0);
+
   bow := TArcherBow.Create;
   Inventory().Push(bow, 0);
 
@@ -3896,9 +3901,9 @@ begin
       begin
         inv_objs := FMap.InventoryObjectsAt(FPlayer.RoomPos, True);
         if inv_objs.Count > 0 then
-          UI.SetOtherInventory(inv_objs[0].Inventory)
+          UI.SetOtherInventory(inv_objs[0].Inventory, nil)
         else
-          UI.SetOtherInventory(nil);
+          UI.SetOtherInventory(nil, nil);
       end;
     end;
   end;

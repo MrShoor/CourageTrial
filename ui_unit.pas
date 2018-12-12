@@ -57,6 +57,7 @@ type
     procedure DoValidate; override;
     procedure AfterRegister; override;
     procedure DrawControl(const AMat: TMat3); override;
+    procedure HitTestLocal(const ALocalPt: TVec2; var AControl: TavmBaseControl); override;
   public
     property SkillSlots: TavmSkills read FSkillSlots;
     property RoomUnit: TRoomUnit read FRoomUnit write SetRoomUnit;
@@ -262,6 +263,16 @@ begin
   Pos := Vec(Main.WindowSize.x * 0.5, Main.WindowSize.y);
   FSkillSlots.Pos := Vec(Size.x*0.5, cSkillSlotsTop);
   inherited DrawControl(AMat);
+end;
+
+procedure TavmUnitMenu.HitTestLocal(const ALocalPt: TVec2; var AControl: TavmBaseControl);
+begin
+  if ALocalPt.y < cHPBarTop then
+  begin
+    AControl := nil;
+    Exit;
+  end;
+  inherited HitTestLocal(ALocalPt, AControl);
 end;
 
 end.

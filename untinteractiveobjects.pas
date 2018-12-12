@@ -80,6 +80,7 @@ type
     function GetBattleRoom: TBattleRoom;
     procedure ShowOtherInventory;
     procedure HideOtherInventory;
+    procedure OnCloseOtherInventory(ASender: TObject);
   public
     procedure TryCancel; override;
     function ProcessAction: Boolean; override;
@@ -257,12 +258,17 @@ end;
 
 procedure TBRA_LootChestAction.ShowOtherInventory;
 begin
-  GetBattleRoom.UI.SetOtherInventory(FChest.Inventory());
+  GetBattleRoom.UI.SetOtherInventory(FChest.Inventory(), {$IfDef FPC}@{$EndIf}OnCloseOtherInventory);
 end;
 
 procedure TBRA_LootChestAction.HideOtherInventory;
 begin
-  GetBattleRoom.UI.SetOtherInventory(nil);
+  GetBattleRoom.UI.SetOtherInventory(nil, nil);
+end;
+
+procedure TBRA_LootChestAction.OnCloseOtherInventory(ASender: TObject);
+begin
+  TryCancel;
 end;
 
 procedure TBRA_LootChestAction.TryCancel;
