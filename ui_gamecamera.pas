@@ -67,7 +67,7 @@ type
 implementation
 
 uses
-  Math;
+  Math, Windows, avPlatform;
 
 { TavmCameraControl }
 
@@ -91,7 +91,6 @@ procedure TavmCameraControl.StopPlaying(const AAtEnd: Boolean);
 begin
   if not FSmoothPlaying then Exit;
   FSmoothPlaying := False;
-  UPSUnSubscribe;
 
   if AAtEnd then
   begin
@@ -110,7 +109,6 @@ begin
   FTargetPitch := ATargetPitch;
   FTargetYaw := ATargetYaw;
   FSmoothPlaying := True;
-  UPSSubscribe;
 end;
 
 procedure TavmCameraControl.SetFloorBoundingRect(const AValue: TRectF);
@@ -134,6 +132,7 @@ begin
   FPitch := Pi*0.25;
   FDist := 4;
   UpdateCameraPosition;
+  UPSSubscribe;
 end;
 
 procedure TavmCameraControl.Notify_KeyDown(AKey: Word; const Ex: TKeyEventEx);
@@ -148,7 +147,7 @@ var delta: TVec2;
     IntPt: TVec3;
 begin
   inherited Notify_MouseMove(APt, AShifts);
-  if sMiddle in AShifts then
+  if sRight in AShifts then
   begin
     delta := APt - FLastCoords;
     FLastCoords := APt;
@@ -198,7 +197,45 @@ end;
 
 procedure TavmCameraControl.OnUPS;
 const cSpeed = 0.07;
+      cBorderWidth = 10;
+      cPanSpeed = 0.3;
+var cpt: TVec2;
+    panDir: TVec2;
+    viewDir3D: TVec3;
+    viewDir2D: TVec3;
+    panOffset: TVec3;
 begin
+  cpt := GetCursorPos(Main.Window, True, False);
+
+  if (cpt.x >= 0) and
+     (cpt.y >= 0) and
+     (cpt.x < Main.WindowSize.x) and
+     (cpt.y < Main.WindowSize.y) and
+     (GetForegroundWindow = Main.Window) then
+  begin
+    panDir := Vec(0, 0);
+    if cpt.x < cBorderWidth then
+      panDir.x := panDir.x + 1.0;
+    if Main.WindowSize.x - cpt.x < cBorderWidth then
+      panDir.x := panDir.x - 1.0;
+    if cpt.y < cBorderWidth then
+      panDir.y := panDir.y - 1.0;
+    if Main.WindowSize.y - cpt.y < cBorderWidth then
+      panDir.y := panDir.y + 1.0;
+
+    if LenSqr(panDir) > 0.001 then
+    begin
+      StopPlaying();
+
+      viewDir3D := Main.Camera.Eye - Main.Camera.At;
+      viewDir2D := normalize(Vec(viewDir3D.x, 0, viewDir3D.z));
+      panOffset := viewDir2D * panDir.y * cPanSpeed;
+      panOffset := panOffset + (viewDir2D * Quat(Vec(0, 1, 0), PI * 0.5)) * panDir.x * cPanSpeed;
+      Main.Camera.Eye := Main.Camera.Eye + panOffset;
+      Main.Camera.At  := Main.Camera.At + panOffset;
+    end;
+  end;
+
   if FSmoothPlaying then
   begin
     FDist := Lerp(FDist, FTargetDist, cSpeed);

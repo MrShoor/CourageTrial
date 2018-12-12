@@ -5,6 +5,7 @@ unit untMain;
 interface
 
 uses
+  Windows,
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, untLevel, avBase, avRes, avTypes, mutils,
   untFloor,
   bWorld;
@@ -66,7 +67,18 @@ uses
 procedure TUPSObject.EMUps(var msg: TavMessage);
 var
   i: Integer;
+  rct: TRect;
 begin
+  if GetForegroundWindow = FWorld.Main.Window then
+  begin
+    ZeroClear(rct, SizeOf(rct));
+    GetClientRect(FWorld.Main.Window, rct);
+    ClientToScreen(FWorld.Main.Window, rct.TopLeft);
+    ClientToScreen(FWorld.Main.Window, rct.BottomRight);
+    ClipCursor(@rct);
+  end
+  else
+    ClipCursor(nil);
   FWorld.UpdateStep(msg.param);
   for i := 0 to min(msg.param, 8) - 1 do
   begin
@@ -84,6 +96,7 @@ end;
 
 procedure TfrmMain.FormCreate(Sender: TObject);
 begin
+  Randomize;
   FMain := TavMainRender.Create(nil);
   FMain.Camera.At := Vec(0,0,0);
   FMain.Camera.Up := Vec(0,1,0);
