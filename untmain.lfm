@@ -12,6 +12,7 @@ object frmMain: TfrmMain
   OnPaint = FormPaint
   ParentDoubleBuffered = False
   LCLVersion = '2.0.0.2'
+  WindowState = wsMaximized
   object ApplicationProperties1: TApplicationProperties
     OnIdle = ApplicationProperties1Idle
     left = 80

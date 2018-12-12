@@ -41,13 +41,20 @@ type
     FUPSObj: TUPSObject;
 
     FWorld: TbWorld;
+    FWaitForNewGame: Boolean;
     FFloor: TFloorMap;
+
+    FWaitForExit: Boolean;
 
     procedure AutoInit;
     procedure RenderScene;
 
     procedure InitWorld;
     procedure OnAfterWorldDraw(Sender: TObject);
+
+    procedure MakeNewGameIfNeeded();
+    procedure MakeNewGame_Delayed(ASender: TObject);
+    procedure DoExit_Delayed(ASender: TObject);
   public
 
   end;
@@ -109,6 +116,13 @@ end;
 
 procedure TfrmMain.ApplicationProperties1Idle(Sender: TObject; var Done: Boolean);
 begin
+  if FWaitForExit then
+  begin
+    Close;
+    Exit;
+  end;
+  MakeNewGameIfNeeded;
+
   if FMain.Inited3D then
 	  FMain.InvalidateWindow;
   Done := False;
@@ -121,9 +135,19 @@ end;
 
 procedure TfrmMain.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
-  FFloor.CurrentRoom.KeyPress(Key);
-  if Key = Ord(' ') then
-    FWorld.Renderer.InvalidateShaders;
+  if FFloor <> nil then
+  begin
+    if Key = VK_ESCAPE then
+    begin
+      FFloor.UI.InGameMenuVisible := not FFloor.UI.InGameMenuVisible;
+    end
+    else
+    begin
+      FFloor.CurrentRoom.KeyPress(Key);
+      if Key = Ord(' ') then
+        FWorld.Renderer.InvalidateShaders;
+    end;
+  end;
 end;
 
 procedure TfrmMain.FormMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
@@ -197,8 +221,26 @@ begin
   FWorld.Renderer.OnAfterDraw := {$IfDef FPC}@{$EndIf}OnAfterWorldDraw;
   PreloadModels;
 
+  FWaitForNewGame := True;
+  MakeNewGameIfNeeded;
+end;
+
+procedure TfrmMain.OnAfterWorldDraw(Sender: TObject);
+begin
+  FFloor.CurrentRoom.Draw3DUI();
+end;
+
+procedure TfrmMain.MakeNewGameIfNeeded();
+begin
+  if not FWaitForNewGame then Exit;
+  FWaitForNewGame := False;
+
+  FreeAndNil(FFloor);
+
   FFloor := TFloorMap.Create(FWorld);
   FFloor.Create2Rooms;
+  FFloor.UI.OnMenuNewGame := {$IfDef FPC}@{$EndIf}MakeNewGame_Delayed;
+  FFloor.UI.OnMenuExit := {$IfDef FPC}@{$EndIf}DoExit_Delayed;
   //FFloor.CreateLab(8);
 
   if FUPSObj = nil then
@@ -206,9 +248,14 @@ begin
   FUPSObj.SetState(FWorld, FFloor);
 end;
 
-procedure TfrmMain.OnAfterWorldDraw(Sender: TObject);
+procedure TfrmMain.MakeNewGame_Delayed(ASender: TObject);
 begin
-  FFloor.CurrentRoom.Draw3DUI();
+  FWaitForNewGame := True;
+end;
+
+procedure TfrmMain.DoExit_Delayed(ASender: TObject);
+begin
+  FWaitForExit := True;
 end;
 
 end.

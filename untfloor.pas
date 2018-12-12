@@ -14,7 +14,7 @@ uses
   avContnrsDefaults,
   avPathFinder,
   ui_wndbutton,
-  ui_unit, ui_inventory, ui_skills, ui_gamecamera, ui_messages, ui_enemies;
+  ui_unit, ui_inventory, ui_skills, ui_gamecamera, ui_messages, ui_enemies, ui_ingame_menu;
 
 type
   TFloorMap = class;
@@ -24,6 +24,8 @@ type
 
   TGameUI = class(TavMainRenderChild, IGameUI)
   private
+    FInGameMenu : TavmInGameMenu;
+
     FRootControl    : TavmCameraControl;
     FUnitMenu       : TavmCustomControl;
     FEnemiesBar     : TavmEnemiesBar;
@@ -67,6 +69,14 @@ type
     procedure DoOnEndTurnBtnClick(ASender: TObject);
     procedure DoOnLootGroundClick(ASender: TObject);
     procedure DoOnAdjustCameraToUnit(ASender: TObject);
+  protected
+    FOnMenuExit: TNotifyEvent;
+    FOnMenuNewGame: TNotifyEvent;
+    function GetInGameMenuVisible: Boolean;
+    procedure SetInGameMenuVisible(const AValue: Boolean);
+    procedure DoOnMenuResume(ASender: TObject);
+    procedure DoOnMenuNewGame(ASender: TObject);
+    procedure DoOnMenuExit(ASender: TObject);
   private
     function QueryInterface({$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;out obj) : HRes;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
     function _AddRef : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
@@ -79,6 +89,10 @@ type
     procedure Draw2DUI();
     property OnEndTurnBtnClick: TNotifyEvent read FOnEndTurnBtnClick write FOnEndTurnBtnClick;
     property OnLootGroundClick: TNotifyEvent read FOnLootGroundClick write FOnLootGroundClick;
+
+    property InGameMenuVisible: Boolean read GetInGameMenuVisible write SetInGameMenuVisible;
+    property OnMenuNewGame: TNotifyEvent read FOnMenuNewGame write FOnMenuNewGame;
+    property OnMenuExit   : TNotifyEvent read FOnMenuExit    write FOnMenuExit;
   end;
 
   { TFloorMapGraph }
@@ -141,6 +155,7 @@ type
     procedure Draw2DUI();
 
     property CurrentRoom: TBattleRoom read FCurrentRoom;
+    property UI: TGameUI read FUI;
   public
     constructor Create(AParent: TavObject); override;
     destructor Destroy; override;
@@ -219,6 +234,8 @@ function TGameUI.IsMouseOnUI: Boolean;
 var curpt: TVec2;
     hit: TavmBaseControl;
 begin
+  if FInGameMenu.Visible then Exit(True);
+
   curpt := (Main.Cursor.WindowCur*Vec(0.5, -0.5) + Vec(0.5, 0.5) )*Main.WindowSize;
   if FRootControl.InputConnector.Captured <> nil then Exit(True);
   hit := FRootControl.HitTest(curpt, True);
@@ -312,12 +329,38 @@ begin
   FRootControl.LookAt(unt.Room.UI.TilePosToWorldPos(unt.RoomPos), True);
 end;
 
+procedure TGameUI.DoOnMenuResume(ASender: TObject);
+begin
+  InGameMenuVisible := False;
+end;
+
+procedure TGameUI.DoOnMenuNewGame(ASender: TObject);
+begin
+  if Assigned(FOnMenuNewGame) then FOnMenuNewGame(Self);
+end;
+
+procedure TGameUI.DoOnMenuExit(ASender: TObject);
+begin
+  if Assigned(FOnMenuExit) then FOnMenuExit(Self);
+end;
+
+function TGameUI.GetInGameMenuVisible: Boolean;
+begin
+  Result := FInGameMenu.Visible;
+end;
+
 function TGameUI.QueryInterface({$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;out obj) : HRes;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
 begin
   if getinterface(iid,obj) then
     result:=S_OK
   else
     result:=longint(E_NOINTERFACE);
+end;
+
+procedure TGameUI.SetInGameMenuVisible(const AValue: Boolean);
+begin
+  FInGameMenu.Visible := AValue;
+  FRootControl.Disabled := AValue;
 end;
 
 function TGameUI._AddRef : longint;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
@@ -334,6 +377,11 @@ procedure TGameUI.Draw2DUI();
 begin
   if FRootControl <> nil then
     FRootControl.Draw();
+  if (FInGameMenu <> nil) and FInGameMenu.Visible then
+  begin
+    FInGameMenu.Pos := Vec(Integer(Main.WindowSize.x div 2), Main.WindowSize.y div 2);
+    FInGameMenu.Draw();
+  end;
 end;
 
 procedure TGameUI.CreateUI();
@@ -369,6 +417,12 @@ var
   skills_ui: TavmSkills;
   lookAt: TVec3;
 begin
+  FInGameMenu := TavmInGameMenu.Create(Self);
+  FInGameMenu.Visible := False;
+  FInGameMenu.OnResume := {$IfDef FPC}@{$EndIf}DoOnMenuResume;
+  FInGameMenu.OnNewGame := {$IfDef FPC}@{$EndIf}DoOnMenuNewGame;
+  FInGameMenu.OnExit := {$IfDef FPC}@{$EndIf}DoOnMenuExit;
+
   FRootControl := TavmCameraControl.Create(Self);
   FRootControl.Size := Vec(10000, 10000);
 

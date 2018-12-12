@@ -16,6 +16,7 @@ type
 
   TavmCameraControl = class(TavmCustomControl)
   private
+    FDisabled: Boolean;
     FRotateSens: Single;
     FWheelSens: Single;
 
@@ -54,6 +55,8 @@ type
 
     procedure OnUPS; override;
   public
+    property Disabled: Boolean read FDisabled write FDisabled;
+
     property YPlane: Single read FYPlane write FYPlane;
     property RotateSens: Single read FRotateSens write FRotateSens;
     property WheelSens : Single read FWheelSens  write FWheelSens;
@@ -138,6 +141,7 @@ end;
 procedure TavmCameraControl.Notify_KeyDown(AKey: Word; const Ex: TKeyEventEx);
 begin
   inherited Notify_KeyDown(AKey, Ex);
+  if FDisabled then Exit;
   if sShift in Ex.shifts then
     FHoldPtValid := Intersect(FDragPlane, Main.Cursor.Ray, FHoldPt);
 end;
@@ -147,6 +151,8 @@ var delta: TVec2;
     IntPt: TVec3;
 begin
   inherited Notify_MouseMove(APt, AShifts);
+  if FDisabled then Exit;
+
   if sRight in AShifts then
   begin
     delta := APt - FLastCoords;
@@ -176,6 +182,8 @@ end;
 procedure TavmCameraControl.Notify_MouseWheel(const APt: TVec2; AWheelShift: Integer; AShifts: TShifts);
 begin
   inherited Notify_MouseWheel(APt, AWheelShift, AShifts);
+  if FDisabled then Exit;
+
   FDist := FDist * Power(FWheelSens, AWheelShift);
   FDist := Clamp(FDist, 1, 150);
   StopPlaying;
@@ -185,6 +193,8 @@ end;
 procedure TavmCameraControl.Notify_MouseDown(ABtn: Integer; const APt: TVec2; AShifts: TShifts);
 begin
   inherited Notify_MouseDown(ABtn, APt, AShifts);
+  if FDisabled then Exit;
+
   FLastCoords := APt;
   if sShift in AShifts then
     FHoldPtValid := Intersect(FDragPlane, Main.Cursor.Ray, FHoldPt);
@@ -193,6 +203,7 @@ end;
 procedure TavmCameraControl.Notify_MouseUp(ABtn: Integer; const APt: TVec2; AShifts: TShifts);
 begin
   inherited Notify_MouseUp(ABtn, APt, AShifts);
+  if FDisabled then Exit;
 end;
 
 procedure TavmCameraControl.OnUPS;
@@ -205,6 +216,8 @@ var cpt: TVec2;
     viewDir2D: TVec3;
     panOffset: TVec3;
 begin
+  if FDisabled then Exit;
+
   cpt := GetCursorPos(Main.Window, True, False);
 
   if (cpt.x >= 0) and
@@ -233,6 +246,8 @@ begin
       panOffset := panOffset + (viewDir2D * Quat(Vec(0, 1, 0), PI * 0.5)) * panDir.x * cPanSpeed;
       Main.Camera.Eye := Main.Camera.Eye + panOffset;
       Main.Camera.At  := Main.Camera.At + panOffset;
+
+      UpdateCameraPosition;
     end;
   end;
 
@@ -256,6 +271,8 @@ end;
 
 procedure TavmCameraControl.LookAt(const APt: TVec3; ASmooth: Boolean);
 begin
+  if FDisabled then Exit;
+
   StopPlaying;
   if ASmooth then
   begin
@@ -271,6 +288,8 @@ end;
 
 procedure TavmCameraControl.LookAt(const APt, AViewDir: TVec3);
 begin
+  if FDisabled then Exit;
+
   StopPlaying;
   Main.Camera.At := Vec(APt.x, FYPlane, APt.z);
   FYaw  := -arctan2(-AViewDir.z, -AViewDir.x);
