@@ -840,7 +840,7 @@ begin
   Origin := Vec(1,0);
   Pos := Vec(10, 10);
   GridWidth := 5;
-  GridHeight := 10;
+  GridHeight := 5;
 
   FSkillHighlighter := TavmSkillHighlighter.Create(Self);
   FSkillHighlighter.Pos := Vec(0,0);

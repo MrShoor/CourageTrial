@@ -532,7 +532,7 @@ begin
   Origin := Vec(0,0);
   Pos := Vec(10, 10);
   GridWidth := 5;
-  GridHeight := 10;
+  GridHeight := 5;
 
   FHint := TavmItemHint.Create(Self);
   FHint.Pos := Vec(0,0);

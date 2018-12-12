@@ -15,7 +15,7 @@ type
 
   TavmMessages = class(TavmCustomControl)
   private const
-    textXSpacing = 10;
+    textXSpacing = 5;
   private type
     TRoomMessage = record
       str: string;
@@ -41,12 +41,12 @@ procedure TavmMessages.AfterRegister;
 begin
   inherited AfterRegister;
   FMessages := TRoomMessageArr.Create();
-  Size := Vec(400, 400);
+  Size := Vec(400, 300);
 end;
 
 procedure TavmMessages.DoValidate;
 const
-  cMessageSpacing = 20;
+  cMessageSpacing = 10;
 var
   i: Integer;
   y: Single;

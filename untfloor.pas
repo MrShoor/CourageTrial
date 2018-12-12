@@ -13,6 +13,7 @@ uses
   avCanvas,
   avContnrsDefaults,
   avPathFinder,
+  ui_wndbutton,
   ui_unit, ui_inventory, ui_skills, ui_gamecamera, ui_messages, ui_enemies;
 
 type
@@ -31,7 +32,13 @@ type
     FOtherInventory : TavmCustomControl;
     FMessages       : TavmMessages;
 
+    FInventoryBtn   : TavmWndCheckButton;
+    FSkillsBtn      : TavmWndCheckButton;
+
     FOnEndTurnBtnClick: TNotifyEvent;
+
+    procedure InventoryBtnCheck(ASender: TObject);
+    procedure SkillsBtnCheck(ASender: TObject);
   private
     function IsMouseOnUI: Boolean;
 
@@ -167,6 +174,16 @@ end;
 
 { TGameUI }
 
+procedure TGameUI.InventoryBtnCheck(ASender: TObject);
+begin
+  FPlayerInventory.Visible := FInventoryBtn.Checked;
+end;
+
+procedure TGameUI.SkillsBtnCheck(ASender: TObject);
+begin
+  FPlayerSkills.Visible := FSkillsBtn.Checked;
+end;
+
 function TGameUI.IsMouseOnUI: Boolean;
 var curpt: TVec2;
     hit: TavmBaseControl;
@@ -234,9 +251,13 @@ end;
 procedure TGameUI.AlignControls;
 begin
   if FPlayerSkills <> nil then
-    FPlayerSkills.Pos := Vec(Main.WindowSize.x - 10, 10);
+  begin
+    FPlayerSkills.Pos := Vec(Main.WindowSize.x - 10, 80);
+    if FSkillsBtn <> nil then
+      FSkillsBtn.Pos := Vec(FPlayerSkills.Pos.x - Round(FPlayerSkills.Size.x) div 2, 5);
+  end;
   if FMessages <> nil then
-    FMessages.Pos := Vec(10, Main.WindowSize.y - 200);
+    FMessages.Pos := Vec(10, Main.WindowSize.y - 145);
 end;
 
 procedure TGameUI.DoOnEndTurnBtnClick(ASender: TObject);
@@ -326,17 +347,31 @@ begin
   FEnemiesBar := TavmEnemiesBar.Create(FRootControl);
 
   inv_ui := TavmInventory.Create(FRootControl);
+  inv_ui.Pos := Vec(inv_ui.Pos.x, 80);
   FPlayerInventory := inv_ui;
 
   skills_ui := TavmSkills.Create(FRootControl);
-  skills_ui.Pos := Vec(30, 10);
+  skills_ui.Pos := Vec(30, 80);
   skills_ui.HintDirection := Vec(-0.7, 0.7);
   FPlayerSkills := skills_ui;
 
   inv_ui := TavmInventory.Create(FRootControl);
-  inv_ui.Pos := Vec(inv_ui.Pos.x + 500, inv_ui.Pos.y);
+  inv_ui.Pos := Vec(FPlayerInventory.Pos.x + 400, FPlayerInventory.Pos.y);
   inv_ui.Visible := False;
   FOtherInventory := inv_ui;
+
+  FInventoryBtn := TavmWndCheckButton.Create(FRootControl);
+  FInventoryBtn.Origin := Vec(0.5, 0);
+  FInventoryBtn.Pos := Vec(FPlayerInventory.Pos.x + Round(FPlayerInventory.Size.x) div 2, 5);
+  FInventoryBtn.Text := 'Инвентарь';
+  FInventoryBtn.Checked := FPlayerInventory.Visible;
+  FInventoryBtn.OnCheck := {$IfDef FPC}@{$EndIf}InventoryBtnCheck;
+
+  FSkillsBtn := TavmWndCheckButton.Create(FRootControl);
+  FSkillsBtn.Origin := Vec(0.5, 0);
+  FSkillsBtn.Text := 'Навыки';
+  FSkillsBtn.Checked := FPlayerSkills.Visible;
+  FSkillsBtn.OnCheck := {$IfDef FPC}@{$EndIf}SkillsBtnCheck;
 
   PreloadGlyphs;
 end;
