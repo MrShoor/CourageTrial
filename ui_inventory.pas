@@ -520,7 +520,7 @@ begin
   if FDropPosition >= 0 then
   begin
     i := FDropPosition mod GridWidth;
-    j := FDropPosition div GridHeight - FScroll.ViewportPos;
+    j := FDropPosition div GridWidth - FScroll.ViewportPos;
     cellPos.x := cCellBorderSize + (cCellSize + cCellBorderSize) * i - cCellBorderSize*0.5;
     cellPos.y := cCellBorderSize + (cCellSize + cCellBorderSize) * j - cCellBorderSize*0.5;
     Canvas.Pen.Width := 3;

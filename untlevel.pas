@@ -289,6 +289,7 @@ type
     procedure InvalidateFloor;
   protected
     FFloorModels: IavModelInstanceArr;
+    FBackPackModel: IavModelInstance;
     procedure AfterRegister; override;
     procedure AddWalls();
   public
@@ -300,6 +301,8 @@ type
 
     property DoorsOpened: Boolean read FDoorsOpened write SetDoorsOpened;
     function DoorCellIndex(const ATileCoord: TVec2i): Integer;
+
+    procedure UpdateInventoryObjects;
   end;
 
   { TRoomBullet }
@@ -677,6 +680,9 @@ type
     procedure RegInventoryObject(const AObject: TRoomObject);
     procedure UnRegInventoryObject(const AObject: TRoomObject);
     function  InventoryObjectsAt(const APos: TVec2i; const ANonEmpty: Boolean): IRoomObjectArr;
+    function  AllInventoryObjects(const ANonEmpty: Boolean): IRoomObjectArr;
+    function  AllInventoryObjectsPos(const ANonEmpty: Boolean): IVec2iSet;
+    procedure InvalidateInventoryBagsOnGround;
 
     function  InAction: Boolean;
     procedure AddAction(AAction: IBRA_Action);
@@ -859,6 +865,23 @@ type
     constructor Create(const AUnit, AFromUnit: TRoomUnit; const ADamage: Integer);
   end;
 
+  { TBRA_LootGround }
+
+  TBRA_LootGround = class(TBRA_Action)
+  private
+    FInAction: Boolean;
+    FUnit : TRoomUnit;
+    FInventoryUnit: TRoomObject;
+    function GetBattleRoom: TBattleRoom;
+    procedure ShowOtherInventory;
+    procedure HideOtherInventory;
+    procedure OnCloseOtherInventory(ASender: TObject);
+  public
+    procedure TryCancel; override;
+    function ProcessAction: Boolean; override;
+    constructor Create(AUnit: TRoomUnit; AInventoryUnit: TRoomObject);
+  end;
+
   { TBattleRoom }
 
   TBattleRoom = class (TavMainRenderChild)
@@ -993,6 +1016,48 @@ function FindRoomClass(const AName: string): TRoomObjectClass;
 begin
   if gvRegRommClasses = nil then Exit(nil);
   if not gvRegRommClasses.TryGetValue(AName, Result) then Result := nil;
+end;
+
+{ TBRA_LootGround }
+
+function TBRA_LootGround.GetBattleRoom: TBattleRoom;
+begin
+  Result := TBattleRoom(FUnit.FindAtParents(TBattleRoom));
+end;
+
+procedure TBRA_LootGround.ShowOtherInventory;
+begin
+  GetBattleRoom.UI.SetOtherInventory(FInventoryUnit.Inventory(), {$IfDef FPC}@{$EndIf}OnCloseOtherInventory);
+end;
+
+procedure TBRA_LootGround.HideOtherInventory;
+begin
+  GetBattleRoom.UI.SetOtherInventory(nil, nil);
+end;
+
+procedure TBRA_LootGround.OnCloseOtherInventory(ASender: TObject);
+begin
+  TryCancel;
+end;
+
+procedure TBRA_LootGround.TryCancel;
+begin
+  FInAction := False;
+  HideOtherInventory;
+  FUnit.Room.InvalidateInventoryBagsOnGround;
+end;
+
+function TBRA_LootGround.ProcessAction: Boolean;
+begin
+  Result := FInAction;
+end;
+
+constructor TBRA_LootGround.Create(AUnit: TRoomUnit; AInventoryUnit: TRoomObject);
+begin
+  FUnit := AUnit;
+  FInventoryUnit := AInventoryUnit;
+  FInAction := True;
+  ShowOtherInventory;
 end;
 
 { TRoomCellFilter_ViewableExclude_ObjectsExclude }
@@ -1584,6 +1649,8 @@ begin
   if AType = mtDefault then
     for i := 0 to FFloorModels.Count - 1 do
       ACollection.Add(FFloorModels[i]);
+  if FBackPackModel <> nil then
+    ACollection.Add(FBackPackModel);
 end;
 
 function TRoomFloor.AllHoles: IVec2iSet;
@@ -1599,6 +1666,30 @@ begin
     if FDoors[i] <> nil then
       if FDoors[i].RoomPos = ATileCoord then Exit(i);
   Result := -1;
+end;
+
+procedure TRoomFloor.UpdateInventoryObjects;
+var pts: IVec2iSet;
+    meshInst: IavMeshInstance;
+    pt: TVec2i;
+    n : Integer;
+begin
+  pts := Room.AllInventoryObjectsPos(True);
+  if pts.Count = 0 then
+  begin
+    FBackPackModel := nil;
+    Exit;
+  end;
+
+  meshInst := World.Renderer.FindPrefabInstances('BackPack');
+  FBackPackModel := World.Renderer.ModelsCollection.AddFromMesh(meshInst.Mesh, pts.Count);
+  pts.Reset;
+  n := 0;
+  while pts.Next(pt) do
+  begin
+    FBackPackModel.MultiMesh[n].Transform := Room.UI.TileToWorldTransform(pt, 0);
+    Inc(n);
+  end;
 end;
 
 { TRoomMapGraph_CustomFilter }
@@ -3601,14 +3692,34 @@ end;
 procedure TRoomMap.RegInventoryObject(const AObject: TRoomObject);
 begin
   FInventoryObjects.Add(AObject);
+  InvalidateInventoryBagsOnGround;
 end;
 
 procedure TRoomMap.UnRegInventoryObject(const AObject: TRoomObject);
 begin
   FInventoryObjects.Delete(AObject);
+  InvalidateInventoryBagsOnGround;
 end;
 
 function TRoomMap.InventoryObjectsAt(const APos: TVec2i; const ANonEmpty: Boolean): IRoomObjectArr;
+var obj: TRoomObject;
+begin
+  Result := TRoomObjectArr.Create();
+  FInventoryObjects.Reset;
+  while FInventoryObjects.Next(obj) do
+  begin
+    if obj.RoomPos <> APos then Continue;
+    if ANonEmpty then
+    begin
+      if obj.Inventory.Items.Count > 0 then
+        Result.Add(obj);
+    end
+    else
+      Result.Add(obj);
+  end;
+end;
+
+function TRoomMap.AllInventoryObjects(const ANonEmpty: Boolean): IRoomObjectArr;
 var obj: TRoomObject;
 begin
   Result := TRoomObjectArr.Create();
@@ -3623,6 +3734,28 @@ begin
     else
       Result.Add(obj);
   end;
+end;
+
+function TRoomMap.AllInventoryObjectsPos(const ANonEmpty: Boolean): IVec2iSet;
+var obj: TRoomObject;
+begin
+  Result := TVec2iSet.Create();
+  FInventoryObjects.Reset;
+  while FInventoryObjects.Next(obj) do
+  begin
+    if ANonEmpty then
+    begin
+      if obj.Inventory.Items.Count > 0 then
+        Result.Add(obj.RoomPos);
+    end
+    else
+      Result.Add(obj.RoomPos);
+  end;
+end;
+
+procedure TRoomMap.InvalidateInventoryBagsOnGround;
+begin
+  FRoomFloor.UpdateInventoryObjects;
 end;
 
 function TRoomMap.InAction: Boolean;
@@ -3897,13 +4030,11 @@ begin
     end;
     Ord('G') :
     begin
-      if FPlayer <> nil then
+      if (FPlayer <> nil) and not InAction() then
       begin
         inv_objs := FMap.InventoryObjectsAt(FPlayer.RoomPos, True);
         if inv_objs.Count > 0 then
-          UI.SetOtherInventory(inv_objs[0].Inventory, nil)
-        else
-          UI.SetOtherInventory(nil, nil);
+          FActions.Add(TBRA_LootGround.Create(FPlayer, inv_objs[0]));
       end;
     end;
   end;

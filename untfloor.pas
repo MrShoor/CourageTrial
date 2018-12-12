@@ -393,12 +393,14 @@ begin
   FOtherInventory_TakeAllBtn := TavmOtherInventoryBtn.Create(FRootControl);
   FOtherInventory_TakeAllBtn.Text := 'Взять всё';
   FOtherInventory_TakeAllBtn.Pos := Vec(FOtherInventory.Pos.x, FOtherInventory.Pos.y + FOtherInventory.Size.y);
+  FOtherInventory_TakeAllBtn.Visible := False;
   FOtherInventory_TakeAllBtn.OnClick := {$IfDef FPC}@{$EndIf}OnOtherInventoryBtnTakeAll;
 
   FOtherInventory_CloseBtn   := TavmOtherInventoryBtn.Create(FRootControl);
   FOtherInventory_CloseBtn.Text := 'Закрыть';
   FOtherInventory_CloseBtn.Origin := Vec(1, 0);
   FOtherInventory_CloseBtn.Pos := Vec(FOtherInventory.Pos.x + FOtherInventory.Size.x, FOtherInventory.Pos.y + FOtherInventory.Size.y);
+  FOtherInventory_CloseBtn.Visible := False;
   FOtherInventory_CloseBtn.OnClick := {$IfDef FPC}@{$EndIf}OnOtherInventoryBtnClose;
 
   FInventoryBtn := TavmWndCheckButton.Create(FRootControl);
