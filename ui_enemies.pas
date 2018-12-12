@@ -8,7 +8,7 @@ interface
 
 uses
   Classes, SysUtils,
-  avBase, avRes, avMiniControls, avContnrs, avCanvas, untLevel, mutils, avTypes, intfUtils;
+  avRes, avMiniControls, avContnrs, avCanvas, untLevel, mutils, avTypes, intfUtils;
 
 type
 

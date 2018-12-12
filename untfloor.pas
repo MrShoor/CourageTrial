@@ -39,6 +39,7 @@ type
     FOtherInventory_CloseBtn  : TavmOtherInventoryBtn;
 
     FOnEndTurnBtnClick: TNotifyEvent;
+    FOnLootGroundClick: TNotifyEvent;
 
     FOtherInventoryCloseCallback: TNotifyEvent;
 
@@ -64,6 +65,7 @@ type
   private
     procedure AlignControls;
     procedure DoOnEndTurnBtnClick(ASender: TObject);
+    procedure DoOnLootGroundClick(ASender: TObject);
     procedure DoOnAdjustCameraToUnit(ASender: TObject);
   private
     function QueryInterface({$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;out obj) : HRes;{$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
@@ -76,6 +78,7 @@ type
     procedure SetPlayer(const APlayer: TPlayer);
     procedure Draw2DUI();
     property OnEndTurnBtnClick: TNotifyEvent read FOnEndTurnBtnClick write FOnEndTurnBtnClick;
+    property OnLootGroundClick: TNotifyEvent read FOnLootGroundClick write FOnLootGroundClick;
   end;
 
   { TFloorMapGraph }
@@ -116,6 +119,7 @@ type
     FPlayer: TPlayer;
     procedure CreatePlayer;
     procedure DoOnEndTurnBtnClick(ASender: TObject);
+    procedure DoOnLootGroundClick(ASender: TObject);
     procedure DoLeaveBattleRoom(const ABattleRoom: TBattleRoom; const ADoorIdx: Integer);
 
     function ObtainBattleRoom(const ARoomCoord: TVec2i): TBattleRoom;
@@ -295,6 +299,11 @@ begin
   if Assigned(FOnEndTurnBtnClick) then FOnEndTurnBtnClick(Self);
 end;
 
+procedure TGameUI.DoOnLootGroundClick(ASender: TObject);
+begin
+  if Assigned(FOnLootGroundClick) then FOnLootGroundClick(Self);
+end;
+
 procedure TGameUI.DoOnAdjustCameraToUnit(ASender: TObject);
 var unt: TRoomUnit;
 begin
@@ -371,6 +380,7 @@ begin
 
   menu := TavmUnitMenu.Create(FRootControl);
   menu.OnEndTurnClick := {$IfDef FPC}@{$EndIf}DoOnEndTurnBtnClick;
+  menu.OnLootGround   := {$IfDef FPC}@{$EndIf}DoOnLootGroundClick;
   menu.OnAdjustToUnit := {$IfDef FPC}@{$EndIf}DoOnAdjustCameraToUnit;
   FUnitMenu := menu;
 
@@ -459,6 +469,14 @@ begin
   if FCurrentRoom = nil then Exit;
   if not FCurrentRoom.IsPlayerTurn then Exit;
   FCurrentRoom.EndTurn();
+end;
+
+procedure TFloorMap.DoOnLootGroundClick(ASender: TObject);
+begin
+  if FCurrentRoom = nil then Exit;
+  if not FCurrentRoom.IsPlayerTurn then Exit;
+  if FCurrentRoom.InAction() then Exit;
+  FCurrentRoom.AddAction(TBRA_LootGround.Create(FCurrentRoom.Player));
 end;
 
 procedure TFloorMap.DoLeaveBattleRoom(const ABattleRoom: TBattleRoom; const ADoorIdx: Integer);
@@ -582,6 +600,7 @@ begin
   FRooms := TRoomsMap.Create();
   FUI := TGameUI.Create(Self);
   FUI.OnEndTurnBtnClick := {$IfDef FPC}@{$EndIf}DoOnEndTurnBtnClick;
+  FUI.OnLootGroundClick := {$IfDef FPC}@{$EndIf}DoOnLootGroundClick;
 end;
 
 class function TFloorMap.RoomsDirectory: UnicodeString;

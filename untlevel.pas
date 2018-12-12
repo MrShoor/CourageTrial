@@ -657,6 +657,7 @@ type
 
     procedure Draw();
     procedure AddMessage(const AStr: string);
+    procedure AddFlyOutMessage(const AStr: string; const ATilePos: TVec2i; const AColor: TVec3; AHeight: Single = 1.5; const ATime: Integer = 1700);
 
     function NeighbourTile(const ACurrent: TVec2i; const AIndex: Integer): TVec2i;
     function Distance(const APt1, APt2: TVec2i): Integer;
@@ -879,7 +880,7 @@ type
   public
     procedure TryCancel; override;
     function ProcessAction: Boolean; override;
-    constructor Create(AUnit: TRoomUnit; AInventoryUnit: TRoomObject);
+    constructor Create(AUnit: TRoomUnit);
   end;
 
   { TBattleRoom }
@@ -1042,6 +1043,7 @@ end;
 
 procedure TBRA_LootGround.TryCancel;
 begin
+  if not FInAction then Exit;
   FInAction := False;
   HideOtherInventory;
   FUnit.Room.InvalidateInventoryBagsOnGround;
@@ -1052,11 +1054,27 @@ begin
   Result := FInAction;
 end;
 
-constructor TBRA_LootGround.Create(AUnit: TRoomUnit; AInventoryUnit: TRoomObject);
+constructor TBRA_LootGround.Create(AUnit: TRoomUnit);
+var inv: IRoomObjectArr;
 begin
   FUnit := AUnit;
-  FInventoryUnit := AInventoryUnit;
+  FInventoryUnit := nil;
+  inv := FUnit.Room.InventoryObjectsAt(FUnit.RoomPos, True);
+  if inv.Count = 0 then
+  begin
+    FInAction := False;
+    FUnit.Room.AddFlyOutMessage('На земле ничего нет', FUnit.RoomPos, Vec(1,0,0));
+    Exit;
+  end;
+  if FUnit.AP <= 0 then
+  begin
+    FInAction := False;
+    FUnit.Room.AddFlyOutMessage('Не хватает 1 ОД', FUnit.RoomPos, Vec(1,0,0));
+    Exit;
+  end;
   FInAction := True;
+  FUnit.AP := FUnit.AP - 1;
+  FInventoryUnit := inv[0];
   ShowOtherInventory;
 end;
 
@@ -3417,6 +3435,15 @@ begin
   broom.UI.AddMessage(AStr);
 end;
 
+procedure TRoomMap.AddFlyOutMessage(const AStr: string; const ATilePos: TVec2i;
+  const AColor: TVec3; AHeight: Single; const ATime: Integer);
+var
+  msg: TbFlyOutMessage;
+begin
+  msg := TbFlyOutMessage.Create(BattleRoom.World);
+  msg.SetState(UI.TilePosToWorldPos(ATilePos)+Vec(0,AHeight,0), AStr, Vec(AColor,1), ATime);
+end;
+
 function TRoomMap.Distance(const APt1, APt2: TVec2i): Integer;
 var dv: TVec2i;
 begin
@@ -4031,11 +4058,7 @@ begin
     Ord('G') :
     begin
       if (FPlayer <> nil) and not InAction() then
-      begin
-        inv_objs := FMap.InventoryObjectsAt(FPlayer.RoomPos, True);
-        if inv_objs.Count > 0 then
-          FActions.Add(TBRA_LootGround.Create(FPlayer, inv_objs[0]));
-      end;
+        FActions.Add(TBRA_LootGround.Create(FPlayer));
     end;
   end;
 end;

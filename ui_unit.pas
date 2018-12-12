@@ -43,6 +43,7 @@ type
     FLastAP: Integer;
 
     FEndTurnBtn: TavmUnitBtn;
+    FLootGndBtn: TavmUnitBtn;
     FUnitIco : TavmUnitIco;
 
     FSkillSlots: TavmSkills;
@@ -50,8 +51,10 @@ type
 
     function GetOnAdjustToUnit: TNotifyEvent;
     function GetOnEndTurnClick: TNotifyEvent;
+    function GetOnLootGround: TNotifyEvent;
     procedure SetOnAdjustToUnit(const AValue: TNotifyEvent);
     procedure SetOnEndTurnClick(const AValue: TNotifyEvent);
+    procedure SetOnLootGround(const AValue: TNotifyEvent);
     procedure SetRoomUnit(const AValue: TRoomUnit);
   protected
     procedure DoValidate; override;
@@ -62,6 +65,7 @@ type
     property SkillSlots: TavmSkills read FSkillSlots;
     property RoomUnit: TRoomUnit read FRoomUnit write SetRoomUnit;
     property OnEndTurnClick: TNotifyEvent read GetOnEndTurnClick write SetOnEndTurnClick;
+    property OnLootGround  : TNotifyEvent read GetOnLootGround   write SetOnLootGround;
     property OnAdjustToUnit: TNotifyEvent read GetOnAdjustToUnit write SetOnAdjustToUnit;
   end;
 
@@ -126,6 +130,11 @@ begin
   Result := FEndTurnBtn.OnClick;
 end;
 
+function TavmUnitMenu.GetOnLootGround: TNotifyEvent;
+begin
+  Result := FLootGndBtn.OnClick;
+end;
+
 function TavmUnitMenu.GetOnAdjustToUnit: TNotifyEvent;
 begin
   Result := FUnitIco.OnClick;
@@ -139,6 +148,11 @@ end;
 procedure TavmUnitMenu.SetOnEndTurnClick(const AValue: TNotifyEvent);
 begin
   FEndTurnBtn.OnClick := AValue;
+end;
+
+procedure TavmUnitMenu.SetOnLootGround(const AValue: TNotifyEvent);
+begin
+  FLootGndBtn.OnClick := AValue;
 end;
 
 procedure TavmUnitMenu.SetRoomUnit(const AValue: TRoomUnit);
@@ -239,6 +253,11 @@ begin
   FEndTurnBtn.Size := Vec(96, 64);
   FEndTurnBtn.Pos := Vec(Size.x - FEndTurnBtn.Size.x, cHPBarTop);
   FEndTurnBtn.Text := 'Конец хода';
+
+  FLootGndBtn := TavmUnitBtn.Create(Self);
+  FLootGndBtn.Size := Vec(96, 58);
+  FLootGndBtn.Pos := Vec(Size.x - FEndTurnBtn.Size.x, cHPBarTop + FEndTurnBtn.Size.y + 6);
+  FLootGndBtn.Text := 'Подобрать';
 
   FUnitIco := TavmUnitIco.Create(Self);
   FUnitIco.Origin := Vec(0, 0);
