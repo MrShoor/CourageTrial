@@ -68,6 +68,22 @@ type
     function Weapon_Damage: TVec2i; override;
   end;
 
+  { TPoisonBottle }
+
+  TPoisonBottle = class(TUnitItem)
+  private
+  public
+    function Name  : string;          override;
+    function Kind  : TUnitItemKind;   override;
+    function Slot  : TRoomUnitEqSlot; override;
+    function Model : string;          override;
+    function Ico48 : string;          override;
+
+    function ExtraDesc: string; override;
+
+    function Consume(AUnit: TRoomUnit): IBRA_Action; override;
+  end;
+
   { THealBottle }
 
   THealBottle = class(TUnitItem)
@@ -134,6 +150,51 @@ type
     function ProcessAction: Boolean; override;
     constructor Create(AUnit: TRoomUnit; const AItem: IUnitItem; const ABuff: IUnitBuff);
   end;
+
+{ TPoisonBottle }
+
+function TPoisonBottle.Name: string;
+begin
+  Result := 'Яд?';
+end;
+
+function TPoisonBottle.Kind: TUnitItemKind;
+begin
+  Result := ikConsumable;
+end;
+
+function TPoisonBottle.Slot: TRoomUnitEqSlot;
+begin
+  Result := esNone;
+end;
+
+function TPoisonBottle.Model: string;
+begin
+  Result := 'PotionB';
+end;
+
+function TPoisonBottle.Ico48: string;
+begin
+  Result := 'poison.png';
+end;
+
+function TPoisonBottle.ExtraDesc: string;
+begin
+  Result := 'Жизнь слишком проста? Ну ладно, пей';
+end;
+
+function TPoisonBottle.Consume(AUnit: TRoomUnit): IBRA_Action;
+begin
+  if not CheckConsume(AUnit) then Exit(nil);
+  AUnit.AP := AUnit.AP - 1;
+  Result := TBRA_DrinkPotion.Create(AUnit, Self);
+  if Result <> nil then
+  begin
+    AUnit.Room.AddMessage(AUnit.Name + ' выпивает неизвестную жидкость, и чувствует, как яд расходится по венам.');
+    AUnit.ApplyBuff(TBuff_Poison.Create(AUnit, 5));
+    AUnit.Inventory().Pop(self);
+  end;
+end;
 
 { THealBottle2 }
 

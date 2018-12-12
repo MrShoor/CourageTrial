@@ -212,7 +212,7 @@ type
 
     procedure LogAction(const AStr: string);
 
-    procedure DealDamage(ADmg: Integer; AFromUnit: TRoomUnit); override;
+    procedure DealPureDamage(ADmg: Integer; AFromUnit: TRoomUnit; const AMsg: string = ''); override;
   public
     destructor Destroy; override;
   end;
@@ -1883,9 +1883,9 @@ begin
   WriteLn(AStr);
 end;
 
-procedure TBot.DealDamage(ADmg: Integer; AFromUnit: TRoomUnit);
+procedure TBot.DealPureDamage(ADmg: Integer; AFromUnit: TRoomUnit; const AMsg: string);
 begin
-  inherited DealDamage(ADmg, AFromUnit);
+  inherited DealPureDamage(ADmg, AFromUnit);
   if AFromUnit <> nil then
     if not (FBState in [bsRetreat, bsSeeEnemy]) then
     begin

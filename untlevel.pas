@@ -462,7 +462,8 @@ type
     function GetVisible(): Boolean; override;
 
     procedure ApplyBuff(ABuff: IUnitBuff); virtual;
-    procedure DealDamage(ADmg: Integer; AFromUnit: TRoomUnit); virtual;
+    procedure DealPureDamage(ADmg: Integer; AFromUnit: TRoomUnit; const AMsg: string = ''); virtual;
+    procedure DealDamage(ADmg: Integer; AFromUnit: TRoomUnit; const AMsg: string = ''); virtual;
     procedure InstantKill(const AMessage: string); virtual;
 
     property AnimateState: TRoomUnitAnimateState read FAnimateState write FAnimateState;
@@ -2853,20 +2854,19 @@ begin
   end;
 end;
 
-procedure TRoomUnit.DealDamage(ADmg: Integer; AFromUnit: TRoomUnit);
+procedure TRoomUnit.DealPureDamage(ADmg: Integer; AFromUnit: TRoomUnit; const AMsg: string);
 var msg: TbFlyOutMessage;
     s: string;
-    i: Integer;
 begin
-  for i := 0 to FBuffs.Count - 1 do
-    FBuffs[i].ProcessDamage(ADmg, AFromUnit);
-
   HP := HP - ADmg;
 
   msg := TbFlyOutMessage.Create(World);
   msg.SetState(Pos+Vec(0,1.5,0), IntToStr(ADmg), Vec(1,0,0,1));
 
-  s := Name + ' получает ' + IntToStr(ADmg) + ' урона';
+  if AMsg = '' then
+    s := Name + ' получает ' + IntToStr(ADmg) + ' урона'
+  else
+    s := AMsg;
   if IsDead() then
   begin
     Room.AddMessage(s + ' и умирает');
@@ -2877,6 +2877,15 @@ begin
     Room.AddMessage(s);
     SetAnimation(['React0']);
   end;
+end;
+
+procedure TRoomUnit.DealDamage(ADmg: Integer; AFromUnit: TRoomUnit; const AMsg: string);
+var
+  i: Integer;
+begin
+  for i := 0 to FBuffs.Count - 1 do
+    FBuffs[i].ProcessDamage(ADmg, AFromUnit);
+  DealPureDamage(ADmg, AFromUnit, AMsg);
 end;
 
 procedure TRoomUnit.InstantKill(const AMessage: string);
@@ -3883,14 +3892,10 @@ begin
 
   FSlots10[0] := FUnitSkills[0];
   FSlots10[1] := FUnitSkills[1];
+  FSlots10[2] := FUnitSkills[2];
 
   bow := TArcherBow.Create;
   Inventory().Push(bow, 0);
-
-  for i := 0 to 30 do
-    Inventory().Push(TArcherBow.Create, 0);
-  for i := 0 to 30 do
-    Inventory().Push(TAxe.Create, 0);
 
   bow := TArcherBow.Create;
   Inventory().Push(bow, 0);
@@ -3908,6 +3913,7 @@ begin
 
   Inventory().Push(THealBottle.Create, 0);
   Inventory().Push(THealBottle2.Create, 0);
+  Inventory().Push(TPoisonBottle.Create, 0);
 
   SetLength(FAnim, FModels.Count);
   for i := 0 to FModels.Count - 1 do
@@ -4033,8 +4039,7 @@ begin
 end;
 
 procedure TBattleRoom.KeyPress(KeyCode: Integer);
-var inv_objs: IRoomObjectArr;
-    n: Integer;
+var n: Integer;
 begin
   if KeyCode = Ord('O') then
     FMap.RoomFloor.DoorsOpened := not FMap.RoomFloor.DoorsOpened;

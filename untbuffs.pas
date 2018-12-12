@@ -82,7 +82,57 @@ type
     function DoStep: Boolean; override;
   end;
 
+  { TBuff_Poison }
+
+  TBuff_Poison = class(TUnitBuff)
+  private
+  protected
+    function ID  : TUnitBuffID; override;
+    function Name: string; override;
+    function Desc: string; override;
+    function Ico : string; override;
+
+    function Kind: TUnitBuffKind; override;
+    function DoStep: Boolean; override;
+  end;
+
 implementation
+
+{ TBuff_Poison }
+
+function TBuff_Poison.ID: TUnitBuffID;
+begin
+  Result := bidUnknown;
+end;
+
+function TBuff_Poison.Name: string;
+begin
+  Result := 'Отравление';
+end;
+
+function TBuff_Poison.Desc: string;
+begin
+  Result := 'Каждый ход теряется 10 ОЗ';
+end;
+
+function TBuff_Poison.Ico: string;
+begin
+  Result := 'poison.png';
+end;
+
+function TBuff_Poison.Kind: TUnitBuffKind;
+begin
+  Result := bkPoison;
+end;
+
+function TBuff_Poison.DoStep: Boolean;
+var unt: TRoomUnit;
+begin
+  Result := inherited DoStep;
+  unt := Owner;
+  if unt <> nil then
+    unt.DealPureDamage(10, nil, unt.Name + ' получает 10 урона от яда');
+end;
 
 { TBuff_ResonantArmor }
 
