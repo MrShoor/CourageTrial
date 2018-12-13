@@ -10,7 +10,6 @@ interface
 uses
   Classes, SysUtils, avRes, avContnrs, avMiniControls, avTypes, untLevel, mutils, intfUtils,
   avBase,
-  avCanvas,
   avContnrsDefaults,
   avPathFinder,
   ui_wndbutton,
@@ -385,32 +384,6 @@ begin
 end;
 
 procedure TGameUI.CreateUI();
-  procedure PreloadGlyphs;
-  const
-    cRusGlyphs: string = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя';
-    cFont = 'Segoe UI';
-  var
-    cd: TavCanvasCommonData;
-    yyyy: TVec4;
-    xxx: TVec3;
-    ch: WideChar;
-    i: Integer;
-    cRusGlyphsWStr: UnicodeString;
-  begin
-    cRusGlyphsWStr := UnicodeString(cRusGlyphs);
-
-    cd := GetCanvasCommonData(Main);
-    for ch := Chr(32) to Chr(126) do
-      cd.GetGlyphImage(cFont, ch, [], xxx, yyyy);
-    for i := 1 to Length(cRusGlyphsWStr) do
-      cd.GetGlyphImage(cFont, cRusGlyphsWStr[i], [], xxx, yyyy);
-
-    for ch := Chr(32) to Chr(126) do
-      cd.GetGlyphImage(cFont, ch, [gsBold], xxx, yyyy);
-    for i := 1 to Length(cRusGlyphsWStr) do
-      cd.GetGlyphImage(cFont, cRusGlyphsWStr[i], [gsBold], xxx, yyyy);
-  end;
-
 var
   menu: TavmUnitMenu;
   inv_ui: TavmInventory;
@@ -479,8 +452,6 @@ begin
   FSkillsBtn.Text := 'Навыки';
   FSkillsBtn.Checked := FPlayerSkills.Visible;
   FSkillsBtn.OnCheck := {$IfDef FPC}@{$EndIf}SkillsBtnCheck;
-
-  PreloadGlyphs;
 end;
 
 procedure TGameUI.AfterRegister;
