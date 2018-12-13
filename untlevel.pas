@@ -25,6 +25,9 @@ type
   TStringArray = array of string;
   {$EndIf}
 
+  IVisitedRooms = {$IfDef FPC}specialize{$EndIf}IHashSet<string>;
+  TVisitedRooms = {$IfDef FPC}specialize{$EndIf}THashSet<string>;
+
   IRoomMapGraph = {$IfDef FPC}specialize{$EndIf} IMap<TVec2i>;
   IRoomMapNonWeightedGraph = {$IfDef FPC}specialize{$EndIf}INonWeightedGraph<TVec2i>;
   IRoomMapPF  = {$IfDef FPC}specialize{$EndIf} IAStar<TVec2i>;
@@ -975,7 +978,7 @@ type
     procedure UpdateStep();
     procedure PrepareToDraw();
     procedure Draw3DUI();
-    procedure GenerateWithLoad(const AFileName: string; const ADoors: TDoors; const AForPlayer: TPlayer = nil);
+    procedure GenerateWithLoad(const AFileName: string; const ADoors: TDoors; const AForPlayer: TPlayer = nil; const AVisitedRooms: IVisitedRooms = nil);
     procedure GenerateEmpty();
     procedure DrawObstaclePreview(const AName: String; const bmp: TBitmap);
 
@@ -1001,7 +1004,7 @@ implementation
 {$R 'shaders\CT_shaders.rc'}
 
 uses
-  untEnemies, untGraphics, untItems, untSkills, untRoomObstacles;
+  untEnemies, untGraphics, untItems, untSkills, untRoomObstacles, generator;
 
 type
   IRoomClassesMap = {$IfDef FPC}specialize{$EndIf}IHashMap<string, TRoomObjectClass>;
@@ -4316,7 +4319,7 @@ begin
 end;
 
 procedure TBattleRoom.GenerateWithLoad(const AFileName: string;
-  const ADoors: TDoors; const AForPlayer: TPlayer);
+  const ADoors: TDoors; const AForPlayer: TPlayer; const AVisitedRooms: IVisitedRooms);
 
   procedure LoadObstacles;
   var fs: TFileStream;
@@ -4339,31 +4342,24 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string;
     until False;
   end;
 
-  procedure SpawnBot();
+  {$IfDef DEBUGBOTS}
+  procedure SpawnDebugBot();
   var bot: TBot;
   begin
-    {$IfDef DEBUGBOTS}
     //bot := TBotMutant1.Create(FMap);
     //bot.LoadModels();
     //bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
     //FUnits.Add(bot);
 
     bot := TBotWisp.Create(FMap);
-    {$Else}
-    case Random(13123123) mod 3 of
-       0: bot := TBotArcher1.Create(FMap);
-       1: bot := TBotMutant1.Create(FMap);
-       2: bot := TBotWisp.Create(FMap);
-    end;
-    {$EndIf}
     bot.LoadModels();
     bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
     //bot.SetRoomPosDir(Vec(0,0), Random(6));
     FUnits.Add(bot);
   end;
+  {$EndIf}
 
 var
-  i: Integer;
   oldPlayer: TPlayer;
 begin
   FreeAndNil(FMap);
@@ -4375,8 +4371,11 @@ begin
   LoadObstacles();
   FPlayer := oldPlayer;
 
-  for i := 0 to {$IfDef DEBUGBOTS}0{$Else}6{$EndIf} do
-    SpawnBot();
+  {$IfDef DEBUGBOTS}
+    SpawnDebugBot();
+  {$Else}
+    FUnits.AddArray( GenBots(FMap, AVisitedRooms, AForPlayer) );
+  {$EndIf}
 end;
 
 procedure TBattleRoom.GenerateEmpty();

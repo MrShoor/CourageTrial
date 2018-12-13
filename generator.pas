@@ -9,19 +9,17 @@ interface
 uses
   Classes, SysUtils, avContnrs, untLevel;
 
-type
-  IVisitedRooms = {$IfDef FPC}specialize{$EndIf}IHashSet<string>;
-  TVisitedRooms = {$IfDef FPC}specialize{$EndIf}THashSet<string>;
-
 function GenRoom(const AVisitedRooms: IVisitedRooms; const AAllRooms: TStrings): string;
+function GenBots(const AMap: TRoomMap; const AVisitedRooms: IVisitedRooms; const AForPlayer: TRoomUnit): IRoomUnitArr;
 
 function GenAltarLoot(const AForUnit: TRoomUnit): IUnitItem;
 function GenChestLoot(const AForUnit: TRoomUnit): IUnitItemArr;
+procedure GenStdBotInventory(const ABotInventory: IInventory);
 
 implementation
 
 uses
-  mutils, Math, untItems;
+  mutils, Math, untItems, untEnemies;
 
 type
   IRoomWeight = {$IfDef FPC}specialize{$EndIf} IHashMap<string, Integer>;
@@ -59,6 +57,58 @@ begin
   end;
 
   Result := AAllRooms[ WeightedRandom(roomWeights) ];
+end;
+
+function GenBots(const AMap: TRoomMap; const AVisitedRooms: IVisitedRooms; const AForPlayer: TRoomUnit): IRoomUnitArr;
+
+  function GetSpawnPlace(): TVec2i;
+  begin
+    repeat
+      Result.x := Random(AMap.Radius*2+1) - AMap.Radius;
+      Result.y := Random(AMap.Radius*2+1) - AMap.Radius;
+      if AMap.IsCellExists(Result) and (not AMap.RoomFloor.IsHole[Result]) and not AMap.IsCellBlocked(Result) then
+        Exit(Result);
+    until False;
+  end;
+
+  function SpawnBot(const ABotClass: TBotClass): TRoomUnit;
+  var bot: TBot;
+  begin
+    bot := ABotClass.Create(AMap);
+    bot.LoadModels();
+    bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
+    Result := bot;
+  end;
+
+var botsToSpawn: Integer;
+    wispToSpawn, i: Integer;
+begin
+  Result := TRoomUnitArr.Create();
+
+  case AVisitedRooms.Count of
+    0: botsToSpawn := 2 + Random(2);
+    1: botsToSpawn := 3 + Random(2);
+    2: botsToSpawn := 3 + Random(3);
+    3: botsToSpawn := 4 + Random(4);
+    4: botsToSpawn := 5 + Random(4);
+    5: botsToSpawn := 6 + Random(5);
+  else
+    botsToSpawn := 7 + Random(6);
+  end;
+  wispToSpawn := Clamp(Random(botsToSpawn div 3 + 1) + Random(2), 0, (botsToSpawn+2) div 3);
+  if (botsToSpawn > 6) and (wispToSpawn = 0) then wispToSpawn := 1;
+  botsToSpawn := botsToSpawn - wispToSpawn;
+
+  for i := 0 to wispToSpawn - 1 do
+    Result.Add(SpawnBot(TBotWisp));
+
+  for i := 0 to botsToSpawn - 1 do
+  begin
+    if Random(2) = 0 then
+      Result.Add(SpawnBot(TBotMutant1))
+    else
+      Result.Add(SpawnBot(TBotArcher1));
+  end;
 end;
 
 function GenAltarLoot(const AForUnit: TRoomUnit): IUnitItem;
@@ -99,7 +149,7 @@ function GenChestLoot(const AForUnit: TRoomUnit): IUnitItemArr;
 type
   TGenChestItems = (ciBottle30, ciBottle50, ciScrollResonantArmor, ciSocks, ciPoison);
 const
-  cBasicWeights: array [TGenChestItems] of Integer = (5000, 1000, 500, 1000, 200);
+  cBasicWeights: array [TGenChestItems] of Integer = (4000, 1000, 500, 1000, 200);
 var luck: Integer;
     itemsCount: Integer;
     weights: array [TGenChestItems] of Integer;
@@ -134,6 +184,30 @@ begin
     end;
     if newItem <> nil then
       Result.Add(newItem);
+  end;
+end;
+
+procedure GenStdBotInventory(const ABotInventory: IInventory);
+type
+  TGenBotItems = (biBottle30, biBottle50, biScrollResonantArmor, biPoison);
+const
+  cBasicWeights: array [TGenBotItems] of Integer = (4000, 1000, 500, 300);
+var
+  i, itemsCount: Integer;
+  newItem: IUnitItem;
+  newItemID: TGenBotItems;
+begin
+  itemsCount := WeightedRandom([100, 30, 10]);
+  for i := 0 to itemsCount - 1 do
+  begin
+    newItemID := TGenBotItems(WeightedRandom(cBasicWeights));
+    case newItemID of
+      biBottle30           : newItem := THealBottle.Create;
+      biBottle50           : newItem := THealBottle2.Create;
+      biScrollResonantArmor: newItem := TScroll_ResonantArmor.Create;
+      biPoison             : newItem := TPoisonBottle.Create;
+    end;
+    ABotInventory.Push(newItem, ABotInventory.Items.Count - 1);
   end;
 end;
 

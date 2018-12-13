@@ -537,10 +537,10 @@ begin
     broom.RoomDir := pRoom^.RoomRot;
     //broom.GenerateWithLoad('rooms\r'+IntToStr(Random(3)+1)+'.room', GetRoomDoors(ARoomCoord));
     newRoomName := GenRoom(FVisitedRooms, FAllRoomFiles);
-    FVisitedRooms.Add(newRoomName);
-    broom.GenerateWithLoad(dir + '\' + newRoomName, GetRoomDoors(ARoomCoord), AForPlayer);
+    broom.GenerateWithLoad(dir + '\' + newRoomName, GetRoomDoors(ARoomCoord), AForPlayer, FVisitedRooms);
     broom.UI := FUI;
     broom.OnLeaveBattleRoom := {$IfDef FPC}@{$EndIf}DoLeaveBattleRoom;
+    FVisitedRooms.Add(newRoomName);
 
     pRoom^.room := broom;
   end;

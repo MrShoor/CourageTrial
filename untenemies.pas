@@ -216,6 +216,7 @@ type
   public
     destructor Destroy; override;
   end;
+  TBotClass = class of TBot;
   TBotArr = {$IfDef FPC}specialize{$EndIf} TArray<TBot>;
   IBotArr = {$IfDef FPC}specialize{$EndIf} IArray<TBot>;
   TBotSet = {$IfDef FPC}specialize{$EndIf} THashSet<TBot>;
@@ -287,7 +288,7 @@ var gvDebugPoints : IVec2iArr;
 implementation
 
 uses
-  untSkills, untItems;
+  untSkills, untItems, generator;
 
 var gvBotID: Integer = 0;
 
@@ -906,6 +907,8 @@ begin
   FRetreatLimits := 5;
 
   Preview96_128 := 'ui\units\archer.png';
+
+  GenStdBotInventory(FInventory);
 end;
 
 function TBotArcher1.DoAction(): IBRA_Action;
@@ -1951,6 +1954,8 @@ begin
   Preview96_128 := 'ui\units\mutant1.png';
 
   FUnitSkills.Add(TSkill_Kick.Create(nil, 0));
+
+  GenStdBotInventory(FInventory);
 end;
 
 function TBotMutant1.DoAction(): IBRA_Action;
