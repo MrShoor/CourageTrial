@@ -8,7 +8,7 @@ unit untInteractiveObjects;
 interface
 
 uses
-  Classes, SysUtils, bWorld, avBase, untLevel, untObstacles, avModel, avMesh, mutils, untItems;
+  Classes, SysUtils, bWorld, avBase, untLevel, untObstacles, avModel, avMesh, mutils;
 
 type
 
@@ -16,6 +16,7 @@ type
 
   TRoomChest = class(TRoomInteractiveObject)
   private
+    FGenerated: Boolean;
     FInventory: IInventory;
     FAnim: IavAnimationController;
   protected
@@ -66,6 +67,9 @@ type
   end;
 
 implementation
+
+uses
+  generator;
 
 type
 
@@ -203,8 +207,12 @@ end;
 procedure TRoomAltar.LoadModels(const AObstacle: TObstacleDesc);
 begin
   inherited LoadModels(AObstacle);
+
   if not Room.InEditMode then
-    Equip(TArcherBow.Create);
+  begin
+    Equip(GenAltarLoot(Room.BattleRoom.Player));
+//    Equip(TArcherBow.Create);
+  end;
 
   FAnim := Create_IavAnimationController(FModels[0].Mesh.Pose, World.GameTime);
   FAnim.AnimationSequence_StartAndStopOther(['Altar_Idle0'], True);
@@ -310,10 +318,10 @@ begin
   inherited AfterRegister;
   FInventory := TInventory.Create(Self);
 
-  FInventory.Push(TAxe.Create, 0);
-  FInventory.Push(TArcherBow.Create, 0);
-  FInventory.Push(THealBottle.Create, 0);
-  FInventory.Push(TScroll_ResonantArmor.Create, 0);
+  //FInventory.Push(TAxe.Create, 0);
+  //FInventory.Push(TArcherBow.Create, 0);
+  //FInventory.Push(THealBottle.Create, 0);
+  //FInventory.Push(TScroll_ResonantArmor.Create, 0);
 end;
 
 procedure TRoomChest.SetAnimation(const AName: string);
@@ -350,6 +358,18 @@ begin
 end;
 
 function TRoomChest.Interactive_Try(AUnit: TRoomUnit): IBRA_Action;
+
+  procedure DoGenerateIfNeeded;
+  var newItems: IUnitItemArr;
+      i: Integer;
+  begin
+    if FGenerated then Exit;
+    FGenerated := True;
+    newItems := GenChestLoot(AUnit);
+    for i := 0 to newItems.Count - 1 do
+      FInventory.Push(newItems[i], FInventory.Items.Count);
+  end;
+
 var absCrd: TVec2i;
     i: Integer;
 begin
@@ -366,6 +386,8 @@ begin
 
     AUnit.AP := AUnit.AP - Interactive_Cost(i);
     AUnit.RoomDir := Room.Direction(AUnit.RoomPos, RoomPos);
+
+    DoGenerateIfNeeded;
 
     Result := TBRA_LootChestAction.Create(Self, AUnit);
     Exit;

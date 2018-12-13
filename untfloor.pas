@@ -13,7 +13,8 @@ uses
   avContnrsDefaults,
   avPathFinder,
   ui_wndbutton,
-  ui_unit, ui_inventory, ui_skills, ui_gamecamera, ui_messages, ui_enemies, ui_ingame_menu;
+  ui_unit, ui_inventory, ui_skills, ui_gamecamera, ui_messages, ui_enemies, ui_ingame_menu,
+  generator;
 
 type
   TFloorMap = class;
@@ -128,6 +129,8 @@ type
     FCurrentRoom: TBattleRoom;
     FRooms: IRoomsMap;
 
+    FVisitedRooms: IVisitedRooms;
+
     FUI: TGameUI;
     FPlayer: TPlayer;
     procedure CreatePlayer;
@@ -135,7 +138,7 @@ type
     procedure DoOnLootGroundClick(ASender: TObject);
     procedure DoLeaveBattleRoom(const ABattleRoom: TBattleRoom; const ADoorIdx: Integer);
 
-    function ObtainBattleRoom(const ARoomCoord: TVec2i): TBattleRoom;
+    function ObtainBattleRoom(const ARoomCoord: TVec2i; const AForPlayer: TPlayer): TBattleRoom;
 
     function  GetRoomDoors(const ARoomCoord: TVec2i): TDoors;
     procedure MoveToRoom(const ARoomCoord: TVec2i; const AFromDoor: Integer);
@@ -519,10 +522,11 @@ begin
   end;
 end;
 
-function TFloorMap.ObtainBattleRoom(const ARoomCoord: TVec2i): TBattleRoom;
+function TFloorMap.ObtainBattleRoom(const ARoomCoord: TVec2i; const AForPlayer: TPlayer): TBattleRoom;
 var broom: TBattleRoom;
     pRoom: PBattleRoomAdapter;
     dir  : string;
+    newRoomName: string;
 begin
   dir := string(RoomsDirectory);
   pRoom := PBattleRoomAdapter(FRooms.PItem[ARoomCoord]);
@@ -532,7 +536,9 @@ begin
     broom.RoomPos := ARoomCoord;
     broom.RoomDir := pRoom^.RoomRot;
     //broom.GenerateWithLoad('rooms\r'+IntToStr(Random(3)+1)+'.room', GetRoomDoors(ARoomCoord));
-    broom.GenerateWithLoad(dir + '\' + FAllRoomFiles[Random(FAllRoomFiles.Count)], GetRoomDoors(ARoomCoord));
+    newRoomName := GenRoom(FVisitedRooms, FAllRoomFiles);
+    FVisitedRooms.Add(newRoomName);
+    broom.GenerateWithLoad(dir + '\' + newRoomName, GetRoomDoors(ARoomCoord), AForPlayer);
     broom.UI := FUI;
     broom.OnLeaveBattleRoom := {$IfDef FPC}@{$EndIf}DoLeaveBattleRoom;
 
@@ -563,7 +569,7 @@ begin
   if FCurrentRoom <> nil then
     if FCurrentRoom.RoomPos = ARoomCoord then Exit;
 
-  broom := ObtainBattleRoom(ARoomCoord);
+  broom := ObtainBattleRoom(ARoomCoord, FPlayer);
   FCurrentRoom := broom;
 
   if FPlayer = nil then CreatePlayer;
@@ -580,7 +586,7 @@ begin
   if FCurrentRoom <> nil then
     if FCurrentRoom.RoomPos = ARoomCoord then Exit;
 
-  broom := ObtainBattleRoom(ARoomCoord);
+  broom := ObtainBattleRoom(ARoomCoord, FPlayer);
   FCurrentRoom := broom;
 
   if FPlayer = nil then CreatePlayer;
@@ -592,10 +598,20 @@ end;
 
 procedure TFloorMap.ShowAllRooms();
 var roomCoords: TVec2i;
+    allRooms: array of TVec2i;
+    i: Integer;
 begin
+  SetLength(allRooms, FRooms.Count);
+  i := 0;
   FRooms.Reset;
   while FRooms.NextKey(roomCoords) do
-    ObtainBattleRoom(roomCoords);
+  begin
+    allRooms[i] := roomCoords;
+    Inc(i);
+  end;
+
+  for i := 0 to Length(allRooms) - 1 do
+    ObtainBattleRoom(allRooms[i], FPlayer);
 end;
 
 procedure TFloorMap.UpdateBoundsAtVisibleRooms;
@@ -714,7 +730,7 @@ begin
   end;
 
   SetCurrentRoom(Vec(0, 0));
-  ShowAllRooms();
+//  ShowAllRooms();
 end;
 
 procedure TFloorMap.Draw2DUI();
@@ -740,6 +756,7 @@ constructor TFloorMap.Create(AParent: TavObject);
 
 begin
   inherited Create(AParent);
+  FVisitedRooms := TVisitedRooms.Create;
   FAllRoomFiles := TStringList.Create;
   ReadDirectory(RoomsDirectory);
 end;

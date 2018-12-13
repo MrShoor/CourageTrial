@@ -126,6 +126,10 @@ type
   IUnitSkillArr = {$IfDef FPC}specialize{$EndIf}IArray<IUnitSkill>;
   TUnitSkillArr = {$IfDef FPC}specialize{$EndIf}TArray<IUnitSkill>;
 
+  TRoomUnitStats = packed record
+    Lucky: Integer;
+  end;
+
   TUnitBuffKind = (bkPowerUp, bkStun, bkBleed, bkPoison, bkDebuff);
   TUnitBuffID = (bidUnknown, bidAbsoluteSight);
   IUnitBuff = interface
@@ -148,8 +152,12 @@ type
   IUnitBuffsArr = {$IfDef FPC}specialize{$EndIf}IArray<IUnitBuff>;
   TUnitBuffsArr = {$IfDef FPC}specialize{$EndIf}TArray<IUnitBuff>;
 
+  {$ScopedEnums On}
+  TUnitItemID = (Unknown, LuckySocks);
+  {$ScopedEnums Off}
   IUnitItem = interface
   ['{E6D665A9-3E67-43A8-891E-32B835887FB8}']
+    function  ID: TUnitItemID;
     function  GetEquipped: Boolean;
     procedure SetEquipped(const AValue: Boolean);
 
@@ -166,6 +174,8 @@ type
     function Skill(ASkillIndex: Integer): IUnitSkill;
 
     function Consume(AUnit: TRoomUnit): IBRA_Action;
+
+    function StatsUp: TRoomUnitStats;
 
     procedure ProcessDamage(ADmg: Integer; AFromUnit: TRoomUnit);
 
@@ -367,6 +377,7 @@ type
   private
     FAP: Integer;
     FMaxAP: Integer;
+    FStats: TRoomUnitStats;
 
     FHP: Integer;
     FMaxHP: Integer;
@@ -383,6 +394,8 @@ type
     procedure SetMaxAP(const AValue: Integer);
     procedure SetMaxHP(const AValue: Integer);
     procedure SetPreview96_128(const AValue: string);
+
+    function GetCurrentStats: TRoomUnitStats;
   protected
     FBuffs: IUnitBuffsArr;
 
@@ -412,6 +425,9 @@ type
     procedure WriteModels(const ACollection: IavModelInstanceArr; AType: TModelType); override;
     procedure WriteDepthOverrideModels(const ACollection: IavModelInstanceArr; const ADepthOverride: IOverrideColorArr); override;
   public
+    property BasicStats: TRoomUnitStats read FStats write FStats;
+    property Stats: TRoomUnitStats read GetCurrentStats;
+
     property Preview96_128: string read FPreview96_128 write SetPreview96_128;
 
     property SkillSlots: IUnitSkillArr read FSlots10 write FSlots10;
@@ -959,7 +975,7 @@ type
     procedure UpdateStep();
     procedure PrepareToDraw();
     procedure Draw3DUI();
-    procedure GenerateWithLoad(const AFileName: string; const ADoors: TDoors);
+    procedure GenerateWithLoad(const AFileName: string; const ADoors: TDoors; const AForPlayer: TPlayer = nil);
     procedure GenerateEmpty();
     procedure DrawObstaclePreview(const AName: String; const bmp: TBitmap);
 
@@ -2184,6 +2200,7 @@ end;
 
 function TBRA_UnitMovementAction.MoveToNextCell: Boolean;
 begin
+  if RoomUnit.Room.ObjectAt(MovePath[MovePathIdx]) <> nil then Exit(False);
   RoomUnit.RoomPos := MovePath[MovePathIdx];
   RoomUnit.AP := RoomUnit.AP - 1;
 
@@ -2899,6 +2916,18 @@ procedure TRoomUnit.SetAP(const AValue: Integer);
 begin
   if FAP = AValue then Exit;
   FAP := AValue;
+end;
+
+function TRoomUnit.GetCurrentStats: TRoomUnitStats;
+var itemStats: TRoomUnitStats;
+  i: Integer;
+begin
+  Result := FStats;
+  for i := 0 to FInventory.Items.Count - 1 do
+  begin
+    itemStats := FInventory.Items[i].StatsUp;
+    Result.Lucky := Result.Lucky + itemStats.Lucky;
+  end;
 end;
 
 procedure TRoomUnit.SetHP(const AValue: Integer);
@@ -3864,7 +3893,6 @@ end;
 procedure TPlayer.LoadModels();
 var
   i: Integer;
-  bow: IUnitItem;
   axe: IUnitItem;
 begin
   MaxAP := {$IfDef DEBUGBOTS}30{$Else}10{$EndIf};
@@ -3894,26 +3922,18 @@ begin
   FSlots10[1] := FUnitSkills[1];
   FSlots10[2] := FUnitSkills[2];
 
-  bow := TArcherBow.Create;
-  Inventory().Push(bow, 0);
-
-  bow := TArcherBow.Create;
-  Inventory().Push(bow, 0);
+  //Inventory().Push(TArcherBow.Create, 0);
 
   axe := TAxe.Create;
   Inventory().Push(axe, 0);
   Equip(axe);
-  axe := TAxe.Create;
-  Inventory().Push(axe, 0);
 
-  Inventory().Push(TScroll_ResonantArmor.Create, 0);
-  Inventory().Push(TScroll_ResonantArmor.Create, 0);
-  Inventory().Push(TScroll_ResonantArmor.Create, 0);
-  Inventory().Push(TScroll_ResonantArmor.Create, 0);
+  //Inventory().Push(TScroll_ResonantArmor.Create, 0);
 
   Inventory().Push(THealBottle.Create, 0);
-  Inventory().Push(THealBottle2.Create, 0);
-  Inventory().Push(TPoisonBottle.Create, 0);
+  //Inventory().Push(THealBottle2.Create, 0);
+  //Inventory().Push(TPoisonBottle.Create, 0);
+//  Inventory().Push(TSocks.Create, 0);
 
   SetLength(FAnim, FModels.Count);
   for i := 0 to FModels.Count - 1 do
@@ -4295,7 +4315,8 @@ begin
   Main.States.DepthWrite := oldDepthWrite;
 end;
 
-procedure TBattleRoom.GenerateWithLoad(const AFileName: string; const ADoors: TDoors);
+procedure TBattleRoom.GenerateWithLoad(const AFileName: string;
+  const ADoors: TDoors; const AForPlayer: TPlayer);
 
   procedure LoadObstacles;
   var fs: TFileStream;
@@ -4343,12 +4364,16 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string; const ADoors: TD
 
 var
   i: Integer;
+  oldPlayer: TPlayer;
 begin
   FreeAndNil(FMap);
   FMap := TRoomMap.Create(Self);
   FMap.SetDoorsRadius(ADoors, cRoomRadius);
 
+  oldPlayer := FPlayer;
+  FPlayer := AForPlayer;
   LoadObstacles();
+  FPlayer := oldPlayer;
 
   for i := 0 to {$IfDef DEBUGBOTS}0{$Else}6{$EndIf} do
     SpawnBot();

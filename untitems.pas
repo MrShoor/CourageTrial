@@ -20,6 +20,7 @@ type
 
     function CheckConsume(AUnit: TRoomUnit): Boolean;
   public
+    function  ID: TUnitItemID; virtual;
     function  GetEquipped: Boolean;
     procedure SetEquipped(const AValue: Boolean);
 
@@ -36,6 +37,8 @@ type
     function Skill(ASkillIndex: Integer): IUnitSkill; virtual;
 
     function Consume(AUnit: TRoomUnit): IBRA_Action; virtual;
+
+    function StatsUp: TRoomUnitStats; virtual;
 
     procedure ProcessDamage(ADmg: Integer; AFromUnit: TRoomUnit); virtual;
 
@@ -127,10 +130,27 @@ type
     constructor Create; override;
   end;
 
+  { TSocks }
+
+  TSocks = class(TUnitItem)
+  private
+  public
+    function ID    : TUnitItemID;     override;
+    function Name  : string;          override;
+    function Kind  : TUnitItemKind;   override;
+    function Slot  : TRoomUnitEqSlot; override;
+    function Model : string;          override;
+    function Ico48 : string;          override;
+
+    function StatsUp: TRoomUnitStats; override;
+
+    function ExtraDesc: string; override;
+  end;
+
 implementation
 
 uses
-  Math, untBuffs;
+  Math, untBuffs, avTypes;
 
 type
   TBRA_DrinkPotion = class(TBRA_Action)
@@ -150,6 +170,49 @@ type
     function ProcessAction: Boolean; override;
     constructor Create(AUnit: TRoomUnit; const AItem: IUnitItem; const ABuff: IUnitBuff);
   end;
+
+{ TSocks }
+
+function TSocks.ID: TUnitItemID;
+begin
+  Result := TUnitItemID.LuckySocks;
+end;
+
+function TSocks.Name: string;
+begin
+  Result := 'Огромные носки';
+end;
+
+function TSocks.Kind: TUnitItemKind;
+begin
+  Result := ikUnknown;
+end;
+
+function TSocks.Slot: TRoomUnitEqSlot;
+begin
+  Result := esNone;
+end;
+
+function TSocks.Model: string;
+begin
+  Result := 'Socks';
+end;
+
+function TSocks.Ico48: string;
+begin
+  Result := 'socks.png';
+end;
+
+function TSocks.StatsUp: TRoomUnitStats;
+begin
+  Result := inherited StatsUp;
+  Result.Lucky := 10;
+end;
+
+function TSocks.ExtraDesc: string;
+begin
+  Result := 'Они настолько огромны, что даже сложно представить себе хозяина';
+end;
 
 { TPoisonBottle }
 
@@ -386,6 +449,11 @@ begin
   Result := True;
 end;
 
+function TUnitItem.ID: TUnitItemID;
+begin
+  Result := TUnitItemID.Unknown;
+end;
+
 function TUnitItem.GetEquipped: Boolean;
 begin
   Result := FEquipped;
@@ -420,6 +488,11 @@ end;
 function TUnitItem.Consume(AUnit: TRoomUnit): IBRA_Action;
 begin
   Result := nil;
+end;
+
+function TUnitItem.StatsUp: TRoomUnitStats;
+begin
+  ZeroClear(Result, SizeOf(Result));
 end;
 
 procedure TUnitItem.ProcessDamage(ADmg: Integer; AFromUnit: TRoomUnit);

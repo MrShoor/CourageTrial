@@ -117,6 +117,7 @@ const cTextYSpace = 10;
 var
   tb: ITextBuilder;
   y : Single;
+  stats: TRoomUnitStats;
 begin
   if FItem = nil then
   begin
@@ -143,12 +144,21 @@ begin
   if FItem.Kind in cUnitItemKind_Weapons then
     tb.WriteLn(string('Урон: ') + GetDamageStr());
   if FItem.Kind = ikConsumable then
+  begin
     tb.WriteLn(string('Потребляемое'));
+    tb.WriteLn(' ');
+  end;
   if FItem.ExtraDesc <> '' then
   begin
     tb.WriteWrapped(FItem.ExtraDesc);
     tb.WriteWrappedEnd(Size.x - cTextXSpace*2, True);
+    tb.WriteLn(' ');
   end;
+
+  stats := FItem.StatsUp;
+  if stats.Lucky > 0 then tb.WriteWrapped('Удача: +' + IntToStr(stats.Lucky));
+  if stats.Lucky < 0 then tb.WriteWrapped('Удача: ' + IntToStr(stats.Lucky));
+  if stats.Lucky <> 0 then tb.WriteWrappedEnd(Size.x - cTextXSpace*2, True);
 
   FStatsText := tb.Finish();
   FStatsText.BoundsX := Vec(cTextXSpace, Size.x - cTextXSpace);

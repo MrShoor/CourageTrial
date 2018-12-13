@@ -314,7 +314,7 @@ begin
   FreeAndNil(FFloor);
 
   FFloor := TFloorMap.Create(FWorld);
-  FFloor.Create2Rooms;
+  FFloor.CreateLab(7);
   FFloor.UI.OnMenuNewGame := {$IfDef FPC}@{$EndIf}MakeNewGame_Delayed;
   FFloor.UI.OnMenuExit := {$IfDef FPC}@{$EndIf}DoExit_Delayed;
   //FFloor.CreateLab(8);
