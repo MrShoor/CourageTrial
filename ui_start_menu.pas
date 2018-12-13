@@ -245,7 +245,7 @@ end;
 { TavmMenuBtn }
 
 procedure TavmMenuBtn.DoValidate;
-var bkColor: TVec4;
+var rctColor: TVec4;
     txt: ITextLines;
 begin
   inherited DoValidate;
@@ -253,16 +253,16 @@ begin
   Canvas.Font.Size := 82;
 
   if Downed then
-    bkColor := Vec(0.2, 0.2, 1.0, 1.0)
+    rctColor := Vec(0.2, 0.2, 0.2, 1.0)
   else
     if Moved then
-      bkColor := Vec(0.4, 0.4, 1.0, 1.0)
+      rctColor := Vec(1.0, 1.0, 1.0, 1.0)
     else
-      bkColor := Vec(0.3, 0.3, 1.0, 1.0);
+      rctColor := Vec(0.0, 0.0, 0.0, 0.0);
 
   Canvas.Clear;
-  Canvas.Brush.Color := bkColor;
-  Canvas.AddFill(Vec(0,0), Size);
+  Canvas.Pen.Color := rctColor;
+  //Canvas.AddFill(Vec(0,0), Size);
   Canvas.AddRectangle(Vec(0,0), Size);
 
   with Canvas.TextBuilder do
