@@ -201,10 +201,13 @@ type
   private
     FUnit: TRoomUnit;
     FStopTime: Int64;
+    FSoundTime: Int64;
   public
     function ProcessAction: Boolean; override;
     constructor Create(AUnit: TRoomUnit; const AItem: IUnitItem);
   end;
+
+  { TBRA_UseBuffScroll }
 
   TBRA_UseBuffScroll = class(TBRA_Action)
   private
@@ -212,7 +215,7 @@ type
     FStopTime: Int64;
   public
     function ProcessAction: Boolean; override;
-    constructor Create(AUnit: TRoomUnit; const AItem: IUnitItem; const ABuff: IUnitBuff);
+    constructor Create(AUnit: TRoomUnit; const AItem: IUnitItem; const ABuff: IUnitBuff; const ASound: string);
   end;
 
 { TScroll_Axe_Mastery }
@@ -268,7 +271,7 @@ begin
   if upgraded then
   begin
     AUnit.Room.AddMessage('Повышено владение топором');
-    Result := TBRA_UseBuffScroll.Create(AUnit, Self, nil);
+    Result := TBRA_UseBuffScroll.Create(AUnit, Self, nil, 'sounds\selfcast1.mp3');
   end
   else
   begin
@@ -330,7 +333,7 @@ begin
   if upgraded then
   begin
     AUnit.Room.AddMessage('Повышено владение луком');
-    Result := TBRA_UseBuffScroll.Create(AUnit, Self, nil);
+    Result := TBRA_UseBuffScroll.Create(AUnit, Self, nil, 'sounds\selfcast1.mp3');
   end
   else
   begin
@@ -479,7 +482,8 @@ begin
   Result := FUnit.World.GameTime < FStopTime;
 end;
 
-constructor TBRA_UseBuffScroll.Create(AUnit: TRoomUnit; const AItem: IUnitItem; const ABuff: IUnitBuff);
+constructor TBRA_UseBuffScroll.Create(AUnit: TRoomUnit; const AItem: IUnitItem;
+  const ABuff: IUnitBuff; const ASound: string);
 begin
   FUnit := AUnit;
   FUnit.AP := FUnit.AP - 1;
@@ -488,6 +492,7 @@ begin
   if ABuff <> nil then
     FUnit.ApplyBuff(ABuff);
   FStopTime := FUnit.World.GameTime + 1500;
+  TryPlaySound3D(ASound, AUnit);
 end;
 
 
@@ -526,13 +531,19 @@ end;
 function TScroll_ResonantArmor.Consume(AUnit: TRoomUnit): IBRA_Action;
 begin
   if not CheckConsume(AUnit) then Exit(nil);
-  Result := TBRA_UseBuffScroll.Create(AUnit, Self, TBuff_ResonantArmor.Create(AUnit, 8));
+  Result := TBRA_UseBuffScroll.Create(AUnit, Self, TBuff_ResonantArmor.Create(AUnit, 8), 'sounds\selfcast0.mp3');
 end;
 
 { TBRA_DrinkPotion }
 
 function TBRA_DrinkPotion.ProcessAction: Boolean;
 begin
+  if FUnit.World.GameTime > FSoundTime then
+  begin
+    FSoundTime := HUGE;
+    TryPlaySound3D('sounds\PotionUse1.mp3', FUnit);
+  end;
+
   Result := FUnit.World.GameTime < FStopTime;
   if not Result then
     FUnit.TemporaryUnEquip(esLeftHand);
@@ -544,6 +555,7 @@ begin
   FUnit.TemporaryEquip(esLeftHand, AItem.Model);
   FUnit.SetAnimation(['Drink']);
   FStopTime := FUnit.World.GameTime + 1000;
+  FSoundTime := FUnit.World.GameTime + 440;
 end;
 
 { THealBottle }

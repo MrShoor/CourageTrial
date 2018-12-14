@@ -28,10 +28,11 @@ type
     function WearedOnly: Boolean; virtual; abstract;
     function UseReady(AUnit: TRoomUnit): Boolean; virtual; abstract;
 
-    function ID  : TUnitSkillID; virtual;
-    function Name: string; virtual; abstract;
-    function Desc: string; virtual; abstract;
-    function Ico : string; virtual; abstract;
+    function ID   : TUnitSkillID; virtual;
+    function Name : string; virtual; abstract;
+    function Desc : string; virtual; abstract;
+    function Ico  : string; virtual; abstract;
+    function Sound: string; virtual; abstract;
 
     function Cost : Integer; virtual; abstract;
     function Range: Single; virtual; abstract;
@@ -61,9 +62,10 @@ type
     function WearedOnly: Boolean; override;
     function UseReady(AUnit: TRoomUnit): Boolean; override;
 
-    function Name: string; override;
-    function Desc: string; override;
-    function Ico : string; override;
+    function Name : string; override;
+    function Desc : string; override;
+    function Ico  : string; override;
+    function Sound: string; override;
 
     function Cost        : Integer; override;
     function Range       : Single; override;
@@ -89,9 +91,10 @@ type
     function WearedOnly: Boolean; override;
     function UseReady(AUnit: TRoomUnit): Boolean; override;
 
-    function Name: string; override;
-    function Desc: string; override;
-    function Ico : string; override;
+    function Name : string; override;
+    function Desc : string; override;
+    function Ico  : string; override;
+    function Sound: string; override;
 
     function Cost        : Integer; override;
     function Range       : Single; override;
@@ -119,10 +122,11 @@ type
     function WearedOnly: Boolean; override;
     function UseReady(AUnit: TRoomUnit): Boolean; override;
 
-    function ID  : TUnitSkillID; override;
-    function Name: string; override;
-    function Desc: string; override;
-    function Ico : string; override;
+    function ID   : TUnitSkillID; override;
+    function Name : string; override;
+    function Desc : string; override;
+    function Ico  : string; override;
+    function Sound: string; override;
 
     function Cost        : Integer; override;
     function Range       : Single; override;
@@ -151,10 +155,11 @@ type
     function WearedOnly: Boolean; override;
     function UseReady(AUnit: TRoomUnit): Boolean; override;
 
-    function ID  : TUnitSkillID; override;
-    function Name: string; override;
-    function Desc: string; override;
-    function Ico : string; override;
+    function ID   : TUnitSkillID; override;
+    function Name : string; override;
+    function Desc : string; override;
+    function Ico  : string; override;
+    function Sound: string; override;
 
     function Cost        : Integer; override;
     function Range       : Single; override;
@@ -183,9 +188,10 @@ type
     function WearedOnly: Boolean; override;
     function UseReady(AUnit: TRoomUnit): Boolean; override;
 
-    function Name: string; override;
-    function Desc: string; override;
-    function Ico : string; override;
+    function Name : string; override;
+    function Desc : string; override;
+    function Ico  : string; override;
+    function Sound: string; override;
 
     function Cost        : Integer; override;
     function Range       : Single; override;
@@ -214,9 +220,10 @@ type
     function WearedOnly: Boolean; override;
     function UseReady(AUnit: TRoomUnit): Boolean; override;
 
-    function Name: string; override;
-    function Desc: string; override;
-    function Ico : string; override;
+    function Name : string; override;
+    function Desc : string; override;
+    function Ico  : string; override;
+    function Sound: string; override;
 
     function Cost        : Integer; override;
     function Range       : Single; override;
@@ -267,6 +274,11 @@ end;
 function TSkill_MutantPunch.Ico: string;
 begin
   Result := 'kick.png';
+end;
+
+function TSkill_MutantPunch.Sound: string;
+begin
+  Result := 'sounds\Punch.mp3';
 end;
 
 function TSkill_MutantPunch.Cost: Integer;
@@ -330,7 +342,7 @@ begin
   if not CanUse(AOwner, ATarget) then Exit;
   AOwner.AP := AOwner.AP - Cost;
   AOwner.Room.AddMessage(AOwner.Name + ' наносит удар');
-  Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Self, 1890, 1200);
+  Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Self, 1890, 1200, 1020);
 end;
 
 function TSkill_MutantPunch.CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
@@ -369,6 +381,11 @@ end;
 function TSkill_Resurrect.Ico: string;
 begin
   Result := 'noicon.png';
+end;
+
+function TSkill_Resurrect.Sound: string;
+begin
+  Result := 'sounds\Spell_02.mp3';
 end;
 
 function TSkill_Resurrect.Cost: Integer;
@@ -437,7 +454,7 @@ begin
   if not CanUse(AOwner, ATarget) then Exit;
   AOwner.AP := AOwner.AP - Cost;
   AOwner.Room.AddMessage(AOwner.Name + ' использует ' + Name + ' на союзника');
-  Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Self, 1290, 660);
+  Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Self, 1290, 660, 0);
   ATarget.HP := ATarget.MaxHP;
   ATarget.SetAnimation(['Raise0']);
 end;
@@ -478,6 +495,11 @@ end;
 function TSkill_AbsoluteSight.Ico: string;
 begin
   Result := 'abs_sight.png';
+end;
+
+function TSkill_AbsoluteSight.Sound: string;
+begin
+  Result := 'sounds\Spell_00.mp3';
 end;
 
 function TSkill_AbsoluteSight.Cost: Integer;
@@ -549,7 +571,7 @@ begin
   if not CanUse(AOwner, ATarget) then Exit;
   AOwner.AP := AOwner.AP - Cost;
   AOwner.Room.AddMessage(AOwner.Name + ' использует ' + Name);
-  Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Self, 1290, 660);
+  Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Self, 1290, 660, 0);
 end;
 
 function TSkill_AbsoluteSight.CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
@@ -597,6 +619,11 @@ end;
 function TSkill_AxeAttack.Ico: string;
 begin
   Result := 'axe_attack.png';
+end;
+
+function TSkill_AxeAttack.Sound: string;
+begin
+  Result := 'sounds\Axe.mp3';
 end;
 
 function TSkill_AxeAttack.Cost: Integer;
@@ -701,7 +728,7 @@ begin
   if not CanUse(AOwner, ATarget) then Exit;
   AOwner.AP := AOwner.AP - Cost;
   AOwner.Room.AddMessage(AOwner.Name + ' наносит рубящий удар');
-  Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Self, 2000, 866);
+  Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Self, 2000, 866, 0);
 end;
 
 function TSkill_AxeAttack.CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
@@ -755,6 +782,11 @@ end;
 function TSkill_Shoot.Ico: string;
 begin
   Result := 'bow_shoot.png';
+end;
+
+function TSkill_Shoot.Sound: string;
+begin
+  Result := 'sounds\BowShot1.mp3';
 end;
 
 function TSkill_Shoot.ID: TUnitSkillID;
@@ -959,6 +991,11 @@ begin
   Result := 'kick.png';
 end;
 
+function TSkill_Kick.Sound: string;
+begin
+  Result := 'sounds\Kick.mp3';
+end;
+
 function TSkill_Kick.Cost: Integer;
 begin
   Result := 2;
@@ -1031,7 +1068,7 @@ begin
   if not CanUse(AOwner, ATarget) then Exit;
   AOwner.AP := AOwner.AP - Cost;
   AOwner.Room.AddMessage(AOwner.Name + ' пинает врага');
-  Result := TBRA_UnitKickAttack.Create(AOwner, ATarget, Self, 1200, 540);
+  Result := TBRA_UnitKickAttack.Create(AOwner, ATarget, Self, 1200, 540, 420);
 end;
 
 function TSkill_Kick.CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;

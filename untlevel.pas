@@ -1,6 +1,6 @@
 ﻿unit untLevel;
 
-//{$Define DEBUGBOTS}
+{$Define DEBUGBOTS}
 
 {$IfDef FPC}
   {$mode objfpc}{$H+}
@@ -14,6 +14,7 @@ uses
   Math,
   Classes, SysUtils, avBase, avRes, bWorld, mutils, bLights, avMesh, avTypes, avTess, avContnrs, avContnrsDefaults,
   avPathFinder, avModel, avTexLoader, avRTTIUtils,
+  bBassLight,
   untObstacles;
 
 const
@@ -109,10 +110,11 @@ type
     function WearedOnly: Boolean;
     function UseReady(AUnit: TRoomUnit): Boolean;
 
-    function ID  : TUnitSkillID;
-    function Name: string;
-    function Desc: string;
-    function Ico : string;
+    function ID   : TUnitSkillID;
+    function Name : string;
+    function Desc : string;
+    function Ico  : string;
+    function Sound: string;
 
     function Cost       : Integer;
     function Range      : Single;
@@ -376,6 +378,7 @@ type
   end;
 
   TRoomUnitAnimateState = (asStand, asWalk, asDeath);
+  TRoomUnitMaterial = (matNone, matFlesh, matEnergy);
 
   { TRoomUnit }
 
@@ -490,6 +493,9 @@ type
     function GetMovePointsWeighted(AMaxDepth: Integer; const AFilter: IRoomCellFilter): IVec2iWeightedSet; overload;
     function GetMovePoints(AMaxDepth: Integer): IVec2iSet;
     function GetVisible(): Boolean; override;
+
+    function Sound_Footstep(const AStepIndex: Integer): string; virtual;
+    function Material_Body(): TRoomUnitMaterial; virtual;
 
     procedure ApplyBuff(ABuff: IUnitBuff); virtual;
     procedure DealPureDamage(ADmg: Integer; AFromUnit: TRoomUnit; const AMsg: string = ''); virtual;
@@ -767,6 +773,7 @@ type
     function  GetActiveSkill: IUnitSkill;
     procedure SetActiveSkill(const AValue: IUnitSkill);
   protected
+    procedure OnDead(); override;
     procedure Notify_PlayerLeave; override;
     procedure Notify_PlayerEnter; override;
     procedure UpdateStep; override;
@@ -777,6 +784,10 @@ type
     function  GetUnitMoveSpeed: Single; override;
 
     procedure LoadModels(); override;
+
+    function Sound_Footstep(const AStepIndex: Integer): string; override;
+    function Material_Body(): TRoomUnitMaterial; override;
+    procedure DealPureDamage(ADmg: Integer; AFromUnit: TRoomUnit; const AMsg: string = ''); override;
   end;
 
   { TBRA_Action }
@@ -822,6 +833,9 @@ type
 
     Cancelled: Boolean;
 
+    TimeStart: Int64;
+    StepIdx  : Integer;
+
     function MoveToNextCell: Boolean;
   public
     function Name: string; override;
@@ -860,6 +874,7 @@ type
     FSkill   : IUnitSkill;
     FBullets : IBulletInfoArr;
     FShootDelay: Integer;
+    FSoundPlayed: Boolean;
   public
     function ProcessAction: Boolean; override;
     constructor Create(const AUnit: TRoomUnit;
@@ -878,11 +893,13 @@ type
     FSkill      : IUnitSkill;
     FActionTime : Integer;
     FDamageStartTime: Integer;
+    FSoundTime : Integer;
   public
     function ProcessAction: Boolean; override;
     constructor Create(const AUnit, ATarget: TRoomUnit;
                        const ASkill: IUnitSkill;
-                       const ADurationTime, ADamageStartTime: Integer);
+                       const ADurationTime, ADamageStartTime: Integer;
+                       const ASoundDelay: Integer);
   end;
 
   { TBRA_UnitKickAttack }
@@ -894,6 +911,7 @@ type
     FSkill      : IUnitSkill;
     FActionTime : Integer;
     FDamageStartTime: Integer;
+    FSoundTime  : Integer;
     FInKnockBack: Boolean;
     FKnockBack  : Single;
     FKnockBackFrom: TVec3;
@@ -902,7 +920,7 @@ type
     function ProcessAction: Boolean; override;
     constructor Create(const AUnit, ATarget: TRoomUnit;
                        const ASkill: IUnitSkill;
-                       const ADurationTime, ADamageStartTime: Integer);
+                       const ADurationTime, ADamageStartTime, ASoundTime: Integer);
   end;
 
   { TBRA_MakeDamage }
@@ -1033,6 +1051,8 @@ function CanPlaceObstacle(const ARoom: TRoomMap; const AObstacle: TObstacleDesc;
 procedure RegRoomClass(const ARoomClass: TRoomObjectClass);
 function  FindRoomClass(const AName: string): TRoomObjectClass;
 
+function TryPlaySound3D(const AName: string; ARoomObject: TRoomObject; const ALooped: Boolean = False): ISoundStream3D;
+
 implementation
 
 {$R 'shaders\CT_shaders.rc'}
@@ -1046,6 +1066,20 @@ type
 
 var
   gvRegRommClasses: IRoomClassesMap;
+
+
+function TryPlaySound3D(const AName: string; ARoomObject: TRoomObject; const ALooped: Boolean = False): ISoundStream3D;
+var sndPos: TSoundPos;
+begin
+  Result := nil;
+  if AName = '' then Exit;
+  if ARoomObject = nil then Exit;
+  Result := GetLightPlayer.GetStream3D(AName);
+  sndPos := Result.Pos3D;
+  sndPos.Pos := ARoomObject.Pos + Vec(0, 0.5, 0);
+  Result.Pos3D := sndPos;
+  Result.Play(ALooped);
+end;
 
 function CanPlaceObstacle(const ARoom: TRoomMap; const AObstacle: TObstacleDesc; const APos: TVec2i; const ADir: Integer): Boolean;
 var cell: TVec2i;
@@ -1084,6 +1118,12 @@ var buff: IUnitBuff;
 
     knockBackDone: Boolean;
 begin
+  if (FRoomUnit.World.GameTime > FSoundTime) and (FSkill <> nil) then
+  begin
+    FSoundTime := HUGE;
+    TryPlaySound3D(FSkill.Sound, FRoomUnit);
+  end;
+
   if FRoomUnit.World.GameTime > FDamageStartTime then
   begin
     FDamageStartTime := HUGE;
@@ -1143,7 +1183,7 @@ begin
   Result := (FRoomUnit.World.GameTime < FActionTime) or not knockBackDone;
 end;
 
-constructor TBRA_UnitKickAttack.Create(const AUnit, ATarget: TRoomUnit; const ASkill: IUnitSkill; const ADurationTime, ADamageStartTime: Integer);
+constructor TBRA_UnitKickAttack.Create(const AUnit, ATarget: TRoomUnit; const ASkill: IUnitSkill; const ADurationTime, ADamageStartTime, ASoundTime: Integer);
 begin
   Assert(AUnit <> nil);
   Assert(ATarget <> nil);
@@ -1154,8 +1194,7 @@ begin
   FTarget := ATarget;
   FActionTime := FRoomUnit.World.GameTime + ADurationTime;
   FDamageStartTime := FRoomUnit.World.GameTime + ADamageStartTime;
-
-  WriteLn('Kick started. FDamageStartTime: ', FDamageStartTime, ' FActionTime: ',FActionTime);
+  FSoundTime := FRoomUnit.World.GameTime + ASoundTime;
 
   FRoomUnit.SetAnimation([FSkill.Animation]);
   FRoomUnit.RoomDir := FRoomUnit.Room.Direction(FRoomUnit.RoomPos, FTarget.RoomPos);
@@ -1188,6 +1227,7 @@ begin
   if not FInAction then Exit;
   FInAction := False;
   HideOtherInventory;
+  TryPlaySound3D('sounds\BagClose.mp3', FUnit);
   FUnit.Room.InvalidateInventoryBagsOnGround;
 end;
 
@@ -1218,6 +1258,7 @@ begin
   FUnit.AP := FUnit.AP - 1;
   FInventoryUnit := inv[0];
   ShowOtherInventory;
+  TryPlaySound3D('sounds\BagOpen.mp3', FUnit);
 end;
 
 { TRoomCellFilter_ViewableExclude_ObjectsExclude }
@@ -1323,13 +1364,15 @@ begin
   begin
     SubscribeForUpdateStep(2000);
     FAnim.SetTime(World.GameTime);
-    FAnim.AnimationSequence_StartAndStopOther(['Door_Opening'], False)
+    FAnim.AnimationSequence_StartAndStopOther(['Door_Opening'], False);
+    TryPlaySound3D('sounds\DoorSmallOpen.mp3', Self);
   end
   else
   begin
     SubscribeForUpdateStep(2000);
     FAnim.SetTime(World.GameTime);
     FAnim.AnimationSequence_StartAndStopOther(['Door_Closing'], False);
+    TryPlaySound3D('sounds\DoorSmallClose.mp3', Self);
   end;
 end;
 
@@ -1932,6 +1975,7 @@ function TBRA_Shoot.ProcessAction: Boolean;
     if ABltInfo^.hit <> nil then
     begin
       ABltInfo^.hit.DealDamage(FSkill.SampleDamage(FRoomUint, ABltInfo^.hit), ABltInfo^.bullet.Owner);
+      TryPlaySound3D('sounds\ArrowImpact1.mp3', FRoomUint);
     end;
     FreeAndNil(ABltInfo^.bullet);
   end;
@@ -1944,6 +1988,12 @@ begin
   if FBullets.Count = 0 then Exit(False);
   Result := True;
   if FRoomUint.World.GameTime < FShootDelay then Exit;
+
+  if not FSoundPlayed then
+  begin
+    FSoundPlayed := True;
+    TryPlaySound3D('sounds\BowShot1.mp3', FRoomUint);
+  end;
 
   for i := 0 to FBullets.Count - 1 do
   begin
@@ -1982,6 +2032,7 @@ begin
 
   AUnit.SetAnimation([ASkill.Animation]);
 
+  FSoundPlayed := False;
   FRoomUint := AUnit;
   FSkill := ASkill;
   FShootDelay := FRoomUint.World.GameTime + AShootDelay;
@@ -2287,12 +2338,23 @@ end;
 function TBRA_UnitDefaultAttack.ProcessAction: Boolean;
 var buff: IUnitBuff;
 begin
+  if (FRoomUnit.World.GameTime > FSoundTime) and (FSkill <> nil) then
+  begin
+    FSoundTime := HUGE;
+    TryPlaySound3D(FSkill.Sound, FRoomUnit);
+  end;
+
   if FRoomUnit.World.GameTime > FDamageStartTime then
   begin
     FDamageStartTime := HUGE;
     if FSkill.IsAttackSkill then
       if FSkill.SampleHitChance(FRoomUnit, FTarget) then
+      begin
         FTarget.Room.AddAction(TBRA_MakeDamage.Create(FTarget, FRoomUnit, FSkill.SampleDamage(FRoomUnit, FTarget) ));
+        case FTarget.Material_Body() of
+          matFlesh : TryPlaySound3D('sounds\Impact1.mp3', FTarget);
+        end;
+      end;
     if FSkill.IsBuffSkill then
     begin
       buff := FSkill.SampleBuffChance(FRoomUnit, FTarget);
@@ -2305,7 +2367,8 @@ begin
 end;
 
 constructor TBRA_UnitDefaultAttack.Create(const AUnit, ATarget: TRoomUnit;
-  const ASkill: IUnitSkill; const ADurationTime, ADamageStartTime: Integer);
+  const ASkill: IUnitSkill; const ADurationTime, ADamageStartTime: Integer;
+  const ASoundDelay: Integer);
 begin
   Assert(AUnit <> nil);
   Assert(ATarget <> nil);
@@ -2316,6 +2379,7 @@ begin
   FTarget := ATarget;
   FActionTime := FRoomUnit.World.GameTime + ADurationTime;
   FDamageStartTime := FRoomUnit.World.GameTime + ADamageStartTime;
+  FSoundTime := FRoomUnit.World.GameTime + ASoundDelay;
 
   FRoomUnit.SetAnimation([FSkill.Animation]);
   FRoomUnit.RoomDir := FRoomUnit.Room.Direction(FRoomUnit.RoomPos, FTarget.RoomPos);
@@ -2358,6 +2422,7 @@ end;
 function TBRA_UnitMovementAction.ProcessAction: Boolean;
 var fromPt, toPt: TVec3;
     n: Integer;
+    newFootStepIdx: Int64;
 begin
   if MovePath = nil then Exit(False);
   if MovePath.Count = 0 then Exit(False);
@@ -2367,6 +2432,13 @@ begin
       Exit(True)
     else
       Exit(False);
+  end;
+
+  newFootStepIdx := (RoomUnit.World.GameTime - TimeStart) div 300;
+  if newFootStepIdx > StepIdx then
+  begin
+    StepIdx := newFootStepIdx;
+    TryPlaySound3D(RoomUnit.Sound_Footstep(StepIdx), RoomUnit)
   end;
 
   Result := True;
@@ -2398,6 +2470,9 @@ end;
 
 constructor TBRA_UnitMovementAction.Create(const AUnit: TRoomUnit; const APath: IRoomPath);
 begin
+  TimeStart := AUnit.World.GameTime;
+  StepIdx   := 0;
+
   RoomUnit := AUnit;
   MovePathIdx := 0;
   MovePathWeight := 0;
@@ -3014,6 +3089,16 @@ begin
   else
     Result := Room.CurrentPlayer.CanSee(Self);
   {$EndIf}
+end;
+
+function TRoomUnit.Sound_Footstep(const AStepIndex: Integer): string;
+begin
+  Result := '';
+end;
+
+function TRoomUnit.Material_Body(): TRoomUnitMaterial;
+begin
+  Result := matNone;
 end;
 
 procedure TRoomUnit.ApplyBuff(ABuff: IUnitBuff);
@@ -4010,6 +4095,12 @@ begin
   FActiveSkill := AValue;
 end;
 
+procedure TPlayer.OnDead();
+begin
+  inherited OnDead();
+  TryPlaySound3D('sounds\MaleD_Death3.mp3', Self);
+end;
+
 procedure TPlayer.Notify_PlayerLeave;
 begin
 
@@ -4104,6 +4195,26 @@ begin
   SubscribeForUpdateStep;
 
   Preview96_128 := 'ui\units\player.png';
+end;
+
+function TPlayer.Sound_Footstep(const AStepIndex: Integer): string;
+begin
+  if AStepIndex mod 2 = 0 then
+    Result := 'sounds\StepStone1.mp3'
+  else
+    Result := 'sounds\StepStone2.mp3';
+end;
+
+function TPlayer.Material_Body(): TRoomUnitMaterial;
+begin
+  Result := matFlesh;
+end;
+
+procedure TPlayer.DealPureDamage(ADmg: Integer; AFromUnit: TRoomUnit; const AMsg: string);
+begin
+  inherited DealPureDamage(ADmg, AFromUnit, AMsg);
+  if not IsDead() then
+    TryPlaySound3D('sounds\MaleD_Wound2.mp3', self);
 end;
 
 { TBattleRoom }
@@ -4357,7 +4468,15 @@ procedure TBattleRoom.UpdateStep();
 var bot: TBot;
     new_action: IBRA_Action;
     i: LongInt;
+
+    lstnrPos: TListenerPos;
 begin
+  lstnrPos.Front := normalize(Main.Camera.Eye - Main.Camera.At);
+  lstnrPos.Pos := Main.Camera.Eye;
+  lstnrPos.Top := Main.Camera.Up;
+  lstnrPos.Vel := Vec(0,0,0);
+  GetLightPlayer.Listener3DPos := lstnrPos;
+
   if FUnits.Count = 0 then Exit;
   if FPlayer = nil then Exit;
   if FTryLeaveIndex >= 0 then
@@ -4552,6 +4671,16 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string;
     FUnits.Add(bot);
 
     bot := TBotWisp.Create(FMap);
+    bot.LoadModels();
+    bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
+    FUnits.Add(bot);
+
+    bot := TBotMutant1.Create(FMap);
+    bot.LoadModels();
+    bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
+    FUnits.Add(bot);
+
+    bot := TBotArcher1.Create(FMap);
     bot.LoadModels();
     bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
     FUnits.Add(bot);

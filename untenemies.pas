@@ -230,6 +230,7 @@ type
   protected
     function FindOptimalRouteForCheck(const ACheckPts: IVec2iSet): IRoomPath; override;
 
+    procedure OnDead(); override;
     procedure UpdateStep; override;
   public
     procedure SetAnimation(const ANameSequence: array of string); override;
@@ -238,6 +239,11 @@ type
     procedure LoadModels(); override;
 
     function DoAction(): IBRA_Action; override;
+
+    function Sound_Footstep(const AStepIndex: Integer): string; override;
+    function Material_Body(): TRoomUnitMaterial; override;
+
+    procedure DealPureDamage(ADmg: Integer; AFromUnit: TRoomUnit; const AMsg: string = ''); override;
   end;
 
   { TBotArcher1 }
@@ -246,6 +252,7 @@ type
   private
     FAnim: array of IavAnimationController;
   protected
+    procedure OnDead(); override;
     function FindOptimalRouteForCheck(const ACheckPts: IVec2iSet): IRoomPath; override;
     procedure UpdateStep; override;
   public
@@ -255,6 +262,11 @@ type
     procedure LoadModels(); override;
 
     function DoAction(): IBRA_Action; override;
+
+    function Sound_Footstep(const AStepIndex: Integer): string; override;
+    function Material_Body(): TRoomUnitMaterial; override;
+
+    procedure DealPureDamage(ADmg: Integer; AFromUnit: TRoomUnit; const AMsg: string = ''); override;
   end;
 
   { TBotHunter1 }
@@ -263,6 +275,7 @@ type
   private
     FAnim: array of IavAnimationController;
   protected
+    procedure OnDead(); override;
     function FindOptimalRouteForCheck(const ACheckPts: IVec2iSet): IRoomPath; override;
     procedure UpdateStep; override;
   public
@@ -272,6 +285,11 @@ type
     procedure LoadModels(); override;
 
     function DoAction(): IBRA_Action; override;
+
+    function Sound_Footstep(const AStepIndex: Integer): string; override;
+    function Material_Body(): TRoomUnitMaterial; override;
+
+    procedure DealPureDamage(ADmg: Integer; AFromUnit: TRoomUnit; const AMsg: string = ''); override;
   end;
 
   { TBotWisp }
@@ -297,6 +315,9 @@ type
 
     procedure LoadModels(); override;
     function DoAction(): IBRA_Action; override;
+    function Material_Body(): TRoomUnitMaterial; override;
+
+    procedure DealPureDamage(ADmg: Integer; AFromUnit: TRoomUnit; const AMsg: string = ''); override;
   end;
 
 var gvDebugPoints : IVec2iArr;
@@ -310,6 +331,12 @@ uses
 var gvBotID: Integer = 0;
 
 { TBotHunter1 }
+
+procedure TBotHunter1.OnDead();
+begin
+  inherited OnDead();
+  TryPlaySound3D('sounds\FemaleA_Death2.mp3', self);
+end;
 
 function TBotHunter1.FindOptimalRouteForCheck(const ACheckPts: IVec2iSet): IRoomPath;
 begin
@@ -379,7 +406,7 @@ begin
 
   FRetreatLimits := 1;
 
-  Preview96_128 := 'ui\units\archer.png';
+  Preview96_128 := 'ui\units\arissa.png';
 
   GenStdBotInventory(FInventory);
 end;
@@ -608,6 +635,27 @@ begin
   end;
 end;
 
+function TBotHunter1.Sound_Footstep(const AStepIndex: Integer): string;
+begin
+  if AStepIndex mod 2 = 0 then
+    Result := 'sounds\StepStone1.mp3'
+  else
+    Result := 'sounds\StepStone2.mp3';
+end;
+
+function TBotHunter1.Material_Body(): TRoomUnitMaterial;
+begin
+  Result := matFlesh;
+end;
+
+procedure TBotHunter1.DealPureDamage(ADmg: Integer; AFromUnit: TRoomUnit;
+  const AMsg: string);
+begin
+  inherited DealPureDamage(ADmg, AFromUnit, AMsg);
+  if not IsDead() then
+    TryPlaySound3D('sounds\FemaleA_Wound1.mp3', Self);
+end;
+
 { TBotWisp }
 
 procedure TBotWisp.BuildLight();
@@ -820,6 +868,18 @@ begin
     bsRetreat: Result := Behaviour_DefaultRetreat(1, 2);
     bsPatrol: Result := Behaviour_DefaultPatrol();
   end;
+end;
+
+function TBotWisp.Material_Body(): TRoomUnitMaterial;
+begin
+  Result := matEnergy;
+end;
+
+procedure TBotWisp.DealPureDamage(ADmg: Integer; AFromUnit: TRoomUnit;
+  const AMsg: string);
+begin
+  inherited DealPureDamage(ADmg, AFromUnit, AMsg);
+  TryPlaySound3D('sounds\Wisp_Wound.mp3', Self);
 end;
 
 { TBot.THidePtsComparer }
@@ -1167,6 +1227,12 @@ end;
 
 { TBotArcher1 }
 
+procedure TBotArcher1.OnDead();
+begin
+  inherited OnDead();
+  TryPlaySound3D('sounds\FemaleB_Death2.mp3', Self);
+end;
+
 function TBotArcher1.FindOptimalRouteForCheck(const ACheckPts: IVec2iSet): IRoomPath;
 begin
   Result := FindOptimalRouteForCheck_Ranged(ACheckPts);
@@ -1428,6 +1494,27 @@ begin
     bsRetreat: Result := Behaviour_DefaultRetreat(1, 2);
     bsPatrol: Result := Behaviour_DefaultPatrol();
   end;
+end;
+
+function TBotArcher1.Sound_Footstep(const AStepIndex: Integer): string;
+begin
+  if AStepIndex mod 2 = 0 then
+    Result := 'sounds\StepStone1.mp3'
+  else
+    Result := 'sounds\StepStone2.mp3';
+end;
+
+function TBotArcher1.Material_Body(): TRoomUnitMaterial;
+begin
+  Result := matFlesh;
+end;
+
+procedure TBotArcher1.DealPureDamage(ADmg: Integer; AFromUnit: TRoomUnit;
+  const AMsg: string);
+begin
+  inherited DealPureDamage(ADmg, AFromUnit, AMsg);
+  if not IsDead() then
+    TryPlaySound3D('sounds\FemaleB_Wound1.mp3', Self);
 end;
 
 { TBot }
@@ -2247,6 +2334,12 @@ begin
   Result := FindOptimalRouteForCheck_Melee(ACheckPts);
 end;
 
+procedure TBotMutant1.OnDead();
+begin
+  inherited OnDead();
+  TryPlaySound3D('sounds\Mutant_Death.mp3', Self);
+end;
+
 procedure TBotMutant1.UpdateStep;
 begin
   inherited UpdateStep;
@@ -2321,6 +2414,26 @@ begin
     bsRetreat: Result := Behaviour_DefaultRetreat(1, 2);
     bsPatrol: Result := Behaviour_DefaultPatrol();
   end;
+end;
+
+function TBotMutant1.Sound_Footstep(const AStepIndex: Integer): string;
+begin
+  if AStepIndex mod 2 = 0 then
+    Result := 'sounds\StepStone1.mp3'
+  else
+    Result := 'sounds\StepStone2.mp3';
+end;
+
+function TBotMutant1.Material_Body(): TRoomUnitMaterial;
+begin
+  Result := matFlesh;
+end;
+
+procedure TBotMutant1.DealPureDamage(ADmg: Integer; AFromUnit: TRoomUnit; const AMsg: string);
+begin
+  inherited DealPureDamage(ADmg, AFromUnit, AMsg);
+  if not IsDead() then
+    TryPlaySound3D('sounds\Mutant_Wound.mp3', Self);
 end;
 
 end.

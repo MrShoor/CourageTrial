@@ -258,6 +258,7 @@ begin
   AUnit.AP := AUnit.AP - Interactive_Cost(idx);
   SetAnimation('Altar_Action' + IntToStr(idx));
   Result := TBRA_AltarPick.Create(Self, AUnit);
+  TryPlaySound3D('sounds\altar_pick.mp3', Self);
 end;
 
 { TBRA_LootChestAction }
@@ -291,6 +292,7 @@ procedure TBRA_LootChestAction.TryCancel;
 begin
   FInAction := False;
   FChest.SetAnimation('Chest_Close');
+  TryPlaySound3D('sounds\ChestClose2.mp3', FChest);
   HideOtherInventory;
 end;
 
@@ -311,6 +313,7 @@ begin
   FMenuStart := FChest.World.GameTime + 500;
 
   AChest.SetAnimation('Chest_Open');
+  TryPlaySound3D('sounds\ChestOpen2.mp3', FChest);
 end;
 
 { TRoomChest }
