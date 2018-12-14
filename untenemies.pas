@@ -345,7 +345,7 @@ begin
   FRetreatHPRange := Vec(0,0);
 
   MaxAP := 14;
-  MaxHP := 200;
+  MaxHP := 250;
   HP := MaxHP;
   AP := MaxAP;
 
@@ -365,6 +365,7 @@ begin
   Inventory().Push(bow, 0);
 
   FUnitSkills.Add(TSkill_Shoot.Create(nil, 0));
+  FUnitSkills.Add(TSkill_Resurrect.Create(nil, 0));
 
   FAnimationPrefix := 'Hunter_';
 
@@ -459,23 +460,57 @@ const
       if not Result.CanUse(Self, AEnemy) then Result := nil;
   end;
 
-  function DoShootFirst(const ACurrentPos, ABestPos, AEnemyPos: TVec2i): Boolean;
+  function DoShootFirst(const ACurrentPos, ABestPos, AEnemyPos: TVec2i; const ASkill: IUnitSkill; AHideRoute: Boolean): Boolean;
   var
       currentWorldPos: TVec3;
       bestWorldPos: TVec3;
   begin
+    if AHideRoute and (ASkill <> nil) then
+      if (AP - ASkill.Cost >= FBS_SeeEnemy.OptimalRoute.Count) then Exit(True);
+
     if ACurrentPos = ABestPos then Exit(True);
     currentWorldPos := Room.UI.TilePosToWorldPos(ACurrentPos - AEnemyPos);
     bestWorldPos := Room.UI.TilePosToWorldPos(ABestPos - AEnemyPos);
     Result := LenSqr(currentWorldPos) <= LenSqr(bestWorldPos);
   end;
 
+  function TryResurrect(): IBRA_Action;
+  var
+    i: Integer;
+    bot, targetBot: TBot;
+  begin
+    if FUnitSkills[1].Cost > AP then Exit(nil);
+
+    Result := nil;
+    targetBot := nil;
+    for i := 0 to Room.ChildCount - 1 do
+    begin
+      if Room.Child[i] is TBot then
+      begin
+        bot := TBot(Room.Child[i]);
+        if bot = self then Continue;
+        if not bot.IsDead() then Continue;
+        if not CanSee(bot) then Continue;
+        if not FUnitSkills[1].CanUse(Self, bot) then Continue;
+        targetBot := bot;
+        Break;
+      end;
+    end;
+    if targetBot = nil then Exit;
+    Result := FUnitSkills[1].DoAction(Self, targetBot);
+  end;
+
 var
   skill: IUnitSkill;
+  isHideRoute: Boolean;
 begin
+  isHideRoute := False;
   if AP = 0 then Exit(nil);
 
   LogAction('DoAction AP = ' + IntToStr(AP));
+
+  Result := TryResurrect();
+  if Result <> nil then Exit;
 
   case FBState of
     bsNothing: Result := Behaviour_DefaultNothing();
@@ -493,7 +528,11 @@ begin
         if FBS_SeeEnemy.OptimalRoute = nil then
         begin
           FBS_SeeEnemy.OptimalRoute := GetOptimalHidePosition(skill);
-          if FBS_SeeEnemy.OptimalRoute <> nil then LogAction('  Optimal route for hiding found. Len: ' + IntToStr(FBS_SeeEnemy.OptimalRoute.Count));
+          if FBS_SeeEnemy.OptimalRoute <> nil then
+          begin
+            LogAction('  Optimal route for hiding found. Len: ' + IntToStr(FBS_SeeEnemy.OptimalRoute.Count));
+            isHideRoute := True;
+          end;
 
           if FBS_SeeEnemy.OptimalRoute = nil then
           begin
@@ -548,7 +587,7 @@ begin
         end
         else
         begin
-          if (FBS_SeeEnemy.OptimalRoute.Count = 0) or DoShootFirst(RoomPos, FBS_SeeEnemy.OptimalRoute.Last, FBS_SeeEnemy.Enemy.RoomPos) then
+          if (FBS_SeeEnemy.OptimalRoute.Count = 0) or DoShootFirst(RoomPos, FBS_SeeEnemy.OptimalRoute.Last, FBS_SeeEnemy.Enemy.RoomPos, skill, isHideRoute) then
           begin
             LogAction('  Shoot!');
             Result := skill.DoAction(Self, FBS_SeeEnemy.Enemy);
@@ -1264,11 +1303,14 @@ const
       if not Result.CanUse(Self, AEnemy) then Result := nil;
   end;
 
-  function DoShootFirst(const ACurrentPos, ABestPos, AEnemyPos: TVec2i): Boolean;
+  function DoShootFirst(const ACurrentPos, ABestPos, AEnemyPos: TVec2i; const ASkill: IUnitSkill; AHideRoute: Boolean): Boolean;
   var
       currentWorldPos: TVec3;
       bestWorldPos: TVec3;
   begin
+    if AHideRoute and (ASkill <> nil) then
+      if (AP - ASkill.Cost >= FBS_SeeEnemy.OptimalRoute.Count) then Exit(True);
+
     if ACurrentPos = ABestPos then Exit(True);
     currentWorldPos := Room.UI.TilePosToWorldPos(ACurrentPos - AEnemyPos);
     bestWorldPos := Room.UI.TilePosToWorldPos(ABestPos - AEnemyPos);
@@ -1276,8 +1318,10 @@ const
   end;
 
 var
+  isHideRoute: Boolean;
   skill: IUnitSkill;
 begin
+  isHideRoute := False;
   if AP = 0 then Exit(nil);
 
   LogAction('DoAction AP = ' + IntToStr(AP));
@@ -1297,8 +1341,11 @@ begin
 
         if FBS_SeeEnemy.OptimalRoute = nil then
         begin
-          FBS_SeeEnemy.OptimalRoute := GetOptimalHidePosition(skill);
-          if FBS_SeeEnemy.OptimalRoute <> nil then LogAction('  Optimal route for hiding found. Len: ' + IntToStr(FBS_SeeEnemy.OptimalRoute.Count));
+          if FBS_SeeEnemy.OptimalRoute <> nil then
+          begin
+            LogAction('  Optimal route for hiding found. Len: ' + IntToStr(FBS_SeeEnemy.OptimalRoute.Count));
+            isHideRoute := True;
+          end;
 
           if FBS_SeeEnemy.OptimalRoute = nil then
           begin
@@ -1353,7 +1400,7 @@ begin
         end
         else
         begin
-          if (FBS_SeeEnemy.OptimalRoute.Count = 0) or DoShootFirst(RoomPos, FBS_SeeEnemy.OptimalRoute.Last, FBS_SeeEnemy.Enemy.RoomPos) then
+          if (FBS_SeeEnemy.OptimalRoute.Count = 0) or DoShootFirst(RoomPos, FBS_SeeEnemy.OptimalRoute.Last, FBS_SeeEnemy.Enemy.RoomPos, skill, isHideRoute) then
           begin
             LogAction('  Shoot!');
             Result := skill.DoAction(Self, FBS_SeeEnemy.Enemy);

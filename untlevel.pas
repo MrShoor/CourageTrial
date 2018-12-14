@@ -1,6 +1,6 @@
 ﻿unit untLevel;
 
-{$Define DEBUGBOTS}
+//{$Define DEBUGBOTS}
 
 {$IfDef FPC}
   {$mode objfpc}{$H+}
@@ -4354,10 +4354,20 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string;
   procedure SpawnDebugBot();
   var bot: TBot;
   begin
-    //bot := TBotMutant1.Create(FMap);
-    //bot.LoadModels();
-    //bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
-    //FUnits.Add(bot);
+    bot := TBotWisp.Create(FMap);
+    bot.LoadModels();
+    bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
+    FUnits.Add(bot);
+
+    bot := TBotWisp.Create(FMap);
+    bot.LoadModels();
+    bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
+    FUnits.Add(bot);
+
+    bot := TBotWisp.Create(FMap);
+    bot.LoadModels();
+    bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
+    FUnits.Add(bot);
 
     bot := TBotHunter1.Create(FMap);
     bot.LoadModels();

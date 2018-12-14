@@ -80,10 +80,37 @@ function GenBots(const AMap: TRoomMap; const AVisitedRooms: IVisitedRooms; const
     Result := bot;
   end;
 
-var botsToSpawn: Integer;
+var bossRoom: Boolean;
+    botsToSpawn: Integer;
     wispToSpawn, i: Integer;
 begin
   Result := TRoomUnitArr.Create();
+
+  case AVisitedRooms.Count of
+    0: bossRoom := False;
+    1: bossRoom := Random(100) < 1;
+    2: bossRoom := Random(100) < 3;
+    3: bossRoom := Random(100) < 5;
+    4: bossRoom := Random(100) < 10;
+    5: bossRoom := Random(100) < 15;
+  else
+    bossRoom := Random(100) < 20;
+  end;
+
+  if bossRoom then
+  begin
+    if AVisitedRooms.Count > 5 then
+      botsToSpawn := 2;
+    if AVisitedRooms.Count < 3 then
+      wispToSpawn := 2
+    else
+      wispToSpawn := 3;
+    for i := 0 to wispToSpawn - 1 do
+      Result.Add(SpawnBot(TBotWisp));
+    for i := 0 to botsToSpawn - 1 do
+      Result.Add(SpawnBot(TBotHunter1));
+    Exit;
+  end;
 
   case AVisitedRooms.Count of
     0: botsToSpawn := 2 + Random(2);
@@ -113,9 +140,9 @@ end;
 
 function GenAltarLoot(const AForUnit: TRoomUnit): IUnitItem;
 type
-  TGenAltarItems = (aiBottle50, aiScrollResonantArmor, aiSocks, aiPoison, aiBow);
+  TGenAltarItems = (aiBottle50, aiScrollResonantArmor, aiSocks, aiPoison, aiBow, aiHuntersBow);
 const
-  cBasicWeights: array [TGenAltarItems] of Integer = (2000, 1000, 2000, 200, 1000);
+  cBasicWeights: array [TGenAltarItems] of Integer = (2000, 1000, 2000, 200, 1000, 300);
 var
   i: Integer;
   weights: array [TGenAltarItems] of Integer;
@@ -140,6 +167,7 @@ begin
     aiSocks              : Result := TSocks.Create;
     aiPoison             : Result := TPoisonBottle.Create;
     aiBow                : Result := TArcherBow.Create;
+    aiHuntersBow         : Result := THuntersBow.Create;
   else
     Result := nil;
   end;

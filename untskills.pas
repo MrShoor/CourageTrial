@@ -171,10 +171,149 @@ type
     function CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
   end;
 
+  { TSkill_Resurrect }
+
+  TSkill_Resurrect = class(TUnitSkill)
+  private
+  public
+    function WearedOnly: Boolean; override;
+    function UseReady(AUnit: TRoomUnit): Boolean; override;
+
+    function Name: string; override;
+    function Desc: string; override;
+    function Ico : string; override;
+
+    function Cost        : Integer; override;
+    function Range       : Single; override;
+    function Damage      : TVec2i; override;
+    function DamageScale : Single; override;
+    function Accuracy    : TVec2; override;
+
+    function Req_WeaponType: TUnitItemKind; override;
+
+    function Animation: string; override;
+    function IsAttackSkill: Boolean; override;
+    function IsBuffSkill: Boolean; override;
+    function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; override;
+    function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean; override;
+    function SampleBuffChance(AOwner, ATarget: TRoomUnit): IUnitBuff; override;
+
+    function DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action; override;
+    function CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
+  end;
+
 implementation
 
 uses
   Math, untBuffs;
+
+{ TSkill_Resurrect }
+
+function TSkill_Resurrect.WearedOnly: Boolean;
+begin
+  Result := False;
+end;
+
+function TSkill_Resurrect.UseReady(AUnit: TRoomUnit): Boolean;
+begin
+  Result := True;
+end;
+
+function TSkill_Resurrect.Name: string;
+begin
+  Result := 'Воскрешение';
+end;
+
+function TSkill_Resurrect.Desc: string;
+begin
+  Result := 'Возвращает павших на поле боя';
+end;
+
+function TSkill_Resurrect.Ico: string;
+begin
+  Result := 'noicon.png';
+end;
+
+function TSkill_Resurrect.Cost: Integer;
+begin
+  Result := 8;
+end;
+
+function TSkill_Resurrect.Range: Single;
+begin
+  Result := 16;
+end;
+
+function TSkill_Resurrect.Damage: TVec2i;
+begin
+  Result := Vec(0, 0);
+end;
+
+function TSkill_Resurrect.DamageScale: Single;
+begin
+  Result := 0;
+end;
+
+function TSkill_Resurrect.Accuracy: TVec2;
+begin
+  Result := Vec(1, 1);
+end;
+
+function TSkill_Resurrect.Req_WeaponType: TUnitItemKind;
+begin
+  Result := ikUnknown;
+end;
+
+function TSkill_Resurrect.Animation: string;
+begin
+  Result := 'SelfCast';
+end;
+
+function TSkill_Resurrect.IsAttackSkill: Boolean;
+begin
+  Result := False;
+end;
+
+function TSkill_Resurrect.IsBuffSkill: Boolean;
+begin
+  Result := False;
+end;
+
+function TSkill_Resurrect.SampleDamage(AOwner, ATarget: TRoomUnit): Integer;
+begin
+  Result := 0;
+end;
+
+function TSkill_Resurrect.SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean;
+begin
+  Result := True;
+end;
+
+function TSkill_Resurrect.SampleBuffChance(AOwner, ATarget: TRoomUnit): IUnitBuff;
+begin
+  Result := nil;
+end;
+
+function TSkill_Resurrect.DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action;
+begin
+  Result := nil;
+  if not CanUse(AOwner, ATarget) then Exit;
+  AOwner.AP := AOwner.AP - Cost;
+  AOwner.Room.AddMessage(AOwner.Name + ' использует ' + Name + ' на союзника');
+  Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Self, 1290, 660);
+  ATarget.HP := ATarget.MaxHP;
+  ATarget.SetAnimation(['Raise0']);
+end;
+
+function TSkill_Resurrect.CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
+begin
+  Result := inherited CanUse(AOwner, ATarget, AReservedPoints);
+  if not Result then Exit;
+  if not ATarget.IsDead() then Exit(False);
+  if AOwner.AP - AReservedPoints < Cost then Exit(False);
+  if ATarget.Room.ObjectAt(ATarget.RoomPos) <> nil then Exit(False);
+  Result := True;
+end;
 
 { TSkill_AbsoluteSight }
 
