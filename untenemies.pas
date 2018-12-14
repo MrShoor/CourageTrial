@@ -646,7 +646,8 @@ end;
 procedure TBotWisp.Notify_PlayerEnter;
 begin
   inherited Notify_PlayerEnter;
-  BuildLight();
+  if not IsDead() then
+    BuildLight();
 end;
 
 procedure TBotWisp.OnDead();
@@ -1192,7 +1193,7 @@ var
 begin
   FRetreatHPRange := Vec(15, 40);
 
-  MaxAP := 8;
+  MaxAP := 10;
   MaxHP := 100;
   HP := MaxHP;
   AP := MaxAP;

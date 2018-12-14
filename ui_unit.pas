@@ -41,6 +41,7 @@ type
   private
     FRoomUnit: TRoomUnit;
     FLastAP: Integer;
+    FLastHP: Integer;
 
     FEndTurnBtn: TavmUnitBtn;
     FLootGndBtn: TavmUnitBtn;
@@ -241,6 +242,7 @@ begin
     Canvas.AddSprite(cellpos - Vec(13, 0), cellpos + Vec(13, 26), cellname);
   end;
   FLastAP := RoomUnit.AP;
+  FLastHP := RoomUnit.HP;
 end;
 
 procedure TavmUnitMenu.AfterRegister;
@@ -278,6 +280,7 @@ procedure TavmUnitMenu.DrawControl(const AMat: TMat3);
 begin
   if RoomUnit = nil then Exit;
   if FLastAP <> RoomUnit.AP then Invalidate;
+  if FLastHP <> RoomUnit.HP then Invalidate;
 
   Pos := Vec(Main.WindowSize.x * 0.5, Main.WindowSize.y);
   FSkillSlots.Pos := Vec(Size.x*0.5, cSkillSlotsTop);

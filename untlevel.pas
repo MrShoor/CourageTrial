@@ -946,6 +946,8 @@ type
 
     FEmptyLight: IavPointLight;
 
+    FRoomClear: Boolean;
+
     function IsBotTurn: Boolean;
     function IsMouseOnUI: Boolean;
     procedure AutoOpenDoors;
@@ -966,6 +968,7 @@ type
     function WorldRot: TQuat;
 
     function IsPlayerTurn: Boolean;
+    function IsClear: Boolean;
     property MovedTile: TVec2i read FMovedTile;
     property Player: TPlayer read FPlayer;
     property Obstacles: IObstacleArr read FObstacles;
@@ -2214,7 +2217,8 @@ begin
   RoomUnit.RoomPos := MovePath[MovePathIdx];
   RoomUnit.AP := RoomUnit.AP - 1;
 
-  if RoomUnit.AP <= 0 then Exit(False);
+  if not RoomUnit.Room.BattleRoom.IsClear then
+    if RoomUnit.AP <= 0 then Exit(False);
   if MovePath = nil then Exit(False);
   if Cancelled then Exit(False);
 
@@ -2875,7 +2879,7 @@ begin
     Result := True;
   {$Else}
   if Room.CurrentPlayer = nil then
-    Result := inherited GetVisible()
+    Result := False//inherited GetVisible()
   else
     Result := Room.CurrentPlayer.CanSee(Self);
   {$EndIf}
@@ -4012,6 +4016,11 @@ begin
   Result := FUnits[FActiveUnit] = FPlayer;
 end;
 
+function TBattleRoom.IsClear: Boolean;
+begin
+  Result := FRoomClear;
+end;
+
 function TBattleRoom.IsBotTurn: Boolean;
 begin
   Result := FUnits[FActiveUnit] is TBot;
@@ -4032,6 +4041,7 @@ begin
     if FUnits[i] is TBot then
       if not (FUnits[i] as TRoomUnit).IsDead() then
         Exit;
+  FRoomClear := True;
   FMap.RoomFloor.DoorsOpened := True;
 end;
 
@@ -4233,6 +4243,9 @@ begin
   //moved tile update
   if IsPlayerTurn then
   begin
+    if FRoomClear and (FPlayer <> nil) and (FPlayer.AP = 0) and (not FPlayer.IsDead()) then
+      EndTurn();
+
     FMovedTile := FMap.UI.GetTileAtCoords(Main.Cursor.Ray);
     FMovePath := nil;
     if (not IsMouseOnUI) and (FPlayer <> nil) then
@@ -4405,6 +4418,7 @@ begin
   LoadObstacles();
   FPlayer := oldPlayer;
 
+  FRoomClear := False;
   {$IfDef DEBUGBOTS}
     SpawnDebugBot();
   {$Else}

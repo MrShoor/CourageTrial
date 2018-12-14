@@ -622,7 +622,7 @@ end;
 
 function TSkill_Shoot.Cost: Integer;
 begin
-  if FLevel >= 2 then Result := 2 else Result := 3;
+  if FLevel >= 3 then Result := 2 else Result := 3;
 end;
 
 function TSkill_Shoot.Range: Single;
