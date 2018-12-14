@@ -58,6 +58,19 @@ type
     function Weapon_Damage: TVec2i; override;
   end;
 
+  { THuntersBow }
+
+  THuntersBow = class(TUnitItem)
+  public
+    function Name  : string;          override;
+    function Kind  : TUnitItemKind;   override;
+    function Slot  : TRoomUnitEqSlot; override;
+    function Model : string;          override;
+    function Ico48 : string;          override;
+
+    function Weapon_Damage: TVec2i; override;
+  end;
+
   { TAxe }
 
   TAxe = class(TUnitItem)
@@ -170,6 +183,38 @@ type
     function ProcessAction: Boolean; override;
     constructor Create(AUnit: TRoomUnit; const AItem: IUnitItem; const ABuff: IUnitBuff);
   end;
+
+{ THuntersBow }
+
+function THuntersBow.Name: string;
+begin
+  Result := 'Лук охотника'
+end;
+
+function THuntersBow.Kind: TUnitItemKind;
+begin
+  Result := ikBow;
+end;
+
+function THuntersBow.Slot: TRoomUnitEqSlot;
+begin
+  Result := esBothHands;
+end;
+
+function THuntersBow.Model: string;
+begin
+  Result := 'Hunters_Bow';
+end;
+
+function THuntersBow.Ico48: string;
+begin
+  Result := 'hunters_bow.png';
+end;
+
+function THuntersBow.Weapon_Damage: TVec2i;
+begin
+  Result := Vec(30, 35);
+end;
 
 { TSocks }
 

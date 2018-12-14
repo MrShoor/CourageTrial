@@ -286,7 +286,11 @@ procedure TfrmMain.InitWorld;
     FWorld.Renderer.PreloadModels([ExeRelativeFileName('models\scene1.avm')]);
     FWorld.Renderer.SetEnviromentCubemap(ExeRelativeFileName('waterfall.dds'));
 
-    FWorld.Renderer.PreloadModels([ExeRelativeFileName('units\units.avm')]);
+    FWorld.Renderer.PreloadModels([ExeRelativeFileName('units\archer.avm')]);
+    FWorld.Renderer.PreloadModels([ExeRelativeFileName('units\arissa.avm')]);
+    FWorld.Renderer.PreloadModels([ExeRelativeFileName('units\hero.avm')]);
+    FWorld.Renderer.PreloadModels([ExeRelativeFileName('units\mutant.avm')]);
+    FWorld.Renderer.PreloadModels([ExeRelativeFileName('units\wisp.avm')]);
     FWorld.Renderer.PreloadModels([ExeRelativeFileName('bullets\bullets.avm')]);
     FWorld.Renderer.PreloadModels([ExeRelativeFileName('weapons\weapons.avm')]);
   end;

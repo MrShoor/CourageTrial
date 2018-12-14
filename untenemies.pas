@@ -257,6 +257,23 @@ type
     function DoAction(): IBRA_Action; override;
   end;
 
+  { TBotHunter1 }
+
+  TBotHunter1 = class (TBot)
+  private
+    FAnim: array of IavAnimationController;
+  protected
+    function FindOptimalRouteForCheck(const ACheckPts: IVec2iSet): IRoomPath; override;
+    procedure UpdateStep; override;
+  public
+    procedure SetAnimation(const ANameSequence: array of string); override;
+    function  GetUnitMoveSpeed: Single; override;
+
+    procedure LoadModels(); override;
+
+    function DoAction(): IBRA_Action; override;
+  end;
+
   { TBotWisp }
 
   TBotWisp = class (TBot)
@@ -291,6 +308,265 @@ uses
   untSkills, untItems, generator;
 
 var gvBotID: Integer = 0;
+
+{ TBotHunter1 }
+
+function TBotHunter1.FindOptimalRouteForCheck(const ACheckPts: IVec2iSet): IRoomPath;
+begin
+  Result := FindOptimalRouteForCheck_Ranged(ACheckPts);
+end;
+
+procedure TBotHunter1.UpdateStep;
+var i: Integer;
+begin
+  inherited UpdateStep;
+  for i := 0 to Length(FAnim) - 1 do
+    FAnim[i].SetTime(World.GameTime);
+end;
+
+procedure TBotHunter1.SetAnimation(const ANameSequence: array of string);
+var i: Integer;
+begin
+  inherited SetAnimation(ANameSequence);
+  for i := 0 to Length(FAnim) - 1 do
+    FAnim[i].AnimationSequence_StartAndStopOther(AddAnimationPrefix(ANameSequence), AnimateState <> asDeath);
+end;
+
+function TBotHunter1.GetUnitMoveSpeed: Single;
+begin
+  Result := 6;
+end;
+
+procedure TBotHunter1.LoadModels();
+var
+  i: Integer;
+  bow: IUnitItem;
+begin
+  FRetreatHPRange := Vec(0,0);
+
+  MaxAP := 14;
+  MaxHP := 200;
+  HP := MaxHP;
+  AP := MaxAP;
+
+  Name := 'Охотница';
+  ViewRange := 20;
+  ViewAngle := Pi/3+EPS;
+  ViewWholeRange := 2.5;
+
+  AddModel('arissa:Body_Geo', mtDefault);
+  AddModel('arissa:Cloak_Geo', mtDefault);
+  AddModel('arissa:Skirt_Geo', mtDefault);
+  AddModel('arissa:Weapons_Geo', mtDefault);
+  AddModel('arissa:Eyes', mtEmissive);
+
+  bow := THuntersBow.Create;
+  Equip(bow);
+  Inventory().Push(bow, 0);
+
+  FUnitSkills.Add(TSkill_Shoot.Create(nil, 0));
+
+  FAnimationPrefix := 'Hunter_';
+
+  SetLength(FAnim, FModels.Count + FEmissive.Count);
+  for i := 0 to FModels.Count - 1 do
+    FAnim[i] := Create_IavAnimationController(FModels[i].Mesh.Pose, World.GameTime);
+  for i := 0 to FEmissive.Count - 1 do
+    FAnim[i+FModels.Count] := Create_IavAnimationController(FEmissive[i].Mesh.Pose, World.GameTime);
+  SetAnimation([]);
+
+  FRetreatLimits := 1;
+
+  Preview96_128 := 'ui\units\archer.png';
+
+  GenStdBotInventory(FInventory);
+end;
+
+function TBotHunter1.DoAction(): IBRA_Action;
+const
+  cBestDistance = 9;
+
+  function GetMoveToEnemyPosition(const ATargetPos: TVec2i): IRoomPath;
+  var points: IVec2iArr;
+      i: Integer;
+  begin
+    points := GetPointsOnRange(ATargetPos, cBestDistance, 30);
+    for i := 0 to points.Count - 1 do
+      if RayCastBooleanExcludeSelf(points[i], ATargetPos) then
+      begin
+        Result := FindPath(points[i]);
+        if RoomPos <> points[i] then
+          Result.Add(points[i]);
+        Exit;
+      end;
+    Result := nil;
+  end;
+
+  function GetOptimalRangePosition(const ATargetPos: TVec2i): IRoomPath;
+  var points: IVec2iArr;
+      i: Integer;
+  begin
+    points := GetPointsOnRange(ATargetPos, cBestDistance, AP - 1);
+    for i := 0 to points.Count - 1 do
+      if RayCastBooleanExcludeSelf(points[i], ATargetPos) then
+      begin
+        Result := FindPath(points[i]);
+        if RoomPos <> points[i] then
+          Result.Add(points[i]);
+        Exit;
+      end;
+    Result := nil;
+  end;
+
+  function GetOptimalHidePosition(const ASkillForUse: IUnitSkill): IRoomPath;
+  const
+    cBestDistance = 8;
+  var hidePts: IHidePointArr;
+      cmp: IComparer;
+      moveDist, i: Integer;
+      minEnemyDist: Integer;
+  begin
+    if not CanSee(FBS_SeeEnemy.Enemy.RoomPos) then Exit(nil);
+
+    moveDist := AP;
+    if ASkillForUse <> nil then
+      moveDist := moveDist - ASkillForUse.Cost;
+    minEnemyDist := 4;
+    Result := nil;
+    hidePts := FBS_SeeEnemy.GetHidePoints(Self);
+    cmp := THidePtsComparer.Create(cBestDistance, moveDist, minEnemyDist);
+    hidePts.Sort(cmp);
+
+    for i := 0 to hidePts.Count - 1 do
+    begin
+      if hidePts[i].params.moveWeight > moveDist then Exit;
+      if hidePts[i].params.enemyMoveWeight <= minEnemyDist then Exit;
+      Result := FindPath(hidePts[i].pt, TMoveFilter.Create(Self, nil));
+      if Result <> nil then
+      begin
+        Result.Add(hidePts[i].pt);
+        Exit;
+      end;
+    end;
+  end;
+
+  function GetBestSkillForUse(const AEnemy: TRoomUnit; const AFromPoint: TVec2i): IUnitSkill;
+  begin
+    if not Room.RayCastBoolean(RoomPos, AEnemy.RoomPos) then Exit(nil);
+    Result := FUnitSkills[0];
+    if AP < Result.Cost then Result := nil;
+    if Result <> nil then
+      if not Result.CanUse(Self, AEnemy) then Result := nil;
+  end;
+
+  function DoShootFirst(const ACurrentPos, ABestPos, AEnemyPos: TVec2i): Boolean;
+  var
+      currentWorldPos: TVec3;
+      bestWorldPos: TVec3;
+  begin
+    if ACurrentPos = ABestPos then Exit(True);
+    currentWorldPos := Room.UI.TilePosToWorldPos(ACurrentPos - AEnemyPos);
+    bestWorldPos := Room.UI.TilePosToWorldPos(ABestPos - AEnemyPos);
+    Result := LenSqr(currentWorldPos) <= LenSqr(bestWorldPos);
+  end;
+
+var
+  skill: IUnitSkill;
+begin
+  if AP = 0 then Exit(nil);
+
+  LogAction('DoAction AP = ' + IntToStr(AP));
+
+  case FBState of
+    bsNothing: Result := Behaviour_DefaultNothing();
+    bsSeeEnemy:
+      begin
+        if not CanSee(FBS_SeeEnemy.Enemy) and not InViewField(FBS_SeeEnemy.Enemy.RoomPos) then
+        begin
+          LogAction('  Dont see enemy. Turn on.');
+          Result := TBRA_UnitTurnAction.Create(Self, FBS_SeeEnemy.Enemy.RoomPos);
+          Exit;
+        end;
+
+        skill := GetBestSkillForUse(FBS_SeeEnemy.Enemy, RoomPos);
+
+        if FBS_SeeEnemy.OptimalRoute = nil then
+        begin
+          FBS_SeeEnemy.OptimalRoute := GetOptimalHidePosition(skill);
+          if FBS_SeeEnemy.OptimalRoute <> nil then LogAction('  Optimal route for hiding found. Len: ' + IntToStr(FBS_SeeEnemy.OptimalRoute.Count));
+
+          if FBS_SeeEnemy.OptimalRoute = nil then
+          begin
+            FBS_SeeEnemy.OptimalRoute := GetOptimalRangePosition(FBS_SeeEnemy.Enemy.RoomPos);
+            if FBS_SeeEnemy.OptimalRoute <> nil then LogAction('  Optimal route for range position found. Len: ' + IntToStr(FBS_SeeEnemy.OptimalRoute.Count));
+          end;
+
+          if FBS_SeeEnemy.OptimalRoute = nil then
+          begin
+            FBS_SeeEnemy.OptimalRoute := GetMoveToEnemyPosition(FBS_SeeEnemy.Enemy.RoomPos);
+            if FBS_SeeEnemy.OptimalRoute <> nil then LogAction('  Moving to enemy. Len: ' + IntToStr(FBS_SeeEnemy.OptimalRoute.Count));
+          end;
+        end;
+//
+//        if skill = nil then
+//        begin
+//          if (FBS_SeeEnemy.OptimalRoute <> nil) and (FBS_SeeEnemy.OptimalRoute.Count > 0) then
+//            skill := GetBestSkillForUse(FBS_SeeEnemy.Enemy, FBS_SeeEnemy.);
+//        end;
+
+        if FBS_SeeEnemy.OptimalRoute = nil then
+        begin
+          LogAction('  Cant find optimal route. Just attack');
+          if skill = nil then
+          begin
+            LogAction('      But no skill for use');
+            Result := nil;
+            Exit;
+          end;
+          Result := skill.DoAction(Self, FBS_SeeEnemy.Enemy);
+          Exit;
+        end;
+
+        if skill = nil then
+        begin
+          LogAction('  No skill for use. Just move');
+          if FBS_SeeEnemy.OptimalRoute.Count = 0 then
+          begin
+            LogAction('      But at optimal point');
+            Result := nil;
+            Exit;
+          end;
+          Result := Action_MoveWithRoute(FBS_SeeEnemy.OptimalRoute);
+          Exit;
+        end;
+
+        if FBS_SeeEnemy.OptimalRoute.Count > AP - skill.Cost then
+        begin
+          LogAction('  Not enought points for skill. Just move');
+          Result := Action_MoveWithRoute(FBS_SeeEnemy.OptimalRoute);
+          Exit;
+        end
+        else
+        begin
+          if (FBS_SeeEnemy.OptimalRoute.Count = 0) or DoShootFirst(RoomPos, FBS_SeeEnemy.OptimalRoute.Last, FBS_SeeEnemy.Enemy.RoomPos) then
+          begin
+            LogAction('  Shoot!');
+            Result := skill.DoAction(Self, FBS_SeeEnemy.Enemy);
+            Exit;
+          end
+          else
+          begin
+            LogAction('  Move to optimal position');
+            Result := Action_MoveWithRoute(FBS_SeeEnemy.OptimalRoute);
+            Exit;
+          end;
+        end;
+      end;
+    bsLostEnemy: Result := Behaviour_EnemySearch(10);
+    bsRetreat: Result := Behaviour_DefaultRetreat(1, 2);
+    bsPatrol: Result := Behaviour_DefaultPatrol();
+  end;
+end;
 
 { TBotWisp }
 
