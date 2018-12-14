@@ -1070,6 +1070,7 @@ var
 
 function TryPlaySound3D(const AName: string; ARoomObject: TRoomObject; const ALooped: Boolean = False): ISoundStream3D;
 var sndPos: TSoundPos;
+    attr  : TSoundAttr3D;
 begin
   Result := nil;
   if AName = '' then Exit;
@@ -1077,6 +1078,9 @@ begin
   Result := GetLightPlayer.GetStream3D(AName);
   sndPos := Result.Pos3D;
   sndPos.Pos := ARoomObject.Pos + Vec(0, 0.5, 0);
+  attr := Result.Attr3D;
+  attr.DistRange := Vec(4, 2000);
+  Result.Attr3D := attr;
   Result.Pos3D := sndPos;
   Result.Play(ALooped);
 end;

@@ -9,7 +9,7 @@ uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, untLevel, avBase, avRes, avTypes, mutils,
   avCanvas, avMiniControls,
   untFloor, ui_start_menu,
-  bWorld;
+  bWorld, bBassLight;
 
 type
 
@@ -37,6 +37,8 @@ type
     procedure FormMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure FormPaint(Sender: TObject);
   private
+    FMusicTheme: ISoundStream;
+
     FStartTitle: TamvStartTitle;
 
     FMain: TavMainRender;
@@ -301,8 +303,8 @@ begin
   PreloadModels;
   PreloadGlyphs;
 
-  //FWaitForNewGame := True;
-  //MakeNewGameIfNeeded;
+  FMusicTheme := GetLightPlayer.GetStream('music\Menu_vol.mp3');
+  FMusicTheme.Play(True);
 end;
 
 procedure TfrmMain.OnAfterWorldDraw(Sender: TObject);
@@ -313,6 +315,11 @@ end;
 procedure TfrmMain.MakeNewGameIfNeeded();
 begin
   if not FWaitForNewGame then Exit;
+
+  if FMusicTheme <> nil then FMusicTheme.Stop();
+  FMusicTheme := GetLightPlayer.GetStream('music\InRoom_vol.mp3');
+  FMusicTheme.Play(True);
+
   FWaitForNewGame := False;
 
   FreeAndNil(FFloor);
