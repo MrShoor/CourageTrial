@@ -18,12 +18,17 @@ type
   private
     FItem : IWeakRefIntf;
     FIndex: Integer;
+    FLevel: Integer;
   protected
+    function  GetSkillLevel: Integer;
+    procedure SetSkillLevel(ALevel: Integer);
+
     function Item: IUnitItem;
     function Idx : Integer;
     function WearedOnly: Boolean; virtual; abstract;
     function UseReady(AUnit: TRoomUnit): Boolean; virtual; abstract;
 
+    function ID  : TUnitSkillID; virtual;
     function Name: string; virtual; abstract;
     function Desc: string; virtual; abstract;
     function Ico : string; virtual; abstract;
@@ -86,6 +91,7 @@ type
     function WearedOnly: Boolean; override;
     function UseReady(AUnit: TRoomUnit): Boolean; override;
 
+    function ID  : TUnitSkillID; override;
     function Name: string; override;
     function Desc: string; override;
     function Ico : string; override;
@@ -117,6 +123,7 @@ type
     function WearedOnly: Boolean; override;
     function UseReady(AUnit: TRoomUnit): Boolean; override;
 
+    function ID  : TUnitSkillID; override;
     function Name: string; override;
     function Desc: string; override;
     function Ico : string; override;
@@ -438,14 +445,19 @@ begin
   Result := True;
 end;
 
+function TSkill_AxeAttack.ID: TUnitSkillID;
+begin
+  Result := sidAxeMastery;
+end;
+
 function TSkill_AxeAttack.Name: string;
 begin
-  Result := 'Рубануть';
+  Result := 'Владение топором ' + IntToStr(FLevel);
 end;
 
 function TSkill_AxeAttack.Desc: string;
 begin
-  Result := 'Базовый навык владения топором';
+  Result := 'Простой рубящий удар';
 end;
 
 function TSkill_AxeAttack.Ico: string;
@@ -455,7 +467,12 @@ end;
 
 function TSkill_AxeAttack.Cost: Integer;
 begin
-  Result := 3;
+  case FLevel of
+    1 : Result := 3;
+    2 : Result := 2;
+  else
+    Result := 2;
+  end;
 end;
 
 function TSkill_AxeAttack.Range: Single;
@@ -465,17 +482,33 @@ end;
 
 function TSkill_AxeAttack.Damage: TVec2i;
 begin
-  Result := Vec(0, 0);
+  case FLevel of
+    1: Result := Vec(0, 0);
+    2: Result := Vec(5, 10);
+    3: Result := Vec(10, 20);
+  else
+    Result := Vec(10, 20);
+  end;
 end;
 
 function TSkill_AxeAttack.DamageScale: Single;
 begin
-  Result := 1;
+  case FLevel of
+    1 : Result := 1;
+    2 : Result := 1.2;
+    3 : Result := 1.5;
+  else
+    Result := 1.5;
+  end;
 end;
 
 function TSkill_AxeAttack.Accuracy: TVec2;
 begin
-  Result := Vec(0.9, 0.9);
+  case FLevel of
+    1 : Result := Vec(0.9, 0.9);
+    2 : Result := Vec(0.95, 0.95);
+    3 : Result := Vec(0.99, 0.99);
+  end;
 end;
 
 function TSkill_AxeAttack.Req_WeaponType: TUnitItemKind;
@@ -569,12 +602,12 @@ end;
 
 function TSkill_Shoot.Name: string;
 begin
-  Result := 'Простой выстрел';
+  Result := 'Владение луком ' + IntToStr(FLevel);
 end;
 
 function TSkill_Shoot.Desc: string;
 begin
-  Result := 'Приченяет урон. Если попадешь';
+  Result := 'Простой выстрел. Приченяет урон, если попадешь';
 end;
 
 function TSkill_Shoot.Ico: string;
@@ -582,29 +615,54 @@ begin
   Result := 'bow_shoot.png';
 end;
 
+function TSkill_Shoot.ID: TUnitSkillID;
+begin
+  Result := sidBowMastery;
+end;
+
 function TSkill_Shoot.Cost: Integer;
 begin
-  Result := 2;
+  if FLevel >= 2 then Result := 2 else Result := 3;
 end;
 
 function TSkill_Shoot.Range: Single;
 begin
-  Result := 20;
+  case FLevel of
+    1 : Result := 20;
+    2 : Result := 25;
+    3 : Result := 30;
+  else
+    Result := 30;
+  end;
 end;
 
 function TSkill_Shoot.Damage: TVec2i;
 begin
-  Result := Vec(0, 0);
+  case FLevel of
+    1 : Result := Vec(0, 0);
+    2 : Result := Vec(5, 0);
+    3 : Result := Vec(10, 5);
+  else
+    Result := Vec(10, 5);
+  end;
 end;
 
 function TSkill_Shoot.DamageScale: Single;
 begin
-  Result := 1;
+  case FLevel of
+    1 : Result := 1;
+    2 : Result := 1.1;
+    3 : Result := 1.5;
+  end;
 end;
 
 function TSkill_Shoot.Accuracy: TVec2;
 begin
-  Result := Vec(0.9, 0.3);
+  case FLevel of
+    1 : Result := Vec(0.9, 0.3);
+    2 : Result := Vec(0.9, 0.5);
+    3 : Result := Vec(0.95, 0.7);
+  end;
 end;
 
 function TSkill_Shoot.Req_WeaponType: TUnitItemKind;
@@ -685,6 +743,16 @@ end;
 
 { TUnitSkill }
 
+function TUnitSkill.GetSkillLevel: Integer;
+begin
+  Result := FLevel;
+end;
+
+procedure TUnitSkill.SetSkillLevel(ALevel: Integer);
+begin
+  FLevel := ALevel;
+end;
+
 function TUnitSkill.Item: IUnitItem;
 begin
   if FItem = nil then Exit(nil);
@@ -695,6 +763,11 @@ end;
 function TUnitSkill.Idx: Integer;
 begin
   Result := FIndex;
+end;
+
+function TUnitSkill.ID: TUnitSkillID;
+begin
+  Result := sidUnknown;
 end;
 
 function TUnitSkill.Req_WeaponType: TUnitItemKind;
@@ -712,6 +785,7 @@ begin
   if AItem <> nil then
     FItem := (AItem as IWeakedInterface).WeakRef;
   FIndex := AIndex;
+  FLevel := 1;
 end;
 
 { TSkill_Kick }

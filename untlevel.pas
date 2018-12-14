@@ -98,12 +98,18 @@ type
   IUnitItem = interface;
   IUnitBuff = interface;
 
+  TUnitSkillID = (sidUnknown, sidBowMastery, sidAxeMastery);
   IUnitSkill = interface
+    function  GetSkillLevel: Integer;
+    procedure SetSkillLevel(ALevel: Integer);
+    property SkillLevel: Integer read GetSkillLevel write SetSkillLevel;
+
     function Item: IUnitItem;
     function Idx : Integer;
     function WearedOnly: Boolean;
     function UseReady(AUnit: TRoomUnit): Boolean;
 
+    function ID  : TUnitSkillID;
     function Name: string;
     function Desc: string;
     function Ico : string;
@@ -434,6 +440,7 @@ type
     property Preview96_128: string read FPreview96_128 write SetPreview96_128;
 
     property SkillSlots: IUnitSkillArr read FSlots10 write FSlots10;
+    function UnitSkills(): IUnitSkillArr;
     function AllSkills(): IUnitSkillArr;
     function AllBuffs(): IUnitBuffsArr;
     procedure ProcessBuffs;
@@ -2659,6 +2666,11 @@ begin
     ADepthOverride.Add(overrideColor);
 end;
 
+function TRoomUnit.UnitSkills(): IUnitSkillArr;
+begin
+  Result := FUnitSkills;
+end;
+
 procedure TRoomUnit.LoadModels();
 begin
   FViewAngle := Pi / 3;
@@ -3939,6 +3951,10 @@ begin
   Inventory().Push(THealBottle2.Create, 0);
   Inventory().Push(THuntersBow.Create, 0);
   Inventory().Push(TScroll_ResonantArmor.Create, 0);
+  Inventory().Push(TScroll_Bow_Mastery.Create, 0);
+  Inventory().Push(TScroll_Bow_Mastery.Create, 0);
+  Inventory().Push(TScroll_Axe_Mastery.Create, 0);
+  Inventory().Push(TScroll_Axe_Mastery.Create, 0);
   {$EndIf}
 
   Inventory().Push(THealBottle.Create, 0);

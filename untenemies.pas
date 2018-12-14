@@ -365,6 +365,7 @@ begin
   Inventory().Push(bow, 0);
 
   FUnitSkills.Add(TSkill_Shoot.Create(nil, 0));
+  FUnitSkills.Last.SkillLevel := 2;
   FUnitSkills.Add(TSkill_Resurrect.Create(nil, 0));
 
   FAnimationPrefix := 'Hunter_';
@@ -1211,6 +1212,7 @@ begin
   Inventory().Push(bow, 0);
 
   FUnitSkills.Add(TSkill_Shoot.Create(nil, 0));
+  FUnitSkills.Last.SkillLevel := 2;
 
   FAnimationPrefix := 'Archer_';
 
@@ -2258,7 +2260,7 @@ procedure TBotMutant1.LoadModels();
 begin
   FRetreatHPRange := Vec(0, 30);
 
-  MaxAP := 8;
+  MaxAP := 10;
   MaxHP := 100;
   HP := MaxHP;
   AP := MaxAP;

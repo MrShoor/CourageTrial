@@ -140,7 +140,38 @@ type
     function ExtraDesc: string; override;
 
     function Consume(AUnit: TRoomUnit): IBRA_Action; override;
-    constructor Create; override;
+  end;
+
+  { TScroll_Bow_Mastery }
+
+  TScroll_Bow_Mastery = class(TUnitItem)
+  private
+  public
+    function Name  : string;          override;
+    function Kind  : TUnitItemKind;   override;
+    function Slot  : TRoomUnitEqSlot; override;
+    function Model : string;          override;
+    function Ico48 : string;          override;
+
+    function ExtraDesc: string; override;
+
+    function Consume(AUnit: TRoomUnit): IBRA_Action; override;
+  end;
+
+  { TScroll_Axe_Mastery }
+
+  TScroll_Axe_Mastery = class(TUnitItem)
+  private
+  public
+    function Name  : string;          override;
+    function Kind  : TUnitItemKind;   override;
+    function Slot  : TRoomUnitEqSlot; override;
+    function Model : string;          override;
+    function Ico48 : string;          override;
+
+    function ExtraDesc: string; override;
+
+    function Consume(AUnit: TRoomUnit): IBRA_Action; override;
   end;
 
   { TSocks }
@@ -183,6 +214,130 @@ type
     function ProcessAction: Boolean; override;
     constructor Create(AUnit: TRoomUnit; const AItem: IUnitItem; const ABuff: IUnitBuff);
   end;
+
+{ TScroll_Axe_Mastery }
+
+function TScroll_Axe_Mastery.Name: string;
+begin
+  Result := 'Свиток... дровосека?';
+end;
+
+function TScroll_Axe_Mastery.Kind: TUnitItemKind;
+begin
+  Result := ikConsumable;
+end;
+
+function TScroll_Axe_Mastery.Slot: TRoomUnitEqSlot;
+begin
+  Result := esNone;
+end;
+
+function TScroll_Axe_Mastery.Model: string;
+begin
+  Result := 'Scroll';
+end;
+
+function TScroll_Axe_Mastery.Ico48: string;
+begin
+  Result := 'scroll_axe_mastery.png';
+end;
+
+function TScroll_Axe_Mastery.ExtraDesc: string;
+begin
+  Result := 'Повышает мастерство владения топором на 1';
+end;
+
+function TScroll_Axe_Mastery.Consume(AUnit: TRoomUnit): IBRA_Action;
+var skills: IUnitSkillArr;
+    upgraded: Boolean;
+    i: Integer;
+begin
+  if not CheckConsume(AUnit) then Exit(nil);
+  upgraded := False;
+  Result := nil;
+  skills := AUnit.UnitSkills();
+  for i := 0 to skills.Count - 1 do
+    if skills[i].ID = sidAxeMastery then
+    begin
+      if skills[i].SkillLevel < 3 then
+      begin
+        skills[i].SkillLevel := skills[i].SkillLevel + 1;
+        upgraded := True;
+      end;
+    end;
+  if upgraded then
+  begin
+    AUnit.Room.AddMessage('Повышено владение топором');
+    Result := TBRA_UseBuffScroll.Create(AUnit, Self, nil);
+  end
+  else
+  begin
+    AUnit.Room.AddFlyOutMessage('Нет навыка для улучшения', AUnit.RoomPos, Vec(1,0,0));
+    Result := nil;
+  end;
+end;
+
+{ TScroll_Bow_Mastery }
+
+function TScroll_Bow_Mastery.Name: string;
+begin
+  Result := 'Свиток лучника';
+end;
+
+function TScroll_Bow_Mastery.Kind: TUnitItemKind;
+begin
+  Result := ikConsumable;
+end;
+
+function TScroll_Bow_Mastery.Slot: TRoomUnitEqSlot;
+begin
+  Result := esNone;
+end;
+
+function TScroll_Bow_Mastery.Model: string;
+begin
+  Result := 'Scroll';
+end;
+
+function TScroll_Bow_Mastery.Ico48: string;
+begin
+  Result := 'scroll_bow_mastery.png';
+end;
+
+function TScroll_Bow_Mastery.ExtraDesc: string;
+begin
+  Result := 'Повышает мастерство владения луком на 1';
+end;
+
+function TScroll_Bow_Mastery.Consume(AUnit: TRoomUnit): IBRA_Action;
+var skills: IUnitSkillArr;
+    upgraded: Boolean;
+    i: Integer;
+begin
+  if not CheckConsume(AUnit) then Exit(nil);
+  upgraded := False;
+  Result := nil;
+  skills := AUnit.UnitSkills();
+  for i := 0 to skills.Count - 1 do
+    if skills[i].ID = sidBowMastery then
+    begin
+      if skills[i].SkillLevel < 3 then
+      begin
+        skills[i].SkillLevel := skills[i].SkillLevel + 1;
+        upgraded := True;
+      end;
+    end;
+  if upgraded then
+  begin
+    AUnit.Room.AddMessage('Повышено владение луком');
+    Result := TBRA_UseBuffScroll.Create(AUnit, Self, nil);
+  end
+  else
+  begin
+    AUnit.Room.AddFlyOutMessage('Нет навыка для улучшения', AUnit.RoomPos, Vec(1,0,0));
+    Result := nil;
+  end;
+end;
 
 { THuntersBow }
 
@@ -330,7 +485,8 @@ begin
   FUnit.AP := FUnit.AP - 1;
   FUnit.Inventory().Pop(AItem);
   FUnit.SetAnimation(['SelfCast']);
-  FUnit.ApplyBuff(ABuff);
+  if ABuff <> nil then
+    FUnit.ApplyBuff(ABuff);
   FStopTime := FUnit.World.GameTime + 1500;
 end;
 
@@ -371,11 +527,6 @@ function TScroll_ResonantArmor.Consume(AUnit: TRoomUnit): IBRA_Action;
 begin
   if not CheckConsume(AUnit) then Exit(nil);
   Result := TBRA_UseBuffScroll.Create(AUnit, Self, TBuff_ResonantArmor.Create(AUnit, 8));
-end;
-
-constructor TScroll_ResonantArmor.Create;
-begin
-  inherited Create;
 end;
 
 { TBRA_DrinkPotion }
@@ -579,7 +730,7 @@ end;
 
 function TArcherBow.Weapon_Damage: TVec2i;
 begin
-  Result := Vec(10, 30);
+  Result := Vec(10, 20);
 end;
 
 end.

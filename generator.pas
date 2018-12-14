@@ -140,9 +140,9 @@ end;
 
 function GenAltarLoot(const AForUnit: TRoomUnit): IUnitItem;
 type
-  TGenAltarItems = (aiBottle50, aiScrollResonantArmor, aiSocks, aiPoison, aiBow, aiHuntersBow);
+  TGenAltarItems = (aiBottle50, aiScrollResonantArmor, aiSocks, aiPoison, aiBow, aiHuntersBow, aiScrollAxe, aiScrollBow);
 const
-  cBasicWeights: array [TGenAltarItems] of Integer = (2000, 1000, 2000, 200, 1000, 300);
+  cBasicWeights: array [TGenAltarItems] of Integer = (2000, 1000, 2000, 200, 1000, 300, 200, 200);
 var
   i: Integer;
   weights: array [TGenAltarItems] of Integer;
@@ -168,6 +168,8 @@ begin
     aiPoison             : Result := TPoisonBottle.Create;
     aiBow                : Result := TArcherBow.Create;
     aiHuntersBow         : Result := THuntersBow.Create;
+    aiScrollAxe          : Result := TScroll_Axe_Mastery.Create;
+    aiScrollBow          : Result := TScroll_Bow_Mastery.Create;
   else
     Result := nil;
   end;
@@ -175,9 +177,9 @@ end;
 
 function GenChestLoot(const AForUnit: TRoomUnit): IUnitItemArr;
 type
-  TGenChestItems = (ciBottle30, ciBottle50, ciScrollResonantArmor, ciSocks, ciPoison);
+  TGenChestItems = (ciBottle30, ciBottle50, ciScrollResonantArmor, ciSocks, ciPoison, ciScrollAxe, ciScrollBow);
 const
-  cBasicWeights: array [TGenChestItems] of Integer = (4000, 1000, 500, 1000, 200);
+  cBasicWeights: array [TGenChestItems] of Integer = (4000, 1000, 500, 1000, 200, 50, 50);
 var luck: Integer;
     itemsCount: Integer;
     weights: array [TGenChestItems] of Integer;
@@ -207,6 +209,8 @@ begin
       ciScrollResonantArmor: newItem := TScroll_ResonantArmor.Create;
       ciSocks              : newItem := TSocks.Create;
       ciPoison             : newItem := TPoisonBottle.Create;
+      ciScrollAxe          : newItem := TScroll_Axe_Mastery.Create;
+      ciScrollBow          : newItem := TScroll_Bow_Mastery.Create;
     else
       newItem := nil;
     end;
