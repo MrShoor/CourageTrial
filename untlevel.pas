@@ -1,6 +1,6 @@
 ﻿unit untLevel;
 
-//{$Define DEBUGBOTS}
+{$Define DEBUGBOTS}
 
 {$IfDef FPC}
   {$mode objfpc}{$H+}
@@ -2419,6 +2419,10 @@ begin
       Unequip(esBothHands);
 
   m := FModels[0].Mesh.BindPoseTransform;
+  {$Warning 'temporary workaroud'}
+  m.f[0,0] := 100;
+  m.f[1,1] := 100;
+  m.f[2,2] := 100;
   inst := World.Renderer.CreateModelInstances([AItem.Model]);
   inst[0].Mesh.Transform := m;
   inst[0].Mesh.Pose := FModels[0].Mesh.Pose;
@@ -3899,7 +3903,7 @@ var
   axe: IUnitItem;
 begin
   MaxAP := {$IfDef DEBUGBOTS}30{$Else}10{$EndIf};
-  MaxHP := 100;
+  MaxHP := {$IfDef DEBUGBOTS}1000{$Else}100{$EndIf};
   HP := MaxHP;
   AP := MaxAP;
 
@@ -3931,7 +3935,11 @@ begin
   Inventory().Push(axe, 0);
   Equip(axe);
 
-  //Inventory().Push(TScroll_ResonantArmor.Create, 0);
+  {$IfDef DEBUGBOTS}
+  Inventory().Push(THealBottle2.Create, 0);
+  Inventory().Push(THuntersBow.Create, 0);
+  Inventory().Push(TScroll_ResonantArmor.Create, 0);
+  {$EndIf}
 
   Inventory().Push(THealBottle.Create, 0);
   //Inventory().Push(THealBottle2.Create, 0);
@@ -4351,7 +4359,7 @@ procedure TBattleRoom.GenerateWithLoad(const AFileName: string;
     //bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
     //FUnits.Add(bot);
 
-    bot := TBotWisp.Create(FMap);
+    bot := TBotHunter1.Create(FMap);
     bot.LoadModels();
     bot.SetRoomPosDir(GetSpawnPlace(), Random(6));
     //bot.SetRoomPosDir(Vec(0,0), Random(6));
