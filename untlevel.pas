@@ -1,6 +1,6 @@
 ﻿unit untLevel;
 
-{$Define DEBUGBOTS}
+//{$Define DEBUGBOTS}
 
 {$IfDef FPC}
   {$mode objfpc}{$H+}
