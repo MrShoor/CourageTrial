@@ -208,6 +208,7 @@ type
 
     procedure SetActiveUnit(const ARoomUnit: TRoomUnit);
     procedure SetPlayerActiveSkill(const ASkill: IUnitSkill);
+    procedure SetReservedAP(const ANewReservedAP: Integer);
     procedure SetOtherInventory(const AInventory: IInventory; ACloseCallback: TNotifyEvent);
     procedure AdjustCameraToPlayer();
     procedure AdjustCameraToPlayerKeepDist();
@@ -428,6 +429,8 @@ type
   protected
     procedure Notify_PlayerLeave; override;
     procedure Notify_PlayerEnter; override;
+
+    procedure UpdateStep; override;
 
     procedure AfterRegister; override;
     function InAbsoluteSight: Boolean;
@@ -882,6 +885,26 @@ type
                        const ADurationTime, ADamageStartTime: Integer);
   end;
 
+  { TBRA_UnitKickAttack }
+
+  TBRA_UnitKickAttack = class(TBRA_Action)
+  private
+    FRoomUnit   : TRoomUnit;
+    FTarget     : TRoomUnit;
+    FSkill      : IUnitSkill;
+    FActionTime : Integer;
+    FDamageStartTime: Integer;
+    FInKnockBack: Boolean;
+    FKnockBack  : Single;
+    FKnockBackFrom: TVec3;
+    FKnockBackTo  : TVec3;
+  public
+    function ProcessAction: Boolean; override;
+    constructor Create(const AUnit, ATarget: TRoomUnit;
+                       const ASkill: IUnitSkill;
+                       const ADurationTime, ADamageStartTime: Integer);
+  end;
+
   { TBRA_MakeDamage }
 
   TBRA_MakeDamage = class(TBRA_Action)
@@ -891,7 +914,7 @@ type
     FActionTime: Integer;
   public
     function ProcessAction: Boolean; override;
-    constructor Create(const AUnit, AFromUnit: TRoomUnit; const ADamage: Integer);
+    constructor Create(const AUnit, AFromUnit: TRoomUnit; const ADamage: Integer; const AMsg: string = '');
   end;
 
   { TBRA_LootGround }
@@ -1048,6 +1071,94 @@ function FindRoomClass(const AName: string): TRoomObjectClass;
 begin
   if gvRegRommClasses = nil then Exit(nil);
   if not gvRegRommClasses.TryGetValue(AName, Result) then Result := nil;
+end;
+
+{ TBRA_UnitKickAttack }
+
+function TBRA_UnitKickAttack.ProcessAction: Boolean;
+var buff: IUnitBuff;
+    wallPos: TVec2i;
+    wallObj: TRoomObject;
+    dir: TVec2i;
+    exDamage: Integer;
+
+    knockBackDone: Boolean;
+begin
+  if FRoomUnit.World.GameTime > FDamageStartTime then
+  begin
+    FDamageStartTime := HUGE;
+    if FSkill.IsAttackSkill then
+      if FSkill.SampleHitChance(FRoomUnit, FTarget) then
+      begin
+        dir := FTarget.RoomPos - FRoomUnit.RoomPos;
+        wallPos := FTarget.RoomPos + dir;
+        wallObj := FRoomUnit.Room.ObjectAt(wallPos);
+        exDamage := 0;
+        if (wallObj <> nil) or not FTarget.Room.IsCellExists(wallPos) then
+        begin
+          FInKnockBack := False;
+          exDamage := 10;
+          if (wallObj is TRoomUnit) then
+          begin
+            FTarget.Room.AddAction(TBRA_MakeDamage.Create(TRoomUnit(wallObj), FTarget, 10, TRoomUnit(wallObj).Name + ' получает 10 урона от столкновения'));
+          end
+          else
+          begin
+            buff := FSkill.SampleBuffChance(FRoomUnit, FTarget);
+            if buff <> nil then
+            begin
+              FTarget.Room.AddMessage(FTarget.Name + ' оглушена на ' + IntToStr(buff.Duration) + ' хода');
+              FTarget.Room.AddFlyOutMessage('Оглушение', FTarget.RoomPos, Vec(1,0,0));
+              FTarget.ApplyBuff(buff);
+            end;
+          end;
+        end
+        else
+        begin
+          FKnockBackFrom := FTarget.Room.UI.TilePosToWorldPos(FTarget.RoomPos);
+          FInKnockBack := True;
+          FKnockBack := 1;
+          FTarget.RoomPos := wallPos;
+          FKnockBackTo := FTarget.Room.UI.TilePosToWorldPos(FTarget.RoomPos);
+        end;
+
+        if FTarget.Room.RoomFloor.IsHole[FTarget.RoomPos] then
+          FTarget.InstantKill(FTarget.Name + ' свалился в пропасть')
+        else
+          FTarget.Room.AddAction(TBRA_MakeDamage.Create(FTarget, FRoomUnit, FSkill.SampleDamage(FRoomUnit, FTarget) + exDamage ));
+      end;
+  end;
+
+  knockBackDone := True;
+  if FInKnockBack then
+  begin
+    FKnockBack := FKnockBack * 0.9;
+    if FKnockBack < 0.05 then
+      FKnockBack := 0
+    else
+      knockBackDone := False;
+    FTarget.Pos := Lerp(FKnockBackTo, FKnockBackFrom, FKnockBack);
+  end;
+
+  Result := (FRoomUnit.World.GameTime < FActionTime) or not knockBackDone;
+end;
+
+constructor TBRA_UnitKickAttack.Create(const AUnit, ATarget: TRoomUnit; const ASkill: IUnitSkill; const ADurationTime, ADamageStartTime: Integer);
+begin
+  Assert(AUnit <> nil);
+  Assert(ATarget <> nil);
+  Assert(ASkill <> nil);
+  FSkill := ASkill;
+
+  FRoomUnit := AUnit;
+  FTarget := ATarget;
+  FActionTime := FRoomUnit.World.GameTime + ADurationTime;
+  FDamageStartTime := FRoomUnit.World.GameTime + ADamageStartTime;
+
+  WriteLn('Kick started. FDamageStartTime: ', FDamageStartTime, ' FActionTime: ',FActionTime);
+
+  FRoomUnit.SetAnimation([FSkill.Animation]);
+  FRoomUnit.RoomDir := FRoomUnit.Room.Direction(FRoomUnit.RoomPos, FTarget.RoomPos);
 end;
 
 { TBRA_LootGround }
@@ -2161,14 +2272,14 @@ begin
   Result := FRoomUnit.World.GameTime < FActionTime;
 end;
 
-constructor TBRA_MakeDamage.Create(const AUnit, AFromUnit: TRoomUnit; const ADamage: Integer);
+constructor TBRA_MakeDamage.Create(const AUnit, AFromUnit: TRoomUnit; const ADamage: Integer; const AMsg: string);
 begin
   Assert(AUnit <> nil);
   FRoomUnit := AUnit;
   FActionTime := FRoomUnit.World.GameTime + 1000;
   FDamage := ADamage;
 
-  FRoomUnit.DealDamage(FDamage, AFromUnit);
+  FRoomUnit.DealDamage(FDamage, AFromUnit, AMsg);
 end;
 
 { TBRA_UnitDefaultAttack }
@@ -2425,6 +2536,7 @@ begin
   if AP <= 0 then
   begin
     Room.AddMessage(string('Нет очков хода чтобы экипировать ') + AItem.Name);
+    Room.AddFlyOutMessage('Нужно 1 ОД', RoomPos, Vec(1,0,0));
     Exit(False);
   end;
   AP := AP - 1;
@@ -2586,6 +2698,15 @@ end;
 procedure TRoomUnit.Notify_PlayerEnter;
 begin
   SubscribeForUpdateStep;
+end;
+
+procedure TRoomUnit.UpdateStep;
+begin
+  inherited UpdateStep;
+  if FRoom <> nil then
+    if FRoom.RoomFloor <> nil then
+      if FRoom.RoomFloor.IsHole[RoomPos] then
+        Pos := Vec(Pos.x, Max(Pos.y-0.05, -10), Pos.z);
 end;
 
 procedure TRoomUnit.AfterRegister;
@@ -4108,6 +4229,9 @@ end;
 procedure TBattleRoom.KeyPress(KeyCode: Integer);
 var n: Integer;
 begin
+  if FPlayer <> nil then
+    if FPlayer.IsDead() then Exit;
+
   if KeyCode = Ord('O') then
     FMap.RoomFloor.DoorsOpened := not FMap.RoomFloor.DoorsOpened;
 
@@ -4146,6 +4270,8 @@ var obj: TRoomObject;
     new_action: IBRA_Action;
 begin
   if not IsPlayerTurn() then Exit;
+  if FPlayer <> nil then
+    if FPlayer.IsDead() then Exit;
   if IsMouseOnUI() then Exit;
 
   if (button = 0) and (FActions.Count > 0) then
@@ -4298,7 +4424,7 @@ end;
 
 procedure TBattleRoom.PrepareToDraw();
 
-  procedure DrawTileMap;
+  procedure DrawTileMap(out AReservedPts: Integer);
   var
     i: Integer;
     unt: TRoomUnit;
@@ -4307,10 +4433,12 @@ procedure TBattleRoom.PrepareToDraw();
     pt: TVec2i;
     //shootPts: IVec2iArr;
   begin
+    AReservedPts := 0;
     FMap.UI.ClearTileColors();
     if {$IfDef DEBUGBOTS}True{$Else}IsPlayerTurn{$EndIf} then
     begin
       if (FMovePath <> nil) and (FActions.Count = 0) then
+      begin
         for i := 0 to FMovePath.Count - 1 do
         begin
           if i >= FPlayer.AP then
@@ -4318,6 +4446,8 @@ procedure TBattleRoom.PrepareToDraw();
           else
             FMap.UI.TileColor[FMovePath[i]] := TTileColorID.HighlightedGreen;
         end;
+        AReservedPts := FMovePath.Count;
+      end;
       if (not IsMouseOnUI) and (FMovePath = nil) then
         FMap.UI.TileColor[FMovedTile] := TTileColorID.Hovered;
 
@@ -4325,12 +4455,12 @@ procedure TBattleRoom.PrepareToDraw();
       //for i := 0 to shootPts.Count - 1 do
       //  FMap.UI.TileColor[shootPts[i]] := TTileColorID.HighlightedRed;
 
-      if gvDebugPoints <> nil then
-        for i := 0 to gvDebugPoints.Count - 1 do
-          FMap.UI.TileColor[gvDebugPoints[i]] := TTileColorID.HighlightedGreen;
-      if gvDebugPoints2 <> nil then
-        for i := 0 to gvDebugPoints2.Count - 1 do
-          FMap.UI.TileColor[gvDebugPoints2[i]] := TTileColorID.HighlightedRed;
+      //if gvDebugPoints <> nil then
+      //  for i := 0 to gvDebugPoints.Count - 1 do
+      //    FMap.UI.TileColor[gvDebugPoints[i]] := TTileColorID.HighlightedGreen;
+      //if gvDebugPoints2 <> nil then
+      //  for i := 0 to gvDebugPoints2.Count - 1 do
+      //    FMap.UI.TileColor[gvDebugPoints2[i]] := TTileColorID.HighlightedRed;
 
       movedObj := FMap.ObjectAt(FMovedTile);
       if (movedObj is TRoomUnit) and (movedObj <> FMap.CurrentPlayer) then
@@ -4342,7 +4472,19 @@ procedure TBattleRoom.PrepareToDraw();
           observSet.Reset;
           while observSet.Next(pt) do
             FMap.UI.TileColor[pt] := TTileColorID.HighlightedYellow;
+
+          for i := 0 to FUnits.Count - 1 do
+          begin
+            if FUnits[i] = unt then
+              FMap.UI.TileColor[FUnits[i].RoomPos] := TTileColorID.Hovered
+            else
+              if unt.CanSee(FUnits[i]) then
+                FMap.UI.TileColor[FUnits[i].RoomPos] := TTileColorID.HighlightedYellow;
+          end;
         end;
+        if FPlayer.ActiveSkill <> nil then
+          if FPlayer.ActiveSkill.CanUse(FPlayer, unt, -FPlayer.ActiveSkill.Cost) then
+            AReservedPts := FPlayer.ActiveSkill.Cost;
       end;
 
       if FRayPath <> nil then
@@ -4352,8 +4494,11 @@ procedure TBattleRoom.PrepareToDraw();
         end;
     end;
   end;
+var reservedPts: Integer;
 begin
-  DrawTileMap;
+  DrawTileMap(reservedPts);
+  if FUI <> nil then
+    FUI.SetReservedAP(reservedPts);
 end;
 
 procedure TBattleRoom.Draw3DUI();

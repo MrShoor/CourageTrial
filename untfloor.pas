@@ -54,6 +54,7 @@ type
 
     procedure SetActiveUnit(const ARoomUnit: TRoomUnit);
     procedure SetPlayerActiveSkill(const ASkill: IUnitSkill);
+    procedure SetReservedAP(const ANewReservedAP: Integer);
     procedure SetOtherInventory(const AInventory: IInventory; ACloseCallback: TNotifyEvent);
 
     procedure AdjustCameraToPlayer();
@@ -258,6 +259,11 @@ end;
 procedure TGameUI.SetPlayerActiveSkill(const ASkill: IUnitSkill);
 begin
   TavmSkills(FPlayerSkills).ActiveSkill := ASkill;
+end;
+
+procedure TGameUI.SetReservedAP(const ANewReservedAP: Integer);
+begin
+  (FUnitMenu as TavmUnitMenu).ReservedPts := ANewReservedAP;
 end;
 
 procedure TGameUI.SetActiveUnit(const ARoomUnit: TRoomUnit);

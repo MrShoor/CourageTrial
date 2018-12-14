@@ -82,6 +82,34 @@ type
     function CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
   end;
 
+  { TSkill_MutantPunch }
+
+  TSkill_MutantPunch = class(TUnitSkill)
+  protected
+    function WearedOnly: Boolean; override;
+    function UseReady(AUnit: TRoomUnit): Boolean; override;
+
+    function Name: string; override;
+    function Desc: string; override;
+    function Ico : string; override;
+
+    function Cost        : Integer; override;
+    function Range       : Single; override;
+    function Damage      : TVec2i; override;
+    function DamageScale : Single; override;
+    function Accuracy    : TVec2; override;
+
+    function Animation: string; override;
+    function IsAttackSkill: Boolean; override;
+    function IsBuffSkill: Boolean; override;
+    function SampleDamage(AOwner, ATarget: TRoomUnit): Integer; override;
+    function SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean; override;
+    function SampleBuffChance(AOwner, ATarget: TRoomUnit): IUnitBuff; override;
+
+    function DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action; override;
+    function CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer = 0): Boolean; override;
+  end;
+
   { TSkill_Shoot }
 
   TSkill_Shoot = class(TUnitSkill)
@@ -214,6 +242,108 @@ implementation
 uses
   Math, untBuffs;
 
+{ TSkill_MutantPunch }
+
+function TSkill_MutantPunch.WearedOnly: Boolean;
+begin
+  Result := False;
+end;
+
+function TSkill_MutantPunch.UseReady(AUnit: TRoomUnit): Boolean;
+begin
+  Result := True;
+end;
+
+function TSkill_MutantPunch.Name: string;
+begin
+  Result := 'Пинок рукой';
+end;
+
+function TSkill_MutantPunch.Desc: string;
+begin
+  Result := 'Всегда ведь приятно ударить врага';
+end;
+
+function TSkill_MutantPunch.Ico: string;
+begin
+  Result := 'kick.png';
+end;
+
+function TSkill_MutantPunch.Cost: Integer;
+begin
+  Result := 3;
+end;
+
+function TSkill_MutantPunch.Range: Single;
+begin
+  Result := 1;
+end;
+
+function TSkill_MutantPunch.Damage: TVec2i;
+begin
+  Result := Vec(20, 20);
+end;
+
+function TSkill_MutantPunch.DamageScale: Single;
+begin
+  Result := 1;
+end;
+
+function TSkill_MutantPunch.Accuracy: TVec2;
+begin
+  Result := Vec(1, 1);
+end;
+
+function TSkill_MutantPunch.Animation: string;
+begin
+  Result := 'Kick0';
+end;
+
+function TSkill_MutantPunch.IsAttackSkill: Boolean;
+begin
+  Result := True;
+end;
+
+function TSkill_MutantPunch.IsBuffSkill: Boolean;
+begin
+  Result := False;
+end;
+
+function TSkill_MutantPunch.SampleDamage(AOwner, ATarget: TRoomUnit): Integer;
+begin
+  Result := RandomRange(Damage.x, Damage.y+1);
+end;
+
+function TSkill_MutantPunch.SampleHitChance(AOwner, ATarget: TRoomUnit): Boolean;
+begin
+  Result := True;
+end;
+
+function TSkill_MutantPunch.SampleBuffChance(AOwner, ATarget: TRoomUnit): IUnitBuff;
+begin
+  Result := nil;
+end;
+
+function TSkill_MutantPunch.DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action;
+begin
+  Result := nil;
+  if not CanUse(AOwner, ATarget) then Exit;
+  AOwner.AP := AOwner.AP - Cost;
+  AOwner.Room.AddMessage(AOwner.Name + ' наносит удар');
+  Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Self, 1890, 1200);
+end;
+
+function TSkill_MutantPunch.CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;
+begin
+  Result := inherited CanUse(AOwner, ATarget, AReservedPoints);
+  if not Result then Exit;
+
+  Result := False;
+  if AOwner.AP - AReservedPoints < Cost then Exit;
+  if AOwner.Room.Distance(AOwner.RoomPos, ATarget.RoomPos) > 1 then Exit;
+  Result := True;
+end;
+
 { TSkill_Resurrect }
 
 function TSkill_Resurrect.WearedOnly: Boolean;
@@ -319,6 +449,7 @@ begin
   if not ATarget.IsDead() then Exit(False);
   if AOwner.AP - AReservedPoints < Cost then Exit(False);
   if ATarget.Room.ObjectAt(ATarget.RoomPos) <> nil then Exit(False);
+  if ATarget.Room.RoomFloor.IsHole[ATarget.RoomPos] then Exit(False);
   Result := True;
 end;
 
@@ -412,6 +543,9 @@ end;
 function TSkill_AbsoluteSight.DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action;
 begin
   Result := nil;
+  if AOwner.AP < Cost then
+    AOwner.Room.AddFlyOutMessage('Нужно ' + IntToStr(Cost) + ' ОД', AOwner.RoomPos, Vec(1,0,0));
+
   if not CanUse(AOwner, ATarget) then Exit;
   AOwner.AP := AOwner.AP - Cost;
   AOwner.Room.AddMessage(AOwner.Name + ' использует ' + Name);
@@ -556,6 +690,14 @@ end;
 function TSkill_AxeAttack.DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action;
 begin
   Result := nil;
+  if AOwner.Room.Distance(AOwner.RoomPos, ATarget.RoomPos) > 1 then
+  begin
+    AOwner.Room.AddFlyOutMessage('Слишком далеко', AOwner.RoomPos, Vec(1,0,0));
+    Exit;
+  end;
+  if AOwner.AP < Cost then
+    AOwner.Room.AddFlyOutMessage('Нужно ' + IntToStr(Cost) + ' ОД', AOwner.RoomPos, Vec(1,0,0));
+
   if not CanUse(AOwner, ATarget) then Exit;
   AOwner.AP := AOwner.AP - Cost;
   AOwner.Room.AddMessage(AOwner.Name + ' наносит рубящий удар');
@@ -714,6 +856,8 @@ var
   bullet: TRoomBullet;
 begin
   Result := nil;
+  if AOwner.AP < Cost then
+    AOwner.Room.AddFlyOutMessage('Нужно ' + IntToStr(Cost) + ' ОД', AOwner.RoomPos, Vec(1,0,0));
 
   if not CanUse(AOwner, ATarget) then Exit;
   AOwner.AP := AOwner.AP - Cost;
@@ -807,7 +951,7 @@ end;
 
 function TSkill_Kick.Desc: string;
 begin
-  Result := 'Всегда ведь приятно пнуть врага';
+  Result := 'Отбрасывает врага. Если отбросить в стену - может оглушить (шанс 50%)';
 end;
 
 function TSkill_Kick.Ico: string;
@@ -817,7 +961,7 @@ end;
 
 function TSkill_Kick.Cost: Integer;
 begin
-  Result := 3;
+  Result := 2;
 end;
 
 function TSkill_Kick.Range: Single;
@@ -827,7 +971,7 @@ end;
 
 function TSkill_Kick.Damage: TVec2i;
 begin
-  Result := Vec(25, 25);
+  Result := Vec(15, 15);
 end;
 
 function TSkill_Kick.DamageScale: Single;
@@ -867,16 +1011,27 @@ end;
 
 function TSkill_Kick.SampleBuffChance(AOwner, ATarget: TRoomUnit): IUnitBuff;
 begin
-  Result := nil;
+  if Random <= 0.5 then
+    Result := TBuff_Stun.Create(ATarget, 2)
+  else
+    Result := nil;
 end;
 
 function TSkill_Kick.DoAction(AOwner, ATarget: TRoomUnit): IBRA_Action;
 begin
   Result := nil;
+  if AOwner.Room.Distance(AOwner.RoomPos, ATarget.RoomPos) > 1 then
+  begin
+    AOwner.Room.AddFlyOutMessage('Слишком далеко', AOwner.RoomPos, Vec(1,0,0));
+    Exit;
+  end;
+  if AOwner.AP < Cost then
+    AOwner.Room.AddFlyOutMessage('Нужно ' + IntToStr(Cost) + ' ОД', AOwner.RoomPos, Vec(1,0,0));
+
   if not CanUse(AOwner, ATarget) then Exit;
   AOwner.AP := AOwner.AP - Cost;
-  AOwner.Room.AddMessage(AOwner.Name + ' наносит удар');
-  Result := TBRA_UnitDefaultAttack.Create(AOwner, ATarget, Self, 1000, 300);
+  AOwner.Room.AddMessage(AOwner.Name + ' пинает врага');
+  Result := TBRA_UnitKickAttack.Create(AOwner, ATarget, Self, 1200, 540);
 end;
 
 function TSkill_Kick.CanUse(AOwner, ATarget: TRoomUnit; AReservedPoints: Integer): Boolean;

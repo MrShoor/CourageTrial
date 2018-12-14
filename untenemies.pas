@@ -2286,7 +2286,7 @@ begin
 
   Preview96_128 := 'ui\units\mutant1.png';
 
-  FUnitSkills.Add(TSkill_Kick.Create(nil, 0));
+  FUnitSkills.Add(TSkill_MutantPunch.Create(nil, 0));
 
   GenStdBotInventory(FInventory);
 end;

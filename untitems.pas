@@ -640,6 +640,7 @@ begin
   if AUnit.AP < 1 then
   begin
     AUnit.Room.AddMessage('Требуется 1 очко действий.');
+    AUnit.Room.AddFlyOutMessage('Нужно 1 ОД', AUnit.RoomPos, Vec(1,0,0));
     Exit(False);
   end;
   Result := True;

@@ -39,6 +39,8 @@ type
     cAPBarTop = 53;
     cSkillSlotsTop = 154;
   private
+    FReservedPts: Integer;
+
     FRoomUnit: TRoomUnit;
     FLastAP: Integer;
     FLastHP: Integer;
@@ -56,6 +58,7 @@ type
     procedure SetOnAdjustToUnit(const AValue: TNotifyEvent);
     procedure SetOnEndTurnClick(const AValue: TNotifyEvent);
     procedure SetOnLootGround(const AValue: TNotifyEvent);
+    procedure SetReservedPts(const AValue: Integer);
     procedure SetRoomUnit(const AValue: TRoomUnit);
   protected
     procedure DoValidate; override;
@@ -65,6 +68,7 @@ type
   public
     property SkillSlots: TavmSkills read FSkillSlots;
     property RoomUnit: TRoomUnit read FRoomUnit write SetRoomUnit;
+    property ReservedPts: Integer read FReservedPts write SetReservedPts;
     property OnEndTurnClick: TNotifyEvent read GetOnEndTurnClick write SetOnEndTurnClick;
     property OnLootGround  : TNotifyEvent read GetOnLootGround   write SetOnLootGround;
     property OnAdjustToUnit: TNotifyEvent read GetOnAdjustToUnit write SetOnAdjustToUnit;
@@ -156,6 +160,13 @@ begin
   FLootGndBtn.OnClick := AValue;
 end;
 
+procedure TavmUnitMenu.SetReservedPts(const AValue: Integer);
+begin
+  if FReservedPts = AValue then Exit;
+  FReservedPts := AValue;
+  Invalidate;
+end;
+
 procedure TavmUnitMenu.SetRoomUnit(const AValue: TRoomUnit);
 begin
   if FRoomUnit = AValue then Exit;
@@ -227,7 +238,6 @@ begin
   Canvas.Font.Style := [];
   BuildHPText(lt, rb);
 
-
   //AP bar
   Canvas.Brush.Color := Vec(1,1,1,1);
   elsize := Vec((RoomUnit.MaxAP - 1.0)*26.0, 26);
@@ -236,7 +246,17 @@ begin
     cellpos.y := cAPBarTop;
     cellpos.x := Lerp((Size.x - elsize.x)*0.5, (Size.x + elsize.x)*0.5, i / (RoomUnit.MaxAP - 1));
     if i < RoomUnit.AP then
-      cellname := 'ui\greencell.png'
+    begin
+      if RoomUnit.AP < ReservedPts then
+        cellname := 'ui\redcell.png'
+      else
+      begin
+        if i < RoomUnit.AP - ReservedPts then
+          cellname := 'ui\greencell.png'
+        else
+          cellname := 'ui\yellowcell.png';
+      end;
+    end
     else
       cellname := 'ui\emptycell.png';
     Canvas.AddSprite(cellpos - Vec(13, 0), cellpos + Vec(13, 26), cellname);

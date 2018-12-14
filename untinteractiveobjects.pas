@@ -236,7 +236,7 @@ end;
 
 function TRoomAltar.Interactive_Cost(AIndex: Integer): Integer;
 begin
-  Result := 2;
+  Result := 1;
 end;
 
 function TRoomAltar.Interactive_Try(AUnit: TRoomUnit): IBRA_Action;
@@ -245,8 +245,16 @@ var
 begin
   Result := nil;
   idx := GetInteractiveIdx(AUnit);
-  if idx < 0 then Exit;
-  if AUnit.AP < Interactive_Cost(idx) then Exit;
+  if idx < 0 then
+  begin
+    AUnit.Room.AddFlyOutMessage('Отсюда это не сделать', AUnit.RoomPos, Vec(1,0,0));
+    Exit;
+  end;
+  if AUnit.AP < Interactive_Cost(idx) then
+  begin
+    AUnit.Room.AddFlyOutMessage('Нужно ' + IntToStr(Interactive_Cost(idx)) + ' ОД', RoomPos, Vec(1,0,0));
+    Exit;
+  end;
   AUnit.AP := AUnit.AP - Interactive_Cost(idx);
   SetAnimation('Altar_Action' + IntToStr(idx));
   Result := TBRA_AltarPick.Create(Self, AUnit);
@@ -378,11 +386,15 @@ begin
 
   for i := 0 to Interactive_CellsCount - 1 do
   begin
-    if AUnit.AP < Interactive_Cost(i) then Continue;
-
     absCrd := TTileUtils.RotateTileCoord(Interactive_GetCell(i), RoomDir);
     absCrd := absCrd + RoomPos;
     if absCrd <> AUnit.RoomPos then Continue;
+
+    if AUnit.AP < Interactive_Cost(i) then
+    begin
+      AUnit.Room.AddFlyOutMessage('Нужно ' + IntTostr(Interactive_Cost(i)) + ' ОД', RoomPos, Vec(1,0,0));
+      Exit;
+    end;
 
     AUnit.AP := AUnit.AP - Interactive_Cost(i);
     AUnit.RoomDir := Room.Direction(AUnit.RoomPos, RoomPos);
@@ -392,6 +404,7 @@ begin
     Result := TBRA_LootChestAction.Create(Self, AUnit);
     Exit;
   end;
+  AUnit.Room.AddFlyOutMessage('Отсюда это не сделать', AUnit.RoomPos, Vec(1,0,0));
 end;
 
 initialization

@@ -265,6 +265,15 @@ begin
     FRoom.KeyPress(Key);
     FMain.InvalidateWindow;
   end;
+
+  if Key = Ord('R') then
+  begin
+    if FWorld <> nil then
+    begin
+      FWorld.Renderer.InvalidateShaders;
+      FMain.InvalidateWindow;
+    end;
+  end;
 end;
 
 procedure TfmrMain.lbObjectsDblClick(Sender: TObject);
