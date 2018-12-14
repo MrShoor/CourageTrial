@@ -210,6 +210,7 @@ type
     procedure SetPlayerActiveSkill(const ASkill: IUnitSkill);
     procedure SetOtherInventory(const AInventory: IInventory; ACloseCallback: TNotifyEvent);
     procedure AdjustCameraToPlayer();
+    procedure AdjustCameraToPlayerKeepDist();
     procedure SetCameraBounds(const ABounds: TRectF);
 
     procedure InvalidateEnemiesBar;
@@ -2249,13 +2250,22 @@ var fromPt, toPt: TVec3;
 begin
   if MovePath = nil then Exit(False);
   if MovePath.Count = 0 then Exit(False);
-  if RoomUnit.AP <= 0 then Exit(False);
+  if RoomUnit.AP <= 0 then
+  begin
+    if RoomUnit.Room.BattleRoom.IsClear then
+      Exit(True)
+    else
+      Exit(False);
+  end;
 
   Result := True;
   MovePathWeight := MovePathWeight + RoomUnit.Main.UpdateStatesInterval / 1000 * MoveSpeed;
   if MovePathWeight >= 1 then
     if not MoveToNextCell then
     begin
+      //if RoomUnit is TPlayer then
+      //  RoomUnit.Room.BattleRoom.UI.AdjustCameraToPlayerKeepDist();
+      //
       RoomUnit.AnimateState := asStand;
       RoomUnit.SetAnimation([]);
 
@@ -4244,7 +4254,10 @@ begin
   if IsPlayerTurn then
   begin
     if FRoomClear and (FPlayer <> nil) and (FPlayer.AP = 0) and (not FPlayer.IsDead()) then
+    begin
+      FPlayer.AP := FPlayer.MaxAP;
       EndTurn();
+    end;
 
     FMovedTile := FMap.UI.GetTileAtCoords(Main.Cursor.Ray);
     FMovePath := nil;

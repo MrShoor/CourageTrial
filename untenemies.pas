@@ -793,6 +793,13 @@ begin
     bsNothing: Result := Behaviour_DefaultNothing();
     bsSeeEnemy:
       begin
+        if FBS_SeeEnemy.Enemy.IsDead() then
+        begin
+          SetBSState(bsNothing);
+          Result := DoAction();
+          Exit;
+        end;
+
         skill := BestSkillForUse;
         if skill <> nil then
         begin
@@ -2261,7 +2268,7 @@ procedure TBotMutant1.LoadModels();
 begin
   FRetreatHPRange := Vec(0, 30);
 
-  MaxAP := 10;
+  MaxAP := 9;
   MaxHP := 100;
   HP := MaxHP;
   AP := MaxAP;

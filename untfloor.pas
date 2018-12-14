@@ -57,6 +57,7 @@ type
     procedure SetOtherInventory(const AInventory: IInventory; ACloseCallback: TNotifyEvent);
 
     procedure AdjustCameraToPlayer();
+    procedure AdjustCameraToPlayerKeepDist();
     procedure SetCameraBounds(const ABounds: TRectF);
 
     procedure InvalidateEnemiesBar;
@@ -69,6 +70,7 @@ type
     procedure DoOnEndTurnBtnClick(ASender: TObject);
     procedure DoOnLootGroundClick(ASender: TObject);
     procedure DoOnAdjustCameraToUnit(ASender: TObject);
+    procedure DoOnAdjustCameraToUnitKeepDist(ASender: TObject);
   protected
     FOnMenuExit: TNotifyEvent;
     FOnMenuNewGame: TNotifyEvent;
@@ -286,6 +288,11 @@ begin
   DoOnAdjustCameraToUnit(nil);
 end;
 
+procedure TGameUI.AdjustCameraToPlayerKeepDist();
+begin
+  DoOnAdjustCameraToUnitKeepDist(nil);
+end;
+
 procedure TGameUI.SetCameraBounds(const ABounds: TRectF);
 begin
   FRootControl.FloorBoundingRect := ABounds;
@@ -329,6 +336,14 @@ begin
   unt := TavmUnitMenu(FUnitMenu).RoomUnit;
   if unt = nil then Exit;
   FRootControl.LookAt(unt.Room.UI.TilePosToWorldPos(unt.RoomPos), True);
+end;
+
+procedure TGameUI.DoOnAdjustCameraToUnitKeepDist(ASender: TObject);
+var unt: TRoomUnit;
+begin
+  unt := TavmUnitMenu(FUnitMenu).RoomUnit;
+  if unt = nil then Exit;
+  FRootControl.LookAtKeepDist(unt.Room.UI.TilePosToWorldPos(unt.RoomPos), True);
 end;
 
 procedure TGameUI.DoOnMenuResume(ASender: TObject);

@@ -64,6 +64,7 @@ type
     property FloorBoundingRect: TRectF read FFloorBoundingRect write SetFloorBoundingRect;
 
     procedure LookAt(const APt: TVec3; ASmooth: Boolean = False); overload;
+    procedure LookAtKeepDist(const APt: TVec3; ASmooth: Boolean = False); overload;
     procedure LookAt(const APt, AViewDir: TVec3); overload;
   end;
 
@@ -209,7 +210,7 @@ end;
 procedure TavmCameraControl.OnUPS;
 const cSpeed = 0.07;
       cBorderWidth = 10;
-      cPanSpeed = 0.3;
+      cPanSpeed = 0.05;
 var cpt: TVec2;
     panDir: TVec2;
     viewDir3D: TVec3;
@@ -220,35 +221,47 @@ begin
 
   cpt := GetCursorPos(Main.Window, True, False);
 
-  if (cpt.x >= 0) and
-     (cpt.y >= 0) and
-     (cpt.x < Main.WindowSize.x) and
-     (cpt.y < Main.WindowSize.y) and
-     (GetForegroundWindow = Main.Window) then
+  panDir := Vec(0, 0);
+  if GetForegroundWindow = Main.Window then
   begin
-    panDir := Vec(0, 0);
-    if cpt.x < cBorderWidth then
-      panDir.x := panDir.x + 1.0;
-    if Main.WindowSize.x - cpt.x < cBorderWidth then
-      panDir.x := panDir.x - 1.0;
-    if cpt.y < cBorderWidth then
-      panDir.y := panDir.y - 1.0;
-    if Main.WindowSize.y - cpt.y < cBorderWidth then
-      panDir.y := panDir.y + 1.0;
-
-    if LenSqr(panDir) > 0.001 then
+    if (not IsKeyPressed(VK_RBUTTON)) and
+       (cpt.x >= 0) and
+       (cpt.y >= 0) and
+       (cpt.x < Main.WindowSize.x) and
+       (cpt.y < Main.WindowSize.y) then
     begin
-      StopPlaying();
-
-      viewDir3D := Main.Camera.Eye - Main.Camera.At;
-      viewDir2D := normalize(Vec(viewDir3D.x, 0, viewDir3D.z));
-      panOffset := viewDir2D * panDir.y * cPanSpeed;
-      panOffset := panOffset + (viewDir2D * Quat(Vec(0, 1, 0), PI * 0.5)) * panDir.x * cPanSpeed;
-      Main.Camera.Eye := Main.Camera.Eye + panOffset;
-      Main.Camera.At  := Main.Camera.At + panOffset;
-
-      UpdateCameraPosition;
+      if cpt.x < cBorderWidth then
+        panDir.x := panDir.x + 1.0;
+      if Main.WindowSize.x - cpt.x < cBorderWidth then
+        panDir.x := panDir.x - 1.0;
+      if cpt.y < cBorderWidth then
+        panDir.y := panDir.y - 1.0;
+      if Main.WindowSize.y - cpt.y < cBorderWidth then
+        panDir.y := panDir.y + 1.0;
     end;
+
+    if (IsKeyPressed(Ord('W')) or IsKeyPressed(VK_UP)) then
+      panDir.y := panDir.y - 1.0;
+    if (IsKeyPressed(Ord('S')) or IsKeyPressed(VK_DOWN)) then
+      panDir.y := panDir.y + 1.0;
+    if (IsKeyPressed(Ord('A')) or IsKeyPressed(VK_LEFT)) then
+      panDir.x := panDir.x + 1.0;
+    if (IsKeyPressed(Ord('D')) or IsKeyPressed(VK_RIGHT)) then
+      panDir.x := panDir.x - 1.0;
+  end;
+
+  if LenSqr(panDir) > 0.001 then
+  begin
+    StopPlaying();
+
+    viewDir3D := Main.Camera.Eye - Main.Camera.At;
+    viewDir2D := normalize(Vec(viewDir3D.x, 0, viewDir3D.z));
+    panOffset := viewDir2D * panDir.y * cPanSpeed * clamp(Main.Camera.Eye.y, 0.25, 4);
+    panOffset := panOffset + (viewDir2D * Quat(Vec(0, 1, 0), PI * 0.5)) * panDir.x * cPanSpeed * clamp(Main.Camera.Eye.y, 0.25, 4);
+    Main.Camera.Eye := Main.Camera.Eye + panOffset;
+    Main.Camera.At  := Main.Camera.At + panOffset;
+
+    UpdateCameraPosition;
   end;
 
   if FSmoothPlaying then
@@ -282,6 +295,22 @@ begin
   begin
     Main.Camera.At := Vec(APt.x, FYPlane, APt.z);
     FDist := 5;
+    UpdateCameraPosition;
+  end;
+end;
+
+procedure TavmCameraControl.LookAtKeepDist(const APt: TVec3; ASmooth: Boolean);
+begin
+  if FDisabled then Exit;
+
+  StopPlaying;
+  if ASmooth then
+  begin
+    PlayAt(Vec(APt.x, FYPlane, APt.z), FYaw, FPitch, FDist);
+  end
+  else
+  begin
+    Main.Camera.At := Vec(APt.x, FYPlane, APt.z);
     UpdateCameraPosition;
   end;
 end;
