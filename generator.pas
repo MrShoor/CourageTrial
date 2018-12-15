@@ -100,7 +100,9 @@ begin
   if bossRoom then
   begin
     if AVisitedRooms.Count > 5 then
-      botsToSpawn := 2;
+      botsToSpawn := 2
+    else
+      botsToSpawn := 1;
     if AVisitedRooms.Count < 3 then
       wispToSpawn := 2
     else
