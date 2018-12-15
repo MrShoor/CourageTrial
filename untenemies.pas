@@ -2303,7 +2303,7 @@ end;
 
 procedure TBot.LogAction(const AStr: string);
 begin
-  WriteLn(AStr);
+  //WriteLn(AStr);
 end;
 
 procedure TBot.DealPureDamage(ADmg: Integer; AFromUnit: TRoomUnit; const AMsg: string);

@@ -168,6 +168,10 @@ uses
 { TavmSkillHint }
 
 procedure TavmSkillHint.BuildTextLines;
+
+const cTextYSpace = 10;
+      cTextXSpace = 20;
+
   function GetDamageStr: string;
   var dmg: TVec2i;
   begin
@@ -198,8 +202,11 @@ procedure TavmSkillHint.BuildTextLines;
       Result := IntToStr(Round(acc.x*100)) + '-' + IntToStr(Round(acc.y*100)) + '%';
   end;
 
-const cTextYSpace = 10;
-      cTextXSpace = 30;
+  function GetWrappedWidth(): Single;
+  begin
+    Result := Size.x - cTextXSpace * 2;
+  end;
+
 var tb: ITextBuilder;
     s : TVec2;
 begin
@@ -215,12 +222,14 @@ begin
   Canvas.Font.Style := [gsBold];
   tb := Canvas.TextBuilder;
   tb.Align := laCenter;
-  tb.WriteLn(FSkill.Name);
+  tb.WriteWrapped(FSkill.Name);
+  tb.WriteWrappedEnd(GetWrappedWidth());
 
   Canvas.Font.Size := 24;
   Canvas.Font.Style := [];
   tb.Align := laLeft;
-  tb.WriteLn(FSkill.Desc);
+  tb.WriteWrapped(FSkill.Desc);
+  tb.WriteWrappedEnd(GetWrappedWidth(), True);
 
   FNameText := tb.Finish();
   FNameText.BoundsX := Vec(cTextXSpace, FNameText.MaxLineWidth());
@@ -267,7 +276,7 @@ end;
 procedure TavmSkillHint.AfterRegister;
 begin
   inherited AfterRegister;
-  Size := Vec(200, 100);
+  Size := Vec(300, 100);
 end;
 
 procedure TavmSkillHint.DoValidate;
